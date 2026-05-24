@@ -17,7 +17,6 @@ public sealed class PlaylistService
         var folder = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
         {
-            // 폴더가 없으면 단일 파일만이라도 재생목록에 둔다.
             if (File.Exists(filePath)) list.Add(new MediaItem(filePath));
             return list;
         }
@@ -33,12 +32,18 @@ public sealed class PlaylistService
             return list;
         }
 
-        foreach (var p in paths.Where(MediaKindExtensions.IsSupported))
-            list.Add(new MediaItem(p));
+        // 시드 파일의 kind만 재생목록에 포함 — 비디오 클릭하면 비디오만, 음악 → 음악만,
+        // 이미지 → 이미지만. ComfyUI 폴더처럼 같은 이름의 .mp4 옆에 .png 미리보기가
+        // 섞여있어도 깔끔하게 영상만 보임.
+        var seedKind = MediaKindExtensions.FromPath(filePath);
+        foreach (var p in paths)
+        {
+            if (MediaKindExtensions.FromPath(p) == seedKind)
+                list.Add(new MediaItem(p));
+        }
 
         list.Sort((a, b) => NaturalStringComparer.Instance.Compare(a.FileName, b.FileName));
 
-        // 호출자가 준 파일이 누락되었으면(권한·경합) 강제 추가.
         if (!list.Any(m => string.Equals(m.FullPath, filePath, StringComparison.OrdinalIgnoreCase))
             && File.Exists(filePath))
         {

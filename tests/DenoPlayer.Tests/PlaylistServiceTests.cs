@@ -35,16 +35,16 @@ public class PlaylistServiceTests : IDisposable
         Assert.Equal(seed, list[0].FullPath);
     }
 
-    [Fact] public void FiltersUnsupportedExtensions()
+    [Fact] public void FiltersUnsupportedExtensionsAndOtherKinds()
     {
+        // 시드가 .mp4(video)면 다른 kind(.mp3=audio)도 제외, 미지원(.txt/.zip)도 당연히 제외.
         Touch("a.mp4");
         Touch("readme.txt");
         Touch("archive.zip");
         Touch("b.mp3");
         var list = _svc.BuildFromFile(Path.Combine(_dir, "a.mp4"));
-        Assert.Equal(2, list.Count);
-        Assert.DoesNotContain(list, m => m.FileName.EndsWith(".txt"));
-        Assert.DoesNotContain(list, m => m.FileName.EndsWith(".zip"));
+        Assert.Single(list);
+        Assert.Equal("a.mp4", list[0].FileName);
     }
 
     [Fact] public void NaturallySortsItems()
@@ -85,13 +85,27 @@ public class PlaylistServiceTests : IDisposable
         Assert.Empty(_svc.BuildFromFile(null!));
     }
 
-    [Fact] public void MixedKindsAllIncluded()
+    [Fact] public void OnlySameKindAsSeedIncluded()
     {
+        // 사용자가 동영상을 더블클릭하면 재생목록엔 동영상만 (음악·이미지 제외).
         Touch("vid.mp4");
         Touch("aud.mp3");
         Touch("img.png");
         var list = _svc.BuildFromFile(Path.Combine(_dir, "vid.mp4"));
-        Assert.Equal(3, list.Count);
+        Assert.Single(list);
+        Assert.Equal("vid.mp4", list[0].FileName);
+    }
+
+    [Fact] public void AudioSeedGivesAudioOnlyList()
+    {
+        Touch("vid.mp4");
+        Touch("aud_a.mp3");
+        Touch("aud_b.flac");
+        Touch("img.png");
+        var list = _svc.BuildFromFile(Path.Combine(_dir, "aud_a.mp3"));
+        Assert.Equal(2, list.Count);
+        Assert.All(list, m => Assert.Contains(System.IO.Path.GetExtension(m.FileName).ToLowerInvariant(),
+                                              new[] { ".mp3", ".flac" }));
     }
 
     [Fact] public void IndexOfIsCaseInsensitive()
