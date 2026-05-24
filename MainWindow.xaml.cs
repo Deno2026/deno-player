@@ -510,6 +510,28 @@ public partial class MainWindow : Window
     // ============================================================
     // Window chrome buttons
     // ============================================================
+    /// <summary>
+    /// Repeat/Shuffle 같은 토글 버튼 클릭 후 ToolTip을 즉시 새 텍스트로 다시 띄움.
+    /// WPF ToolTip은 click 시 자동으로 닫혀서 binding은 갱신돼도 보이지 않으니
+    /// Command 처리 끝난 다음 cycle에 강제로 다시 IsOpen=true.
+    /// </summary>
+    private void OnTooltipRefreshClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.ToolTip is not System.Windows.Controls.ToolTip tt) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                tt.PlacementTarget ??= btn;
+                tt.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+                tt.IsOpen = false;
+                tt.IsOpen = true;
+            }
+            catch { /* refresh 실패해도 무해 */ }
+        }), System.Windows.Threading.DispatcherPriority.Background);
+    }
+
     private void OnSettingsClicked(object? sender, RoutedEventArgs e)
     {
         try

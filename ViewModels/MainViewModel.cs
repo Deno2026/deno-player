@@ -285,8 +285,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (!Set(ref _shuffle, value)) return;
             Settings.Shuffle = value;
+            Raise(nameof(ShuffleTooltip));
         }
     }
+    public string ShuffleTooltip => _shuffle
+        ? "셔플 켜짐 (클릭: 끔)"
+        : "셔플 꺼짐 (클릭: 랜덤 재생)";
 
     // ============================================================
     // commands

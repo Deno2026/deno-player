@@ -367,12 +367,28 @@
                                 Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
                         <Button Style="{StaticResource RepeatToggleButton}"
                                 Content="{Binding RepeatGlyph}"
-                                ToolTip="{Binding RepeatTooltip}"
-                                Command="{Binding CycleRepeatCommand}"/>
+                                Command="{Binding CycleRepeatCommand}"
+                                Click="OnTooltipRefreshClick"
+                                ToolTipService.InitialShowDelay="0"
+                                ToolTipService.BetweenShowDelay="0"
+                                ToolTipService.ShowDuration="20000"
+                                ToolTipService.Placement="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="{Binding RepeatTooltip}"/>
+                            </Button.ToolTip>
+                        </Button>
                         <Button Style="{StaticResource ShuffleToggleButton}"
                                 Content="&#xE8B1;"
-                                ToolTip="셔플 (랜덤 재생)"
-                                Command="{Binding ToggleShuffleCommand}"/>
+                                Command="{Binding ToggleShuffleCommand}"
+                                Click="OnTooltipRefreshClick"
+                                ToolTipService.InitialShowDelay="0"
+                                ToolTipService.BetweenShowDelay="0"
+                                ToolTipService.ShowDuration="20000"
+                                ToolTipService.Placement="Top">
+                            <Button.ToolTip>
+                                <ToolTip Content="{Binding ShuffleTooltip}"/>
+                            </Button.ToolTip>
+                        </Button>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
