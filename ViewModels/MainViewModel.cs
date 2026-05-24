@@ -295,7 +295,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void OpenPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return;
+        Services.AppLog.Info($"OpenPath: '{path}' state={State} ipcConn={_ipc.IsConnected}");
+        if (string.IsNullOrWhiteSpace(path)) { Services.AppLog.Warn("OpenPath: empty path"); return; }
         if (!File.Exists(path))
         {
             State = PlayerState.Failed;
@@ -331,6 +332,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void PlayMedia(MediaItem? media)
     {
+        Services.AppLog.Info($"PlayMedia: {media?.FileName ?? "(null)"}");
         if (media is null) return;
         foreach (var m in Playlist) m.IsPlaying = false;
         media.IsPlaying = true;

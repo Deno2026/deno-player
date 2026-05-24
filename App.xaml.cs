@@ -8,6 +8,7 @@ public partial class App : Application
 {
     public static string[] StartupArgs { get; private set; } = Array.Empty<string>();
     private SingleInstance? _single;
+    private MainWindow? _win;     // cross-thread 안전한 직접 캐시 — Application.MainWindow는 UI affinity 가질 수 있음
 
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
@@ -40,14 +41,22 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        var win = new MainWindow();
-        MainWindow = win;
-        win.Show();
+        _win = new MainWindow();
+        MainWindow = _win;
+        _win.Show();
 
         _single.ArgsReceived += args =>
         {
-            AppLog.Info($"second-instance args received: {string.Join(" | ", args)}");
-            (MainWindow as MainWindow)?.ReceiveExternalArgs(args);
+            try
+            {
+                AppLog.Info($"second-instance args received: {string.Join(" | ", args)}");
+                AppLog.Info($"  route: _win is {(_win is null ? "NULL" : "ok")}");
+                _win?.ReceiveExternalArgs(args);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("ArgsReceived handler crashed", ex);
+            }
         };
     }
 

@@ -179,19 +179,25 @@ public partial class MainWindow : Window
     /// <summary>다른 인스턴스가 인자를 보냄 (single-instance hand-off).</summary>
     public void ReceiveExternalArgs(string[] args)
     {
+        Services.AppLog.Info($"ReceiveExternalArgs entry n={args?.Length ?? -1} access={Dispatcher.CheckAccess()}");
         if (args is null || args.Length == 0) return;
         if (Dispatcher.CheckAccess()) ApplyExternalArgs(args);
-        else Dispatcher.BeginInvoke(new Action(() => ApplyExternalArgs(args)));
+        else Dispatcher.BeginInvoke(new Action(() =>
+        {
+            Services.AppLog.Info("BeginInvoke action firing on UI thread");
+            ApplyExternalArgs(args);
+        }));
     }
 
     private void ApplyExternalArgs(string[] args)
     {
-        // 윈도우 활성화
+        Services.AppLog.Info($"ApplyExternalArgs: count={args.Length} first='{(args.Length > 0 ? args[0] : "")}'");
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
-        Topmost = true; Topmost = _vm.IsAlwaysOnTop; // bring-to-front trick
+        Topmost = true; Topmost = _vm.IsAlwaysOnTop;
         var first = args[0];
         if (File.Exists(first)) _vm.OpenPath(first);
+        else Services.AppLog.Warn($"ApplyExternalArgs: file not found '{first}'");
     }
 
     // ============================================================

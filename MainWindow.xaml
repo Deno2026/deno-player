@@ -1,4 +1,4 @@
-<Window x:Class="DenoPlayer.MainWindow"
+﻿<Window x:Class="DenoPlayer.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -106,14 +106,35 @@
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderSubtle}"
                 BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <DockPanel LastChildFill="True">
+                <!-- 우: 기능 + 창 컨트롤 (Dock=Right가 우선 측정되어 자기 크기 확보) -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Style="{StaticResource PlaylistToggleButton}"
+                            Content="&#xE8FD;"
+                            ToolTip="재생목록 (P)"
+                            Command="{Binding TogglePlaylistCommand}"/>
+                    <Button Style="{StaticResource PinButton}"
+                            Content="&#xE840;"
+                            ToolTip="항상 위 (Ctrl+T)"
+                            Command="{Binding AlwaysOnTopCommand}"/>
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE722;"
+                            ToolTip="스크린샷 (Ctrl+S)"
+                            Command="{Binding ScreenshotCommand}"/>
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE8E5;"
+                            ToolTip="파일 열기 (Ctrl+O)"
+                            Command="{Binding OpenCommand}"/>
+                    <Border Width="1" Height="16" Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE921;" ToolTip="최소화" Click="OnMinimize"/>
+                    <Button x:Name="MaxRestoreBtn" Style="{StaticResource IconButton}"
+                            Content="&#xE922;" ToolTip="최대화/복원" Click="OnMaxRestore"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" ToolTip="닫기" Click="OnClose"/>
+                </StackPanel>
 
-                <!-- 좌: 파일명. 빈 공간 클릭으로 윈도우 드래그. -->
-                <Border Grid.Column="0" Background="Transparent"
+                <!-- 좌: 파일명 (남은 영역 fill, 드래그 핸들) -->
+                <Border Background="Transparent"
                         MouseLeftButtonDown="OnDragArea_MouseDown">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="14,0">
@@ -137,33 +158,7 @@
                                    MaxWidth="800"/>
                     </StackPanel>
                 </Border>
-
-                <!-- 우: 기능 + 창 컨트롤 -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Button Style="{StaticResource PlaylistToggleButton}"
-                            Content=""
-                            ToolTip="재생목록 (P)"
-                            Command="{Binding TogglePlaylistCommand}"/>
-                    <Button Style="{StaticResource PinButton}"
-                            Content=""
-                            ToolTip="항상 위 (Ctrl+T)"
-                            Command="{Binding AlwaysOnTopCommand}"/>
-                    <Button Style="{StaticResource IconButton}"
-                            Content=""
-                            ToolTip="스크린샷 (Ctrl+S)"
-                            Command="{Binding ScreenshotCommand}"/>
-                    <Button Style="{StaticResource IconButton}"
-                            Content=""
-                            ToolTip="파일 열기 (Ctrl+O)"
-                            Command="{Binding OpenCommand}"/>
-                    <Border Width="1" Height="16" Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
-                    <Button Style="{StaticResource IconButton}" Content="" ToolTip="최소화" Click="OnMinimize"/>
-                    <Button x:Name="MaxRestoreBtn" Style="{StaticResource IconButton}"
-                            Content="" ToolTip="최대화/복원" Click="OnMaxRestore"/>
-                    <Button Style="{StaticResource IconButton}" Content="" ToolTip="닫기" Click="OnClose"/>
-                </StackPanel>
-            </Grid>
+            </DockPanel>
         </Border>
 
         <!-- ============================================================
@@ -406,7 +401,7 @@
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
                         <Button Style="{StaticResource IconButton}"
-                                Content=""
+                                Content="&#xE892;"
                                 ToolTip="이전 파일 (PageUp)"
                                 Command="{Binding PrevCommand}"/>
                         <Button Style="{StaticResource PrimaryIconButton}"
@@ -415,7 +410,7 @@
                                 Command="{Binding PlayPauseCommand}"
                                 Margin="2,0"/>
                         <Button Style="{StaticResource IconButton}"
-                                Content=""
+                                Content="&#xE893;"
                                 ToolTip="다음 파일 (PageDown)"
                                 Command="{Binding NextCommand}"/>
                     </StackPanel>

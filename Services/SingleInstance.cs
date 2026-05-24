@@ -20,8 +20,30 @@ internal sealed class SingleInstance : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _serverLoop;
 
-    /// <summary>다른 인스턴스가 보낸 인자를 받는다. UI 스레드는 호출자가 책임.</summary>
-    public event Action<string[]>? ArgsReceived;
+    /// <summary>
+    /// 다른 인스턴스가 보낸 인자를 받는다. UI 스레드 마샬링은 호출자 책임.
+    /// 구독자가 아직 없을 때 들어온 인자는 _pending에 보관 → 구독 시점에 drain.
+    /// </summary>
+    public event Action<string[]>? ArgsReceived
+    {
+        add
+        {
+            lock (_sync)
+            {
+                _argsReceived += value;
+                if (value is not null && _pending.Count > 0)
+                {
+                    var backlog = _pending.ToArray();
+                    _pending.Clear();
+                    foreach (var a in backlog) { try { value(a); } catch { } }
+                }
+            }
+        }
+        remove { lock (_sync) { _argsReceived -= value; } }
+    }
+    private Action<string[]>? _argsReceived;
+    private readonly object _sync = new();
+    private readonly List<string[]> _pending = new();
 
     /// <returns>true면 우리가 첫 인스턴스(서버 시작 OK). false면 인자 전달 후 종료해야 함.</returns>
     public bool TryClaim(string[] args)
@@ -71,7 +93,16 @@ internal sealed class SingleInstance : IDisposable
                 {
                     string[]? args = null;
                     try { args = JsonSerializer.Deserialize<string[]>(line); } catch { }
-                    if (args is { Length: > 0 }) ArgsReceived?.Invoke(args);
+                    if (args is { Length: > 0 })
+                    {
+                        Action<string[]>? handler;
+                        lock (_sync)
+                        {
+                            handler = _argsReceived;
+                            if (handler is null) _pending.Add(args);
+                        }
+                        if (handler is not null) handler(args);
+                    }
                 }
             }
             catch (OperationCanceledException) { break; }

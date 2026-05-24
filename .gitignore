@@ -10,6 +10,7 @@ TestResults/
 *.trx
 coverage.cobertura.xml
 *.received.txt
+test-output/
 
 # IDE
 .idea/
