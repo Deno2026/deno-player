@@ -74,9 +74,12 @@ public sealed class MpvProcessService : IDisposable
         Arg("--input-cursor=yes");          // mouse-pos observe용 (자체 매핑은 no)
         Arg("--cursor-autohide=no");        // 커서 숨김은 우리 OSD 타이머가 관리
         Arg("--audio-display=no");          // 오디오 재생 시 cover art 안 띄움
-        Arg("--keep-open=yes");
-        // --keep-open-pause=no 는 일부 mpv 빌드에서 EOF 시점에 crash 유발 (사용자 환경에서 확인).
-        // 기본값(yes)으로 두고 우리는 end-file 이벤트로 next 처리.
+        // ⚠ --keep-open=yes 는 우리 child Win32 window(--wid) 환경에서 EOF 시 mpv가
+        //   silent crash (exit -1)함. 그래서 자동 next가 안 됐다. idle=yes로 mpv는
+        //   파일 끝나도 살아 있고, end-file(reason=eof) 이벤트는 정상 emit되어
+        //   우리 OnEndFile이 Next/RepeatAll/Shuffle을 트리거한다.
+        //   trade-off: 마지막 frame 안 남고 잠깐 검은 화면 → 다음 곡 즉시 로드.
+        Arg("--keep-open=no");
         Arg("--image-display-duration=inf");
         Arg("--hr-seek=yes");
         Arg("--cache=yes");
