@@ -28,7 +28,30 @@
 - 같은 폴더의 지원 미디어를 자연 정렬로 즉석 재생목록.
 - 네트워크/계정/텔레메트리 코드 0줄.
 
-## 빌드
+## 받자마자 쓰기 (탐색기 통합)
+
+이미 빌드된 상태라면 — **PowerShell 한 줄이면 끝**.
+
+```pwsh
+pwsh -ExecutionPolicy Bypass -File .\tools\install.ps1
+```
+
+스크립트가 자동으로 처리해주는 것:
+1. **바탕화면 바로가기** "Deno Player" 생성
+2. **시작 메뉴**에 "Deno Player" 등록
+3. **탐색기 우클릭 → 연결 프로그램**에 "Deno Player" 노출 (모든 지원 확장자)
+
+이제 사용법:
+- **바탕화면 아이콘 더블클릭** → 빈 상태로 실행 → 영상 끌어다 놓기
+- **탐색기에서 영상 우클릭 → 연결 프로그램 → Deno Player** → 즉시 재생 + 같은 폴더 자동 재생목록
+- **기본 앱으로 등록**하려면 우클릭 메뉴의 "다른 앱 선택" → "Deno Player" → "항상 이 앱으로 열기" 체크
+
+지우려면:
+```pwsh
+pwsh -ExecutionPolicy Bypass -File .\tools\install.ps1 -Uninstall
+```
+
+## 빌드 (소스에서 시작할 때)
 
 ```pwsh
 # 1) .NET 8 SDK가 있어야 한다 (winget으로 설치 가능)
@@ -40,20 +63,17 @@ pwsh -ExecutionPolicy Bypass -File .\tools\fetch-mpv.ps1
 # 3) 빌드
 dotnet build -c Release
 
-# 4) 실행
-.\bin\Release\net8.0-windows\DenoPlayer.exe
-# 또는 파일을 인자로
-.\bin\Release\net8.0-windows\DenoPlayer.exe "C:\path\to\video.mp4"
+# 4) 배포 폴더 만들기
+dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoPlayer-win-x64
+
+# 5) 탐색기 통합
+pwsh -ExecutionPolicy Bypass -File .\tools\install.ps1
 ```
 
-릴리스 배포용 publish:
-
-```pwsh
-dotnet publish -c Release -r win-x64 --self-contained false -o .\publish
-```
-
-`publish\` 폴더를 그대로 배포하면 된다. mpv.exe는 사용자가 직접
-`runtime\mpv\mpv.exe` 자리에 넣게 한다 (라이선스 분리).
+`publish\DenoPlayer-win-x64\` 폴더를 그대로 다른 PC에 복사해서 거기서
+`tools\install.ps1` 만 실행하면 그 PC에서도 똑같이 쓸 수 있다. mpv.exe는
+라이선스 분리 정책으로 같이 묶지 않으니, 새 PC에서도 `fetch-mpv.ps1`을
+한 번 더 돌리면 된다.
 
 ## mpv 설치
 

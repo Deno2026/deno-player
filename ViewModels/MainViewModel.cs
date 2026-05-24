@@ -21,6 +21,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public AppSettings Settings { get; private set; }
     public ObservableCollection<MediaItem> Playlist { get; } = new();
 
+    /// <summary>mpv가 보고하는 마우스 활동(영상 hwnd 위는 WPF가 못 잡음 — IPC로 대체)</summary>
+    public event Action? MouseActivity;
+    public event Action<double, double>? MpvMousePos;
+
     public MainViewModel(MpvProcessService mpvProc)
     {
         _mpvProc = mpvProc;
@@ -87,6 +91,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             await _ipc.ObserveProperty("eof-reached");
             await _ipc.ObserveProperty("file-format");
             await _ipc.ObserveProperty("seekable");
+            await _ipc.ObserveProperty("mouse-pos");
         }
         catch { /* IPC 일찍 끊겨도 앱 계속 */ }
     }
@@ -397,6 +402,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 case "filename":
                     if (value is { ValueKind: JsonValueKind.String } se)
                         FileNameDisplay = se.GetString() ?? FileNameDisplay;
+                    break;
+                case "mouse-pos":
+                    if (value is { ValueKind: JsonValueKind.Object } obj)
+                    {
+                        var x = obj.TryGetProperty("x", out var xe) && xe.TryGetDouble(out var xd) ? xd : 0;
+                        var y = obj.TryGetProperty("y", out var ye) && ye.TryGetDouble(out var yd) ? yd : 0;
+                        MpvMousePos?.Invoke(x, y);
+                    }
+                    MouseActivity?.Invoke();
                     break;
             }
         });

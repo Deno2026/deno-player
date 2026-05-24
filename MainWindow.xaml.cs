@@ -1,8 +1,10 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using DenoPlayer.Helpers;
@@ -24,6 +26,7 @@ public partial class MainWindow : Window
     private ResizeMode _savedResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _closing;
+    private bool _popupsOpen;
 
     public MainWindow()
     {
@@ -31,7 +34,6 @@ public partial class MainWindow : Window
         _vm = new MainViewModel(_mpvProc);
         DataContext = _vm;
 
-        // 저장된 윈도우 크기/위치 적용
         var s = _vm.Settings;
         if (s.WindowWidth >= 480 && s.WindowHeight >= 320)
         {
@@ -47,7 +49,6 @@ public partial class MainWindow : Window
         Topmost = s.AlwaysOnTop;
         _vm.IsAlwaysOnTop = s.AlwaysOnTop;
 
-        // 영상 호스트 hwnd 부착
         VideoHostSlot.Content = _videoHost;
 
         _controlsHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(s.ControlAutoHideMs) };
@@ -56,12 +57,24 @@ public partial class MainWindow : Window
         _playlistHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
         _playlistHideTimer.Tick += (_, _) => HidePlaylist();
 
-        // mpv crash 처리
         _mpvProc.Crashed += () => Dispatcher.BeginInvoke(() =>
         {
             if (_closing) return;
             _vm.StatusMessage = "mpv 프로세스가 종료되었습니다.";
         });
+
+        _vm.MouseActivity += () => Dispatcher.BeginInvoke(() =>
+        {
+            // 영상 hwnd 위 마우스 이동은 mpv에서만 잡힘 → IPC로 받아 OSD 살림
+            ShowControls(); RestartHideTimer();
+            // 오른쪽 끝 24px 근처면 playlist hot zone 활성
+            if (_lastMpvMouseX > 0 && _lastMpvMouseX > ActualWidth - 24 - 2)
+                ShowPlaylist();
+        });
+        _vm.MpvMousePos += (x, y) =>
+        {
+            _lastMpvMouseX = x; _lastMpvMouseY = y;
+        };
 
         SourceInitialized += OnSourceInit;
         Closing += OnWindowClosing;
@@ -71,8 +84,8 @@ public partial class MainWindow : Window
         Drop      += OnDrop;
         KeyDown   += OnAnyKey;
         StateChanged += OnStateChanged;
+        LocationChanged += (_, _) => UpdatePopupLayout();
 
-        // VM의 IsFullscreen / IsAlwaysOnTop 변경 시 window 반영
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.IsFullscreen))
@@ -82,9 +95,8 @@ public partial class MainWindow : Window
         };
     }
 
-    // ============================================================
-    // 외부 진입점 (App.OnAppStartup → 명령줄 첫 인자)
-    // ============================================================
+    private double _lastMpvMouseX, _lastMpvMouseY;
+
     public void OpenFromExternal(string path) => _vm.OpenPath(path);
 
     // ============================================================
@@ -92,10 +104,8 @@ public partial class MainWindow : Window
     // ============================================================
     private async void OnSourceInit(object? sender, EventArgs e)
     {
-        // hwnd가 BuildWindowCore에서 만들어지도록 layout 한 번 강제
         VideoHostSlot.UpdateLayout();
 
-        // mpv가 없으면 사용자에게 알림 (앱은 살리고 NoFile 유지)
         if (!_mpvProc.MpvAvailable)
         {
             _vm.State = PlayerState.Failed;
@@ -117,12 +127,70 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 시작 시 컨트롤은 잠시 보여줘서 어떤 앱인지 즉시 보이게
+        // 명령줄 인자 처리 (Run before IPC가 약간 늦어도 mpv는 idle)
+        if (App.StartupArgs.Length > 0)
+        {
+            var first = App.StartupArgs[0];
+            if (File.Exists(first)) _vm.OpenPath(first);
+        }
+
         ShowControls(); RestartHideTimer();
     }
 
+    private void OnRootLoaded(object sender, RoutedEventArgs e)
+    {
+        // Popup은 PlacementTarget이 화면에 표시된 후에 열어야 위치가 정확
+        UpdatePopupLayout();
+        OpenPopups();
+        UpdatePopupLayout();
+    }
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdatePopupLayout();
+    }
+
+    private void OpenPopups()
+    {
+        if (_popupsOpen) return;
+        TopBarPopup.IsOpen = true;
+        BottomBarPopup.IsOpen = true;
+        PlaylistHotZonePopup.IsOpen = true;
+        PlaylistPanelPopup.IsOpen = true;
+        _popupsOpen = true;
+    }
+
+    private void UpdatePopupLayout()
+    {
+        if (!IsLoaded || Root.ActualWidth <= 0 || Root.ActualHeight <= 0) return;
+        var rw = Root.ActualWidth;
+        var rh = Root.ActualHeight;
+
+        TopBarBorder.Width = rw;
+        Reposition(TopBarPopup, 0, 0);
+
+        BottomBarBorder.Width = rw;
+        Reposition(BottomBarPopup, 0, rh - BottomBarBorder.Height);
+
+        PlaylistHotZoneBorder.Height = rh;
+        Reposition(PlaylistHotZonePopup, rw - PlaylistHotZoneBorder.Width, 0);
+
+        PlaylistPanelBorder.Height = rh;
+        Reposition(PlaylistPanelPopup, rw - PlaylistPanelBorder.Width, 0);
+    }
+
+    private static void Reposition(Popup p, double x, double y)
+    {
+        p.HorizontalOffset = x;
+        p.VerticalOffset = y;
+        // 강제 갱신 trick — 열려있는 popup 위치 즉시 반영
+        var h = p.HorizontalOffset;
+        p.HorizontalOffset = h + 0.001;
+        p.HorizontalOffset = h;
+    }
+
     // ============================================================
-    // 닫기 — 설정 저장 + mpv 종료
+    // 닫기
     // ============================================================
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
@@ -132,6 +200,13 @@ public partial class MainWindow : Window
         var (w, h) = (WindowState == WindowState.Normal ? Width  : RestoreBounds.Width,
                       WindowState == WindowState.Normal ? Height : RestoreBounds.Height);
         _vm.PersistSettings(w, h, l, t, WindowState == WindowState.Maximized);
+
+        // Popups 닫고 정리
+        TopBarPopup.IsOpen = false;
+        BottomBarPopup.IsOpen = false;
+        PlaylistHotZonePopup.IsOpen = false;
+        PlaylistPanelPopup.IsOpen = false;
+
         _vm.Dispose();
         _mpvProc.Dispose();
     }
@@ -140,6 +215,25 @@ public partial class MainWindow : Window
     {
         if (MaxRestoreBtn != null)
             MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "" : "";
+
+        // Minimized 시 Popup이 PlacementTarget을 따라가지 않는 WPF 알려진 동작 →
+        // 명시적으로 닫고, 복원 시 다시 연다.
+        var min = WindowState == WindowState.Minimized;
+        if (min)
+        {
+            TopBarPopup.IsOpen = false;
+            BottomBarPopup.IsOpen = false;
+            PlaylistHotZonePopup.IsOpen = false;
+            PlaylistPanelPopup.IsOpen = false;
+        }
+        else if (_popupsOpen)
+        {
+            TopBarPopup.IsOpen = true;
+            BottomBarPopup.IsOpen = true;
+            PlaylistHotZonePopup.IsOpen = true;
+            PlaylistPanelPopup.IsOpen = true;
+            UpdatePopupLayout();
+        }
     }
 
     // ============================================================
@@ -159,7 +253,13 @@ public partial class MainWindow : Window
 
     private void OnRootPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        // 마우스 클릭이 발생해도 OSD 살아있어야 함
+        ShowControls();
+        RestartHideTimer();
+    }
+
+    /// <summary>Popup 내부에서 마우스가 움직여도 OSD 유지</summary>
+    private void OnPopupMouseMove(object sender, MouseEventArgs e)
+    {
         ShowControls();
         RestartHideTimer();
     }
@@ -173,22 +273,20 @@ public partial class MainWindow : Window
 
     private void ShowControls()
     {
-        FadeTo(TopBar, 1.0, 120);
-        FadeTo(BottomBar, 1.0, 120);
-        TopBar.IsHitTestVisible = true;
-        BottomBar.IsHitTestVisible = true;
+        FadeTo(TopBarBorder, 1.0, 120);
+        FadeTo(BottomBarBorder, 1.0, 120);
+        TopBarBorder.IsHitTestVisible = true;
+        BottomBarBorder.IsHitTestVisible = true;
         Mouse.OverrideCursor = null;
     }
 
     private void HideControls()
     {
-        // 마우스가 컨트롤 바 위에 머무르면 숨기지 않음
-        if (TopBar.IsMouseOver || BottomBar.IsMouseOver) { RestartHideTimer(); return; }
-        // 시킹/패널 hover 중이면 숨김 보류
+        if (TopBarBorder.IsMouseOver || BottomBarBorder.IsMouseOver) { RestartHideTimer(); return; }
         if (_vm.Seeking) { RestartHideTimer(); return; }
 
-        FadeTo(TopBar, 0.0, 200, hideAfter: true);
-        FadeTo(BottomBar, 0.0, 200, hideAfter: true);
+        FadeTo(TopBarBorder, 0.0, 200, hideAfter: true);
+        FadeTo(BottomBarBorder, 0.0, 200, hideAfter: true);
         if (_vm.IsFullscreen)
             Mouse.OverrideCursor = Cursors.None;
     }
@@ -199,7 +297,7 @@ public partial class MainWindow : Window
         {
             To = target,
             Duration = TimeSpan.FromMilliseconds(ms),
-            EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         if (hideAfter)
             anim.Completed += (_, _) =>
@@ -231,31 +329,31 @@ public partial class MainWindow : Window
 
     private void ShowPlaylist()
     {
-        PlaylistPanel.IsHitTestVisible = true;
+        PlaylistPanelBorder.IsHitTestVisible = true;
         var slide = new DoubleAnimation
         {
             To = 0,
             Duration = TimeSpan.FromMilliseconds(180),
-            EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         var fade = new DoubleAnimation
         {
             To = 1.0,
             Duration = TimeSpan.FromMilliseconds(140)
         };
-        PlaylistTx.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slide);
-        PlaylistPanel.BeginAnimation(UIElement.OpacityProperty, fade);
+        PlaylistTx.BeginAnimation(TranslateTransform.XProperty, slide);
+        PlaylistPanelBorder.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     private void HidePlaylist()
     {
         _playlistHideTimer.Stop();
-        if (PlaylistPanel.IsMouseOver) return;
+        if (PlaylistPanelBorder.IsMouseOver) return;
         var slide = new DoubleAnimation
         {
-            To = PlaylistPanel.Width,
+            To = PlaylistPanelBorder.Width,
             Duration = TimeSpan.FromMilliseconds(160),
-            EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = EasingMode.EaseIn }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
         var fade = new DoubleAnimation
         {
@@ -264,10 +362,10 @@ public partial class MainWindow : Window
         };
         fade.Completed += (_, _) =>
         {
-            if (PlaylistPanel.Opacity < 0.05) PlaylistPanel.IsHitTestVisible = false;
+            if (PlaylistPanelBorder.Opacity < 0.05) PlaylistPanelBorder.IsHitTestVisible = false;
         };
-        PlaylistTx.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slide);
-        PlaylistPanel.BeginAnimation(UIElement.OpacityProperty, fade);
+        PlaylistTx.BeginAnimation(TranslateTransform.XProperty, slide);
+        PlaylistPanelBorder.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     private void OnPlaylistDoubleClick(object sender, MouseButtonEventArgs e)
@@ -294,10 +392,7 @@ public partial class MainWindow : Window
 
     private void OnSeekWheel(object sender, MouseWheelEventArgs e)
     {
-        var delta = e.Delta > 0 ? 5 : -5;
-        // 휠은 즉시 상대 seek
-        _ = (delta > 0 ? _vm.Seek5ForwardCommand : _vm.Seek5BackwardCommand);
-        if (delta > 0) _vm.Seek5ForwardCommand.Execute(null);
+        if (e.Delta > 0) _vm.Seek5ForwardCommand.Execute(null);
         else _vm.Seek5BackwardCommand.Execute(null);
         e.Handled = true;
     }
@@ -309,24 +404,16 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // ============================================================
-    // Root wheel — 영상 위에서 휠은 볼륨
-    // ============================================================
     private void OnRootMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        // BottomBar/SeekBar/Volume 슬라이더 위에서는 이미 처리되었을 것
         if (e.Handled) return;
         if (e.Delta > 0) _vm.VolumeUpCommand.Execute(null);
         else _vm.VolumeDownCommand.Execute(null);
         e.Handled = true;
     }
 
-    // ============================================================
-    // Double click — 전체화면 토글
-    // ============================================================
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        // SeekBar/볼륨/버튼 위에서는 토글 안 함
         if (e.OriginalSource is DependencyObject d &&
             (FindAncestor<Slider>(d) is not null ||
              FindAncestor<Button>(d) is not null ||
@@ -341,7 +428,7 @@ public partial class MainWindow : Window
         while (d is not null)
         {
             if (d is T t) return t;
-            d = System.Windows.Media.VisualTreeHelper.GetParent(d);
+            d = VisualTreeHelper.GetParent(d);
         }
         return null;
     }
@@ -387,14 +474,13 @@ public partial class MainWindow : Window
             _vm.State = PlayerState.NoFile;
     }
 
-    // 키 입력 시 OSD 살리기
     private void OnAnyKey(object sender, KeyEventArgs e)
     {
         ShowControls(); RestartHideTimer();
     }
 
     // ============================================================
-    // Window chrome — 우상단 버튼
+    // Window chrome buttons
     // ============================================================
     private void OnMinimize(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void OnMaxRestore(object? sender, RoutedEventArgs e)
@@ -402,7 +488,7 @@ public partial class MainWindow : Window
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 
     // ============================================================
-    // Fullscreen — WindowChrome 잠시 제거하고 borderless maximize
+    // Fullscreen
     // ============================================================
     private void ApplyFullscreen(bool fs)
     {
@@ -419,7 +505,6 @@ public partial class MainWindow : Window
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
-            // 작업표시줄까지 가리기: WindowState=Normal로 갔다가 Maximized
             if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
             WindowState = WindowState.Maximized;
         }
@@ -444,5 +529,6 @@ public partial class MainWindow : Window
                 Width = _savedWidth; Height = _savedHeight;
             }
         }
+        UpdatePopupLayout();
     }
 }

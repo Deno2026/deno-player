@@ -24,12 +24,15 @@
         <h:PlayPauseIconConverter x:Key="PlayIcon"/>
         <h:MuteIconConverter x:Key="MuteIcon"/>
         <h:FullscreenIconConverter x:Key="FsIcon"/>
-        <h:StateToVisibilityConverter x:Key="ShowOnNoFile" Show="NoFile"/>
+        <h:StateToVisibilityConverter x:Key="ShowOnNoFile" Show="NoFile,Dragging"/>
         <h:StateToVisibilityConverter x:Key="ShowOnFailed" Show="Failed"/>
         <h:StateToVisibilityConverter x:Key="ShowOnLoading" Show="Loading"/>
         <h:StateToVisibilityConverter x:Key="ShowOnDragging" Show="Dragging"/>
+        <!-- Video host: 영상 재생/로딩 시에만 Visible, 아니면 Hidden (Collapsed 아님 — hwnd 보존) -->
+        <h:StateToVisibilityConverter x:Key="ShowVideoHost"
+                                       Show="Playing,Paused,Ready,Loading"
+                                       Otherwise="Hidden"/>
 
-        <!-- AlwaysOnTop toggle 버튼: IsAlwaysOnTop true면 accent foreground -->
         <Style x:Key="PinButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsAlwaysOnTop}" Value="True">
@@ -76,27 +79,21 @@
           MouseLeave="OnRootMouseLeave"
           PreviewMouseDown="OnRootPreviewMouseDown"
           MouseWheel="OnRootMouseWheel"
-          Background="{StaticResource BrushBgBase}">
+          Background="{StaticResource BrushBgBase}"
+          SizeChanged="OnRootSizeChanged"
+          Loaded="OnRootLoaded">
 
-        <!-- 영상 호스트 (전체) — child Win32 window. mpv가 이 hwnd 안에 그림. -->
+        <!-- 영상 호스트 — 영상 있을 때만 보임. hwnd 자체는 layout 시 만들어짐. -->
         <Border x:Name="VideoHostContainer"
                 Background="#FF050705"
-                Focusable="False">
+                Focusable="False"
+                Visibility="{Binding State, Converter={StaticResource ShowVideoHost}}">
             <ContentControl x:Name="VideoHostSlot" Focusable="False"/>
         </Border>
 
-        <!-- 우측 끝 hot zone -->
-        <Border x:Name="PlaylistHotZone"
-                Width="{StaticResource PlaylistHotZoneWidth}"
-                HorizontalAlignment="Right"
-                Background="Transparent"
-                MouseEnter="OnHotZoneEnter"/>
-
         <!-- ============================================================
-             상태별 오버레이
+             NoFile / Dragging — 영상 없음 화면
              ============================================================ -->
-
-        <!-- NoFile -->
         <Grid Visibility="{Binding State, Converter={StaticResource ShowOnNoFile}}"
               Background="#FF0B0E0C"
               ClipToBounds="True">
@@ -136,11 +133,18 @@
                            Style="{StaticResource TextMono}"
                            Text=".mp4 .mkv .mov .webm  ·  .mp3 .flac .wav  ·  .png .jpg .gif"/>
             </StackPanel>
+
+            <!-- Dragging — drop target highlight (NoFile 카드 위에 덧붙임) -->
+            <Border Visibility="{Binding State, Converter={StaticResource ShowOnDragging}}"
+                    BorderBrush="{StaticResource BrushAccent}"
+                    BorderThickness="2"
+                    Background="#1457E389"
+                    IsHitTestVisible="False"/>
         </Grid>
 
         <!-- Failed -->
         <Grid Visibility="{Binding State, Converter={StaticResource ShowOnFailed}}"
-              Background="#CC0B0E0C">
+              Background="#FF0B0E0C">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="540">
                 <TextBlock Text="재생할 수 없습니다"
                            Style="{StaticResource TextBody}"
@@ -166,9 +170,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- Loading -->
+        <!-- Loading — 영상 host 위에 살짝 덧붙음 -->
         <Grid Visibility="{Binding State, Converter={StaticResource ShowOnLoading}}"
-              Background="#AA0B0E0C">
+              Background="#AA0B0E0C"
+              IsHitTestVisible="False">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Border Width="40" Height="2" Background="{StaticResource BrushBorderStrong}" Margin="0,0,0,10">
                     <Border Width="14" Height="2"
@@ -195,22 +200,29 @@
             </StackPanel>
         </Grid>
 
-        <!-- Dragging — drop target highlight -->
-        <Border Visibility="{Binding State, Converter={StaticResource ShowOnDragging}}"
-                BorderBrush="{StaticResource BrushAccent}"
-                BorderThickness="2"
-                Background="#1457E389"
-                IsHitTestVisible="False"/>
+    <!-- ============================================================
+         POPUPS — airspace 회피용. 각자 별도 hwnd. Grid 안에 두지만
+         visual 배치는 안 되고 logical tree만 점유. 위치 동기화는
+         코드비하인드의 UpdatePopupLayout()이 담당.
+         ============================================================ -->
 
-        <!-- ============================================================
-             TOP BAR
-             ============================================================ -->
-        <Border x:Name="TopBar"
-                VerticalAlignment="Top"
+    <!-- TOP BAR -->
+    <Popup x:Name="TopBarPopup"
+           PlacementTarget="{Binding ElementName=Root}"
+           Placement="Relative"
+           AllowsTransparency="True"
+           PopupAnimation="None"
+           StaysOpen="True"
+           Focusable="False"
+           IsOpen="False">
+        <Border x:Name="TopBarBorder"
                 Height="36"
                 Background="{StaticResource BrushBgOverlay}"
                 Effect="{StaticResource ShadowControlBar}"
-                Opacity="0">
+                Opacity="0"
+                IsHitTestVisible="False"
+                MouseMove="OnPopupMouseMove"
+                DataContext="{Binding DataContext, ElementName=Root}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -233,8 +245,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            VerticalAlignment="Center">
                     <Button Style="{StaticResource PinButton}"
                             Content=""
                             ToolTip="항상 위 (Ctrl+T)"
@@ -255,16 +266,25 @@
                 </StackPanel>
             </Grid>
         </Border>
+    </Popup>
 
-        <!-- ============================================================
-             BOTTOM CONTROLS
-             ============================================================ -->
-        <Border x:Name="BottomBar"
-                VerticalAlignment="Bottom"
+    <!-- BOTTOM CONTROLS -->
+    <Popup x:Name="BottomBarPopup"
+           PlacementTarget="{Binding ElementName=Root}"
+           Placement="Relative"
+           AllowsTransparency="True"
+           PopupAnimation="None"
+           StaysOpen="True"
+           Focusable="False"
+           IsOpen="False">
+        <Border x:Name="BottomBarBorder"
+                Height="78"
                 Background="{StaticResource BrushBgOverlay}"
                 Effect="{StaticResource ShadowControlBar}"
                 Opacity="0"
-                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                IsHitTestVisible="False"
+                MouseMove="OnPopupMouseMove"
+                DataContext="{Binding DataContext, ElementName=Root}">
             <Grid Margin="14,6,14,8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -351,13 +371,32 @@
                 </Grid>
             </Grid>
         </Border>
+    </Popup>
 
-        <!-- ============================================================
-             PLAYLIST PANEL
-             ============================================================ -->
-        <Border x:Name="PlaylistPanel"
-                Width="{StaticResource PlaylistDefaultWidth}"
-                HorizontalAlignment="Right"
+    <!-- PLAYLIST HOT ZONE — 우측 24px hover 트리거 (별도 hwnd라 airspace 통과) -->
+    <Popup x:Name="PlaylistHotZonePopup"
+           PlacementTarget="{Binding ElementName=Root}"
+           Placement="Relative"
+           AllowsTransparency="True"
+           StaysOpen="True"
+           Focusable="False"
+           IsOpen="False">
+        <Border x:Name="PlaylistHotZoneBorder"
+                Width="24"
+                Background="#01000000"
+                MouseEnter="OnHotZoneEnter"/>
+    </Popup>
+
+    <!-- PLAYLIST PANEL -->
+    <Popup x:Name="PlaylistPanelPopup"
+           PlacementTarget="{Binding ElementName=Root}"
+           Placement="Relative"
+           AllowsTransparency="True"
+           StaysOpen="True"
+           Focusable="False"
+           IsOpen="False">
+        <Border x:Name="PlaylistPanelBorder"
+                Width="320"
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderStrong}"
                 BorderThickness="1,0,0,0"
@@ -366,7 +405,7 @@
                 IsHitTestVisible="False"
                 MouseEnter="OnPlaylistEnter"
                 MouseLeave="OnPlaylistLeave"
-                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                DataContext="{Binding DataContext, ElementName=Root}">
             <Border.RenderTransform>
                 <TranslateTransform x:Name="PlaylistTx" X="320"/>
             </Border.RenderTransform>
@@ -428,5 +467,6 @@
                 </Border>
             </Grid>
         </Border>
+    </Popup>
     </Grid>
 </Window>
