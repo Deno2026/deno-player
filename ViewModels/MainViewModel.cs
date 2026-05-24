@@ -396,8 +396,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ = _ipc.SeekAbsolute(seconds);
     }
 
+    // mpv 이벤트가 매 frame (60Hz+) 옴 → UI 스레드 dispatch 폭주를 막아 키 입력 응답성 확보
+    private DateTime _lastTimePosAt;
+    private DateTime _lastMouseActAt;
+
     private void OnMpvPropertyChanged(string name, JsonElement? value)
     {
+        // throttle을 dispatcher 진입 전에 — 큐 자체를 비움
+        if (name == "time-pos")
+        {
+            var now = DateTime.UtcNow;
+            if (now - _lastTimePosAt < TimeSpan.FromMilliseconds(120)) return;
+            _lastTimePosAt = now;
+        }
+        else if (name == "mouse-pos")
+        {
+            var now = DateTime.UtcNow;
+            if (now - _lastMouseActAt < TimeSpan.FromMilliseconds(150)) return;
+            _lastMouseActAt = now;
+        }
+
         OnUi(() =>
         {
             switch (name)

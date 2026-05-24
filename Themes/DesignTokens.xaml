@@ -199,14 +199,29 @@
     <!-- ============================================================
          Slider — transport seek/volume 공용
          ============================================================ -->
-    <Style x:Key="SliderRepeatThin" TargetType="RepeatButton">
+    <!-- 미재생 영역(우측) — 어둠 -->
+    <Style x:Key="SliderRepeatIncrease" TargetType="RepeatButton">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
-                    <Border Background="Transparent"/>
+                    <Border Background="{StaticResource BrushBorderStrong}" CornerRadius="2"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 재생된 영역(좌측) — DENO green. 현 위치는 자동으로 thumb까지 채워짐 -->
+    <Style x:Key="SliderRepeatDecrease" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="{StaticResource BrushAccent}" CornerRadius="2"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -214,23 +229,32 @@
 
     <Style x:Key="SeekThumb" TargetType="Thumb">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
-        <Setter Property="Height" Value="12"/>
-        <Setter Property="Width" Value="12"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="Width" Value="14"/>
         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Grid>
-                        <Ellipse x:Name="Outer" Fill="{StaticResource BrushAccent}" Opacity="0"/>
-                        <Ellipse x:Name="Inner" Width="10" Height="10" Fill="{StaticResource BrushAccent}" Opacity="0"/>
+                        <Ellipse x:Name="Halo"
+                                 Fill="{StaticResource BrushAccent}"
+                                 Opacity="0"/>
+                        <!-- 평소에도 보이는 원형 indicator (현 위치) -->
+                        <Ellipse x:Name="Dot"
+                                 Width="12" Height="12"
+                                 Fill="{StaticResource BrushAccent}"
+                                 Stroke="{StaticResource BrushBgBase}"
+                                 StrokeThickness="2"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type Slider}}, Path=IsMouseOver}" Value="True">
-                            <Setter TargetName="Inner" Property="Opacity" Value="1"/>
+                            <Setter TargetName="Dot" Property="Width" Value="14"/>
+                            <Setter TargetName="Dot" Property="Height" Value="14"/>
                         </DataTrigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="Inner" Property="Opacity" Value="1"/>
-                            <Setter TargetName="Outer" Property="Opacity" Value="0.25"/>
+                            <Setter TargetName="Dot" Property="Width" Value="14"/>
+                            <Setter TargetName="Dot" Property="Height" Value="14"/>
+                            <Setter TargetName="Halo" Property="Opacity" Value="0.3"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -246,38 +270,21 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
-                    <Grid VerticalAlignment="Center" Height="18">
-                        <Border x:Name="Track"
-                                Height="{StaticResource SeekBarHeight}"
-                                VerticalAlignment="Center"
-                                Background="{StaticResource BrushBorderStrong}"
-                                CornerRadius="2"/>
-                        <Track x:Name="PART_Track" Height="{StaticResource SeekBarHeight}" VerticalAlignment="Center">
+                    <Grid VerticalAlignment="Center" Height="20">
+                        <!-- played(green)와 remaining(dark) 영역을 Track의 두 RepeatButton이 직접 그림.
+                             별도 binding 없이도 thumb 위치 = 그린 끝점으로 자동 일치. -->
+                        <Track x:Name="PART_Track" Height="6" VerticalAlignment="Center">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource SliderRepeatThin}" Command="Slider.DecreaseLarge"/>
+                                <RepeatButton Style="{StaticResource SliderRepeatDecrease}" Command="Slider.DecreaseLarge"/>
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource SliderRepeatThin}" Command="Slider.IncreaseLarge"/>
+                                <RepeatButton Style="{StaticResource SliderRepeatIncrease}" Command="Slider.IncreaseLarge"/>
                             </Track.IncreaseRepeatButton>
                             <Track.Thumb>
                                 <Thumb Style="{StaticResource SeekThumb}"/>
                             </Track.Thumb>
                         </Track>
-                        <Border x:Name="Played"
-                                Height="{StaticResource SeekBarHeight}"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Center"
-                                Background="{StaticResource BrushAccent}"
-                                CornerRadius="2"
-                                IsHitTestVisible="False"
-                                Width="{Binding ElementName=PART_Track, Path=Thumb.(Canvas.Left), TargetNullValue=0}"/>
                     </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Track" Property="Height" Value="{StaticResource SeekBarHoverHeight}"/>
-                            <Setter TargetName="Played" Property="Height" Value="{StaticResource SeekBarHoverHeight}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

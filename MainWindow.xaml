@@ -162,16 +162,11 @@
         </Border>
 
         <!-- ============================================================
-             메인 영역: 영상 + 재생목록
+             메인 영역: 영상이 전체를 차지. 재생목록은 별도 owned window로 hover 슬라이드.
              ============================================================ -->
         <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="{Binding PlaylistColumnWidth}"/>
-            </Grid.ColumnDefinitions>
-
             <!-- 영상 호스트 + 오버레이들 (같은 cell, 같은 z-stack) -->
-            <Grid Grid.Column="0" ClipToBounds="True">
+            <Grid ClipToBounds="True">
                 <!-- 영상 — 영상 상태에서만 Visible. NoFile일 땐 Hidden -->
                 <Border x:Name="VideoHostContainer"
                         Background="#FF050705"
@@ -285,72 +280,6 @@
                 </Grid>
             </Grid>
 
-            <!-- 재생목록 패널 (Column 1) — IsPlaylistOpen에 따라 GridLength 토글 -->
-            <Border Grid.Column="1"
-                    Background="{StaticResource BrushBgRaised}"
-                    BorderBrush="{StaticResource BrushBorderStrong}"
-                    BorderThickness="1,0,0,0"
-                    Visibility="{Binding IsPlaylistOpen, Converter={StaticResource BoolVis}}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <Border Grid.Row="0" Padding="14,12"
-                            BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
-                        <StackPanel>
-                            <TextBlock Text="현재 폴더" Style="{StaticResource TextMono}"/>
-                            <TextBlock Text="{Binding FolderDisplay}"
-                                       Style="{StaticResource TextBody}"
-                                       FontSize="{StaticResource FontSizeSm}"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                    </Border>
-
-                    <ListBox Grid.Row="1"
-                             x:Name="PlaylistListBox"
-                             Style="{StaticResource PlaylistList}"
-                             ItemsSource="{Binding Playlist}"
-                             SelectedItem="{Binding CurrentMedia, Mode=OneWay}"
-                             MouseDoubleClick="OnPlaylistDoubleClick">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{Binding FileName}"
-                                                   Style="{StaticResource TextBody}"
-                                                   FontSize="{StaticResource FontSizeSm}"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Style="{StaticResource TextMono}"
-                                                   Text="실패"
-                                                   Foreground="{StaticResource BrushDanger}"
-                                                   Visibility="{Binding HasError, Converter={StaticResource BoolVis}}"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding DurationDisplay}"
-                                               Style="{StaticResource TextMono}"
-                                               VerticalAlignment="Center"
-                                               Margin="8,0,0,0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <Border Grid.Row="2" Padding="14,8"
-                            BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,1,0,0">
-                        <TextBlock Style="{StaticResource TextMono}">
-                            <Run Text="{Binding Playlist.Count, Mode=OneWay}"/>
-                            <Run Text=" 항목"/>
-                        </TextBlock>
-                    </Border>
-                </Grid>
-            </Border>
         </Grid>
 
         <!-- ============================================================

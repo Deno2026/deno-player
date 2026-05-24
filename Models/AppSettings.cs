@@ -10,7 +10,7 @@ public sealed class AppSettings
     public double WindowHeight { get; set; } = 760;
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
-    public bool WindowMaximized { get; set; }
+    public bool WindowMaximized { get; set; } = true;   // 첫 실행은 풀스크린 화면 가까이 — 보고 끄는 도구
 
     public int Volume { get; set; } = 70;          // 0..100
     public bool Muted { get; set; } = false;

@@ -9,6 +9,7 @@ using DenoPlayer.Helpers;
 using DenoPlayer.Models;
 using DenoPlayer.Services;
 using DenoPlayer.ViewModels;
+using DenoPlayer.Views;
 
 namespace DenoPlayer;
 
@@ -26,6 +27,9 @@ public partial class MainWindow : Window
     private int _mpvRestartCount;
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
+    private PlaylistWindow? _playlistWin;
+    private const int HotZoneWidth = 24;            // 우측 끝 24px hover trigger
+    private DateTime _lastHoverCheck;
 
     public MainWindow()
     {
@@ -76,8 +80,11 @@ public partial class MainWindow : Window
         {
             ShowControls(); RestartHideTimer();
         });
+        // mpv의 hwnd 안 마우스 좌표를 받아 우측 hot-zone 감지 (영상 hwnd 위에서는 WPF가 못 잡음)
+        _vm.MpvMousePos += (x, y) => Dispatcher.BeginInvoke(() => CheckRightHotZoneFromMpv(x));
 
         SourceInitialized += OnSourceInit;
+        Loaded   += OnWindowLoaded;
         Closing += OnWindowClosing;
         DragEnter += OnDragOver;
         DragOver  += OnDragOver;
@@ -85,6 +92,8 @@ public partial class MainWindow : Window
         Drop      += OnDrop;
         KeyDown   += OnAnyKey;
         StateChanged += OnStateChanged;
+        LocationChanged += (_, _) => SyncPlaylistWindowPosition();
+        SizeChanged += (_, _) => SyncPlaylistWindowPosition();
 
         _vm.PropertyChanged += (_, e) =>
         {
@@ -97,11 +106,11 @@ public partial class MainWindow : Window
                     Topmost = _vm.IsAlwaysOnTop;
                     break;
                 case nameof(MainViewModel.CurrentMedia):
-                    // 재생 항목으로 자동 스크롤 — 큰 폴더에서 위치 잃지 않게
-                    if (_vm.CurrentMedia is not null && PlaylistListBox is not null)
-                        Dispatcher.BeginInvoke(new Action(() =>
-                            PlaylistListBox.ScrollIntoView(_vm.CurrentMedia)),
-                            DispatcherPriority.Background);
+                    // 재생 항목으로 자동 스크롤은 PlaylistWindow가 ShowSlide 시 직접 처리.
+                    break;
+                case nameof(MainViewModel.IsPlaylistOpen):
+                    if (_vm.IsPlaylistOpen) _playlistWin?.ShowSlide();
+                    else _playlistWin?.HideSlide();
                     break;
             }
         };
@@ -206,6 +215,8 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _closing = true;
+        try { _playlistWin?.Close(); } catch { }
+        _playlistWin = null;
         var (l, t) = (WindowState == WindowState.Normal ? (double?)Left : null,
                        WindowState == WindowState.Normal ? (double?)Top  : null);
         var (w, h) = (WindowState == WindowState.Normal ? Width  : RestoreBounds.Width,
@@ -218,7 +229,10 @@ public partial class MainWindow : Window
     private void OnStateChanged(object? sender, EventArgs e)
     {
         if (MaxRestoreBtn != null)
-            MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "" : "";
+            MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "" : "";
+        SyncPlaylistWindowPosition();
+        // 최소화될 때 playlist도 같이 숨김 (Owner가 minimize면 자동이긴 하지만 명시)
+        if (WindowState == WindowState.Minimized) _playlistWin?.HideSlide();
     }
 
     // ============================================================
@@ -248,6 +262,8 @@ public partial class MainWindow : Window
     {
         ShowControls();
         RestartHideTimer();
+        // 영상이 없는 상태(NoFile 등)에선 mpv mouse-pos가 안 와서 WPF 좌표로 hot zone 검사
+        CheckRightHotZoneFromWpf(e.GetPosition(Root));
     }
 
     private void OnRootMouseLeave(object sender, MouseEventArgs e)
@@ -315,13 +331,67 @@ public partial class MainWindow : Window
         el.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 
-    private void OnPlaylistDoubleClick(object sender, MouseButtonEventArgs e)
+    // ============================================================
+    // Playlist owned window — 우측 hover slide
+    // ============================================================
+    private void OnWindowLoaded(object? sender, RoutedEventArgs e)
     {
-        if (PlaylistListBox.SelectedItem is MediaItem mi)
+        if (_playlistWin is null)
         {
-            _vm.PlayMedia(mi);
-            e.Handled = true;
+            _playlistWin = new PlaylistWindow { Owner = this };
+            _playlistWin.DataContext = _vm;
+            _playlistWin.Show();
+            SyncPlaylistWindowPosition();
         }
+    }
+
+    private void SyncPlaylistWindowPosition()
+    {
+        if (_playlistWin is null) return;
+        if (WindowState == WindowState.Minimized) return;
+
+        // 메인 윈도우의 client area 우측 가장자리에 붙이기. 풀스크린/일반 둘 다 처리.
+        var w = WindowState == WindowState.Maximized
+            ? SystemParameters.WorkArea.Width  // taskbar 제외 영역
+            : ActualWidth;
+        var h = WindowState == WindowState.Maximized
+            ? SystemParameters.WorkArea.Height
+            : ActualHeight;
+        var left = WindowState == WindowState.Maximized
+            ? SystemParameters.WorkArea.Left
+            : Left;
+        var top = WindowState == WindowState.Maximized
+            ? SystemParameters.WorkArea.Top
+            : Top;
+
+        // top: TopBar(36) 직후
+        var topOffset = 36;
+        _playlistWin.Left = left + w - _playlistWin.Width;
+        _playlistWin.Top  = top + topOffset;
+        _playlistWin.Height = Math.Max(200, h - topOffset - 8);   // 하단 살짝 여백
+    }
+
+    /// <summary>WPF 영역(영상 host 외)에서 마우스가 우측 끝 24px 진입 시 슬라이드 트리거.</summary>
+    private void CheckRightHotZoneFromWpf(Point posInRoot)
+    {
+        if (_playlistWin is null || _closing) return;
+        var w = Root.ActualWidth;
+        if (w <= 0) return;
+        if (posInRoot.X >= w - HotZoneWidth) _playlistWin.ShowSlide();
+    }
+
+    /// <summary>mpv가 보고한 영상 hwnd 안 좌표로 hot zone 검사. 영상 host width와 좌측 offset 0.</summary>
+    private void CheckRightHotZoneFromMpv(double mpvX)
+    {
+        if (_playlistWin is null || _closing) return;
+        // throttle
+        var now = DateTime.UtcNow;
+        if (now - _lastHoverCheck < TimeSpan.FromMilliseconds(80)) return;
+        _lastHoverCheck = now;
+        // 영상 hwnd width = Window client width (단일 column이라 거의 같음)
+        var w = ActualWidth;
+        if (w <= 0) return;
+        if (mpvX >= w - HotZoneWidth) _playlistWin.ShowSlide();
     }
 
     // ============================================================
