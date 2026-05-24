@@ -383,27 +383,35 @@ public partial class MainWindow : Window
         if (_playlistWin is null) return;
         if (WindowState == WindowState.Minimized) return;
 
-        double left, top, w, h;
-        if (WindowStyle == WindowStyle.None && WindowState == WindowState.Maximized)
-        {
-            // 진짜 풀스크린 — Window의 실제 측정값(화면 전체)을 그대로 사용
-            left = Left; top = Top; w = ActualWidth; h = ActualHeight;
-        }
-        else if (WindowState == WindowState.Maximized)
-        {
-            // 일반 Maximized — 작업표시줄 제외 영역
-            var wa = SystemParameters.WorkArea;
-            left = wa.Left; top = wa.Top; w = wa.Width; h = wa.Height;
-        }
-        else
-        {
-            left = Left; top = Top; w = ActualWidth; h = ActualHeight;
-        }
+        // 풀스크린/Maximized 전환 직후엔 ActualWidth/Height가 측정 전이라 0/작은 값 가능 →
+        // dispatcher 다음 cycle(layout pass 후)에 다시 한 번 보정.
+        DoSyncOnce();
+        Dispatcher.BeginInvoke(new Action(DoSyncOnce), DispatcherPriority.ContextIdle);
 
-        const double topOffset = 36;
-        _playlistWin.Left = left + w - _playlistWin.Width;
-        _playlistWin.Top  = top + topOffset;
-        _playlistWin.Height = Math.Max(200, h - topOffset - 8);
+        void DoSyncOnce()
+        {
+            if (_playlistWin is null) return;
+            double left, top, w, h;
+            if (WindowStyle == WindowStyle.None && WindowState == WindowState.Maximized)
+            {
+                left = Left; top = Top; w = ActualWidth; h = ActualHeight;
+            }
+            else if (WindowState == WindowState.Maximized)
+            {
+                var wa = SystemParameters.WorkArea;
+                left = wa.Left; top = wa.Top; w = wa.Width; h = wa.Height;
+            }
+            else
+            {
+                left = Left; top = Top; w = ActualWidth; h = ActualHeight;
+            }
+            if (w <= 0 || h <= 0) return;
+
+            const double topOffset = 36;
+            _playlistWin.Left = left + w - _playlistWin.Width;
+            _playlistWin.Top = top + topOffset;
+            _playlistWin.Height = Math.Max(200, h - topOffset - 8);
+        }
     }
 
     /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → hot zone 안/밖 즉시 반영.</summary>
@@ -622,6 +630,11 @@ public partial class MainWindow : Window
     // ============================================================
     private void ApplyFullscreen(bool fs)
     {
+        // 풀스크린 전환은 mpv가 video output을 재초기화하는 동안 panel이 떠 있으면
+        // 사용자 시각엔 '멈춘 듯' 보임. 전환 동안 panel 무조건 숨기고 사용자가 다시
+        // hot zone 호버해야 나오게.
+        _playlistWin?.HideSlide();
+
         if (fs)
         {
             _savedStyle = WindowStyle;
