@@ -147,6 +147,9 @@
         <Setter Property="Height" Value="{StaticResource ControlButtonSize}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <!-- 핵심: 버튼이 focus를 잡지 않게. 잡으면 Space가 Play/Pause 대신 그 버튼을 클릭함 -->
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="UseLayoutRounding" Value="True"/>
@@ -186,7 +189,8 @@
         <Setter Property="Height" Value="38"/>
     </Style>
 
-    <!-- 텍스트형 버튼 (간단한 secondary action) -->
+    <!-- 텍스트형 버튼 (간단한 secondary action) — IconButton 상속이라 Focusable=False도 상속됨.
+         단 Settings dialog의 OK/Cancel처럼 IsDefault/IsCancel을 받을 버튼은 명시적으로 Focusable=True로 덮어씀. -->
     <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
         <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
         <Setter Property="FontSize" Value="{StaticResource FontSizeSm}"/>

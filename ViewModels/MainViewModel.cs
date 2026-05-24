@@ -459,7 +459,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void TakeScreenshot()
     {
-        if (CurrentMedia is null) return;
+        Services.AppLog.Info($"TakeScreenshot invoked: media={CurrentMedia?.FileName ?? "(null)"} ipc={_ipc.IsConnected}");
+        if (CurrentMedia is null)
+        {
+            Toast?.Invoke("재생 중인 미디어가 없습니다");
+            return;
+        }
+        if (!_ipc.IsConnected)
+        {
+            Toast?.Invoke("mpv 연결이 끊겼습니다 — 앱 재시작 필요");
+            return;
+        }
         try
         {
             var dir = Path.Combine(
@@ -467,13 +477,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 "DenoPlayer");
             Directory.CreateDirectory(dir);
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var name = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);
-            var path = Path.Combine(dir, $"{name}_{stamp}.png");
+            var raw  = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);
+            // mpv가 일부 유니코드/특수문자 경로에서 실패하는 경우가 있어 file-name 안전화
+            var safe = string.Concat(raw.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+            if (string.IsNullOrWhiteSpace(safe)) safe = "screenshot";
+            var path = Path.Combine(dir, $"{safe}_{stamp}.png");
+            Services.AppLog.Info($"Screenshot -> {path}");
             _ = _ipc.Screenshot(path);
-            Toast?.Invoke($"스크린샷 저장 → {path}");
+            Toast?.Invoke($"스크린샷 저장 → {dir}");
         }
         catch (Exception ex)
         {
+            Services.AppLog.Error("Screenshot", ex);
             Toast?.Invoke("스크린샷 실패: " + ex.Message);
         }
     }
