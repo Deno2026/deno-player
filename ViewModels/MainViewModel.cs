@@ -298,8 +298,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// mpv loop-file을 현재 Repeat 모드와 강제 동기화. SendAsync는 fire-and-forget이라
-    /// 가끔 씹히고 mpv가 file 간에 상태를 carry-over하므로 CommandAsync로 응답 확인 + log.
+    /// mpv loop-file을 현재 Repeat 모드와 강제 동기화 + 즉시 동작 변화도 시도.
+    ///   None       → loop-file=no.
+    ///   RepeatAll  → loop-file=no (전체 반복은 우리가 OnEndFile에서 wrap).
+    ///   RepeatOne  → loop-file=inf (mpv가 자체 loop).
+    /// CommandAsync로 응답 확인. 응답 받은 뒤 mpv 쪽에서 실제 값 읽어 한 번 더 검증.
     /// </summary>
     private async Task SyncLoopFileToMpv()
     {
@@ -308,11 +311,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         try
         {
             await _ipc.CommandAsync("set_property", "loop-file", val);
-            Services.AppLog.Info($"  mpv loop-file = {val} OK");
+            Services.AppLog.Info($"  mpv loop-file <= {val} OK");
+
+            // 검증: mpv가 실제로 받았는지 readback
+            try
+            {
+                var got = await _ipc.CommandAsync("get_property", "loop-file");
+                var gotStr = got.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => got.GetString(),
+                    System.Text.Json.JsonValueKind.Number => got.GetRawText(),
+                    System.Text.Json.JsonValueKind.False  => "no",
+                    _ => got.ToString()
+                };
+                Services.AppLog.Info($"  mpv loop-file readback = {gotStr}");
+            }
+            catch { /* 검증 실패는 무해 */ }
         }
         catch (Exception ex)
         {
-            Services.AppLog.Warn($"  mpv loop-file = {val} FAILED: {ex.Message}");
+            Services.AppLog.Warn($"  mpv loop-file <= {val} FAILED: {ex.Message}");
         }
     }
     public bool IsRepeatActive => _repeat != RepeatMode.None;

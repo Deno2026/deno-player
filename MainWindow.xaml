@@ -82,6 +82,9 @@
         <KeyBinding Key="F"        Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="F11"      Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="Enter"    Modifiers="Alt" Command="{Binding FullscreenCommand}"/>
+        <!-- Enter 단독 (메인 키보드 / NumPad Enter 둘 다 잡힘) → 완전 풀스크린 -->
+        <KeyBinding Key="Enter"    Command="{Binding FullscreenCommand}"/>
+        <KeyBinding Key="Return"   Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="Escape"   Command="{Binding ExitFullscreenCommand}"/>
         <KeyBinding Key="Left"     Command="{Binding Seek5BackwardCommand}"/>
         <KeyBinding Key="Right"    Command="{Binding Seek5ForwardCommand}"/>
