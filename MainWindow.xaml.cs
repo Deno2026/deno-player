@@ -371,27 +371,36 @@ public partial class MainWindow : Window
         _playlistWin.Height = Math.Max(200, h - topOffset - 8);   // 하단 살짝 여백
     }
 
-    /// <summary>WPF 영역(영상 host 외)에서 마우스가 우측 끝 24px 진입 시 슬라이드 트리거.</summary>
+    /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → hot zone 안/밖 즉시 반영.</summary>
     private void CheckRightHotZoneFromWpf(Point posInRoot)
     {
         if (_playlistWin is null || _closing) return;
         var w = Root.ActualWidth;
         if (w <= 0) return;
-        if (posInRoot.X >= w - HotZoneWidth) _playlistWin.ShowSlide();
+        UpdatePlaylistFromHotZone(posInRoot.X, w);
     }
 
-    /// <summary>mpv가 보고한 영상 hwnd 안 좌표로 hot zone 검사. 영상 host width와 좌측 offset 0.</summary>
+    /// <summary>mpv가 보고한 영상 hwnd 안 X 좌표 → hot zone 안/밖 즉시 반영.</summary>
     private void CheckRightHotZoneFromMpv(double mpvX)
     {
         if (_playlistWin is null || _closing) return;
-        // throttle
-        var now = DateTime.UtcNow;
-        if (now - _lastHoverCheck < TimeSpan.FromMilliseconds(80)) return;
-        _lastHoverCheck = now;
-        // 영상 hwnd width = Window client width (단일 column이라 거의 같음)
         var w = ActualWidth;
         if (w <= 0) return;
-        if (mpvX >= w - HotZoneWidth) _playlistWin.ShowSlide();
+        UpdatePlaylistFromHotZone(mpvX, w);
+    }
+
+    private void UpdatePlaylistFromHotZone(double x, double w)
+    {
+        var inHotZone = x >= w - HotZoneWidth;
+        if (inHotZone)
+        {
+            _playlistWin!.ShowSlide();
+        }
+        else if (_playlistWin!.IsShown && !_playlistWin.IsMouseOver)
+        {
+            // hot zone 밖이고 panel 위도 아니면 즉시 hide
+            _playlistWin.HideSlide();
+        }
     }
 
     // ============================================================
@@ -517,8 +526,17 @@ public partial class MainWindow : Window
         {
             _savedStyle = WindowStyle;
             _savedResize = ResizeMode;
-            _wasMaximizedBeforeFs = WindowState == WindowState.Maximized;
-            if (!_wasMaximizedBeforeFs)
+            // 풀스크린 해제는 항상 "창 모드"로 갈 것이므로 normal-mode 좌표를 보존.
+            // 현재 Maximized면 RestoreBounds, 아니면 현재 값.
+            if (WindowState == WindowState.Maximized)
+            {
+                var rb = RestoreBounds;
+                _savedLeft   = double.IsNaN(rb.Left)   ? 100  : rb.Left;
+                _savedTop    = double.IsNaN(rb.Top)    ? 60   : rb.Top;
+                _savedWidth  = rb.Width  > 480 ? rb.Width  : 1280;
+                _savedHeight = rb.Height > 320 ? rb.Height : 760;
+            }
+            else
             {
                 _savedLeft = Left; _savedTop = Top;
                 _savedWidth = Width; _savedHeight = Height;
@@ -528,15 +546,13 @@ public partial class MainWindow : Window
             ResizeMode = ResizeMode.NoResize;
             if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
             WindowState = WindowState.Maximized;
-            // 풀스크린 진입 시 자동 숨김 활성화 — 컨트롤 잠시 후 페이드아웃
             RestartHideTimer();
         }
         else
         {
+            // 사용자 의도가 "풀스크린 ↔ 창 모드 스왑"이므로 Maximized로 자동 복원 안 함.
+            // 작은 창으로 명확히 되돌려야 사용자 시각에서 풀스크린과 구분됨.
             Mouse.OverrideCursor = null;
-            WindowState = WindowState.Normal;
-            WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
-            ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
                 CaptionHeight = 0,
@@ -544,15 +560,16 @@ public partial class MainWindow : Window
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
             });
-            if (_wasMaximizedBeforeFs)
-                WindowState = WindowState.Maximized;
-            else if (_savedWidth > 0 && _savedHeight > 0)
+            WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
+            ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
+            WindowState = WindowState.Normal;
+            if (_savedWidth > 0 && _savedHeight > 0)
             {
                 Left = _savedLeft; Top = _savedTop;
                 Width = _savedWidth; Height = _savedHeight;
             }
-            // 영구 표시 복귀
             ShowControls();
         }
+        SyncPlaylistWindowPosition();
     }
 }

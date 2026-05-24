@@ -16,7 +16,6 @@ namespace DenoPlayer.Views;
 /// </summary>
 public partial class PlaylistWindow : Window
 {
-    private readonly DispatcherTimer _hideTimer;
     public bool IsShown { get; private set; }
     public new MainViewModel? DataContext
     {
@@ -28,24 +27,20 @@ public partial class PlaylistWindow : Window
     {
         InitializeComponent();
         Width = 320;
-        _hideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
-        _hideTimer.Tick += (_, _) => { _hideTimer.Stop(); HideSlide(); };
     }
 
     public void ShowSlide()
     {
-        _hideTimer.Stop();
         if (IsShown) return;
         IsShown = true;
         var slide = new DoubleAnimation
         {
             To = 0,
-            Duration = TimeSpan.FromMilliseconds(180),
+            Duration = TimeSpan.FromMilliseconds(100),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
 
-        // 현재 항목 자동 스크롤
         if (DataContext?.CurrentMedia is { } cur)
             Dispatcher.BeginInvoke(new Action(() => PlaylistListBox.ScrollIntoView(cur)),
                 DispatcherPriority.Background);
@@ -58,16 +53,15 @@ public partial class PlaylistWindow : Window
         var slide = new DoubleAnimation
         {
             To = Width,
-            Duration = TimeSpan.FromMilliseconds(160),
+            Duration = TimeSpan.FromMilliseconds(100),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
     }
 
-    public void RequestHideSoon() { _hideTimer.Stop(); _hideTimer.Start(); }
-
-    private void OnPanelEnter(object sender, MouseEventArgs e) => _hideTimer.Stop();
-    private void OnPanelLeave(object sender, MouseEventArgs e) => RequestHideSoon();
+    // 패널 안에 마우스가 있으면 hide 안 함 (panel 안 클릭/스크롤 중에 사라지면 짜증)
+    private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
+    private void OnPanelLeave(object sender, MouseEventArgs e) => HideSlide();
 
     private void OnItemDoubleClick(object sender, MouseButtonEventArgs e)
     {
