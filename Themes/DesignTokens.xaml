@@ -231,6 +231,8 @@
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Height" Value="16"/>
         <Setter Property="Width" Value="16"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -272,12 +274,13 @@
         <Setter Property="IsMoveToPointEnabled" Value="True"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="Minimum" Value="0"/>
+        <Setter Property="MinHeight" Value="22"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
-                    <Grid VerticalAlignment="Center" Height="20">
-                        <!-- played(green)와 remaining(dark) 영역을 Track의 두 RepeatButton이 직접 그림.
-                             별도 binding 없이도 thumb 위치 = 그린 끝점으로 자동 일치. -->
+                    <!-- Grid가 thumb 전체 hit-test 영역. Transparent 배경으로 위/아래 여백도 hit. -->
+                    <Grid Background="Transparent" VerticalAlignment="Stretch" MinHeight="22">
+                        <!-- Track의 두 RepeatButton이 played(green)/remaining(dark) 영역을 직접 그림 -->
                         <Track x:Name="PART_Track" Height="6" VerticalAlignment="Center">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource SliderRepeatDecrease}" Command="Slider.DecreaseLarge"/>
