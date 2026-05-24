@@ -380,23 +380,11 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 재생목록 panel이 영상 위에 떠 있으면 mpv가 가려진 영역 redraw하면서 사용자 눈에
-    /// '영상이 흔들림'으로 보인다. panel show/hide와 동기해서 영상 host에 우측 margin을
-    /// 추가/제거 → 영상 영역이 panel과 안 겹치게.
+    /// 재생목록 panel은 영상 위에 그냥 덮음(사용자 요청). 영상 host 크기는 건드리지 않아서
+    /// mpv가 매번 letterbox 재계산할 일이 없음 — 영상 비율/위치 그대로 유지.
+    /// 이벤트는 남겨두지만 더 이상 영상 host margin을 만지지 않는다.
     /// </summary>
-    private void OnPlaylistShownChanged(bool shown)
-    {
-        var target = shown ? new Thickness(0, 0, _playlistWin?.Width ?? 320, 0) : new Thickness(0);
-        var anim = new System.Windows.Media.Animation.ThicknessAnimation
-        {
-            To = target,
-            Duration = TimeSpan.FromMilliseconds(100),
-            EasingFunction = shown
-                ? new CubicEase { EasingMode = EasingMode.EaseOut }
-                : new CubicEase { EasingMode = EasingMode.EaseIn }
-        };
-        VideoHostContainer.BeginAnimation(MarginProperty, anim);
-    }
+    private void OnPlaylistShownChanged(bool shown) { /* no-op: panel은 영상 위에 덮음 */ }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
