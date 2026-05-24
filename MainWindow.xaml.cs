@@ -92,6 +92,12 @@ public partial class MainWindow : Window
                 ApplyFullscreen(_vm.IsFullscreen);
             else if (e.PropertyName == nameof(MainViewModel.IsAlwaysOnTop))
                 Topmost = _vm.IsAlwaysOnTop;
+            else if (e.PropertyName == nameof(MainViewModel.State))
+            {
+                // 영상 없는 상태에선 컨트롤을 영구 표시 (닫기/최소화/파일 열기 접근성)
+                if (ControlsAlwaysOn) ShowControls();
+                else RestartHideTimer();
+            }
         };
     }
 
@@ -143,6 +149,8 @@ public partial class MainWindow : Window
         UpdatePopupLayout();
         OpenPopups();
         UpdatePopupLayout();
+        // 첫 화면에서 컨트롤(특히 닫기 버튼) 즉시 노출
+        ShowControls();
     }
 
     private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
@@ -264,9 +272,14 @@ public partial class MainWindow : Window
         RestartHideTimer();
     }
 
+    /// <summary>영상이 없는 상태(첫 화면, 실패, 드래그 중)는 컨트롤을 사라지게 하지 않는다.</summary>
+    private bool ControlsAlwaysOn =>
+        _vm.State is PlayerState.NoFile or PlayerState.Dragging or PlayerState.Failed;
+
     private void RestartHideTimer()
     {
         _controlsHideTimer.Stop();
+        if (ControlsAlwaysOn) return;          // 영구 표시 모드
         _controlsHideTimer.Interval = TimeSpan.FromMilliseconds(_vm.Settings.ControlAutoHideMs);
         _controlsHideTimer.Start();
     }
@@ -282,6 +295,7 @@ public partial class MainWindow : Window
 
     private void HideControls()
     {
+        if (ControlsAlwaysOn) return;          // 첫 화면/실패/드래그 중은 영구 표시
         if (TopBarBorder.IsMouseOver || BottomBarBorder.IsMouseOver) { RestartHideTimer(); return; }
         if (_vm.Seeking) { RestartHideTimer(); return; }
 

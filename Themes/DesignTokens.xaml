@@ -13,7 +13,7 @@
     <Color x:Key="ColorBgBase">#FF0B0E0C</Color>
     <Color x:Key="ColorBgRaised">#FF11160F</Color>
     <Color x:Key="ColorBgElevated">#FF161D14</Color>
-    <Color x:Key="ColorBgOverlay">#CC0A0D0B</Color>
+    <Color x:Key="ColorBgOverlay">#EE12180F</Color>
     <Color x:Key="ColorBgScrim">#A6000000</Color>
 
     <!-- ▣ Border -->
