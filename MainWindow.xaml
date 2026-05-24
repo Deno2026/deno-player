@@ -388,9 +388,10 @@
                                 Content="{Binding RepeatGlyph}"
                                 Command="{Binding CycleRepeatCommand}"
                                 Click="OnTooltipRefreshClick"
+                                MouseLeave="OnTooltipMouseLeave"
                                 ToolTipService.InitialShowDelay="0"
                                 ToolTipService.BetweenShowDelay="0"
-                                ToolTipService.ShowDuration="20000"
+                                ToolTipService.ShowDuration="2500"
                                 ToolTipService.Placement="Top">
                             <Button.ToolTip>
                                 <ToolTip Content="{Binding RepeatTooltip}"/>
@@ -400,9 +401,10 @@
                                 Content="&#xE8B1;"
                                 Command="{Binding ToggleShuffleCommand}"
                                 Click="OnTooltipRefreshClick"
+                                MouseLeave="OnTooltipMouseLeave"
                                 ToolTipService.InitialShowDelay="0"
                                 ToolTipService.BetweenShowDelay="0"
-                                ToolTipService.ShowDuration="20000"
+                                ToolTipService.ShowDuration="2500"
                                 ToolTipService.Placement="Top">
                             <Button.ToolTip>
                                 <ToolTip Content="{Binding ShuffleTooltip}"/>

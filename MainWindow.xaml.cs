@@ -563,10 +563,21 @@ public partial class MainWindow : Window
                 tt.PlacementTarget ??= btn;
                 tt.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
                 tt.IsOpen = false;
-                tt.IsOpen = true;
+                // 여전히 마우스가 버튼 위에 있을 때만 다시 표시 — 떠난 뒤면 새로 열지 않음
+                if (btn.IsMouseOver) tt.IsOpen = true;
             }
             catch { /* refresh 실패해도 무해 */ }
         }), System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// 우리가 click 시 IsOpen을 직접 토글하면 WPF의 자동 hide 메커니즘이 끊겨서
+    /// 마우스가 떠나도 ToolTip이 ShowDuration 끝까지 남는다. MouseLeave에서 강제 close.
+    /// </summary>
+    private void OnTooltipMouseLeave(object? sender, MouseEventArgs e)
+    {
+        if (sender is Button btn && btn.ToolTip is System.Windows.Controls.ToolTip tt)
+            tt.IsOpen = false;
     }
 
     private void OnSettingsClicked(object? sender, RoutedEventArgs e)
