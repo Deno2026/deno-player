@@ -646,7 +646,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Services.AppLog.Info($"OnEndFile reason={reason} repeat={Repeat} shuffle={Shuffle} hasNext={HasNext} idx={CurrentIndex} count={Playlist.Count}");
         OnUi(() =>
         {
-            // mpv는 EOF/redirect/unknown 등 다양한 reason을 보낸다. 진행성 사유는 모두 next로 처리
             var progress = reason is "eof" or "redirect" or "unknown" or null;
             if (progress)
             {
@@ -657,28 +656,39 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     return;
                 }
 
-                if (Shuffle && Playlist.Count > 1)
+                if (Shuffle)
                 {
-                    Services.AppLog.Info("  -> Shuffle next");
-                    PlayRandomNext();
+                    var rnd = PickRandomOfSameKind();
+                    if (rnd is not null)
+                    {
+                        Services.AppLog.Info($"  -> Shuffle next (sameKind) -> {rnd.FileName}");
+                        PlayMedia(rnd);
+                        return;
+                    }
+                }
+
+                // 자동 next는 같은 종류(영상↔영상, 음악↔음악)만 따라간다.
+                // ComfyUI 같은 폴더의 음악 옆에 .png 미리보기가 섞여있어도 음악 → 다음 음악으로 진행.
+                var nextSame = NextOfSameKind();
+                if (nextSame is not null)
+                {
+                    Services.AppLog.Info($"  -> Next (sameKind) -> {nextSame.FileName}");
+                    PlayMedia(nextSame);
                     return;
                 }
 
-                if (HasNext)
+                if (Repeat == RepeatMode.RepeatAll)
                 {
-                    Services.AppLog.Info("  -> Next");
-                    Next();
-                    return;
+                    var firstSame = FirstOfSameKind();
+                    if (firstSame is not null)
+                    {
+                        Services.AppLog.Info($"  -> RepeatAll wrap (sameKind) -> {firstSame.FileName}");
+                        PlayMedia(firstSame);
+                        return;
+                    }
                 }
 
-                if (Repeat == RepeatMode.RepeatAll && Playlist.Count > 0)
-                {
-                    Services.AppLog.Info("  -> RepeatAll wrap to first");
-                    PlayMedia(Playlist[0]);
-                    return;
-                }
-
-                Services.AppLog.Info("  -> stop (no more, no repeat/shuffle)");
+                Services.AppLog.Info("  -> stop (no more of same kind)");
             }
             else if (reason == "error")
             {
@@ -693,14 +703,33 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         });
     }
 
-    private void PlayRandomNext()
+    /// <summary>현재 항목 다음 인덱스부터 같은 kind인 첫 항목.</summary>
+    private MediaItem? NextOfSameKind()
     {
-        if (Playlist.Count <= 1) return;
-        var curIdx = CurrentIndex;
-        int next;
-        do { next = _rng.Next(Playlist.Count); }
-        while (next == curIdx);
-        PlayMedia(Playlist[next]);
+        if (CurrentMedia is null) return null;
+        var kind = CurrentMedia.Kind;
+        var idx = CurrentIndex;
+        for (var i = idx + 1; i < Playlist.Count; i++)
+            if (Playlist[i].Kind == kind) return Playlist[i];
+        return null;
+    }
+
+    /// <summary>재생목록 처음부터 같은 kind인 첫 항목 (RepeatAll wrap용).</summary>
+    private MediaItem? FirstOfSameKind()
+    {
+        if (CurrentMedia is null) return null;
+        var kind = CurrentMedia.Kind;
+        return Playlist.FirstOrDefault(m => m.Kind == kind);
+    }
+
+    /// <summary>같은 kind 중 현재 곡 외에서 랜덤 하나 (Shuffle 자동 next).</summary>
+    private MediaItem? PickRandomOfSameKind()
+    {
+        if (CurrentMedia is null) return null;
+        var kind = CurrentMedia.Kind;
+        var pool = Playlist.Where(m => m.Kind == kind && m != CurrentMedia).ToList();
+        if (pool.Count == 0) return null;
+        return pool[_rng.Next(pool.Count)];
     }
 
     // ============================================================
