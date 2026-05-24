@@ -439,10 +439,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (kind == MediaKind.Audio)
         {
-            // DENO green (#57E389) 파형. cline=중앙선 위아래로, 30fps, 1080p target.
+            // 부드러운 파형:
+            //   mode=line  → cline의 위아래 mirror 대신 단일 선 (덜 산만)
+            //   colors @0.45 → 그린 반투명, 검은 배경에서 자극 ↓
+            //   rate=12 + n=8192 → 12 fps + frame당 sample 평균 → 변화 천천히
+            //   draw=scale → peak에 따라 부드럽게 채움
+            //   s=1920x260 → 화면 가운데 가는 띠
             const string filter =
                 "[aid1]asplit[ao][a1];" +
-                "[a1]showwaves=mode=cline:colors=0x89E357:rate=30:s=1920x540[vo]";
+                "[a1]showwaves=mode=line:colors=0x57E389@0.45:rate=12:n=8192:s=1920x260:draw=scale[vo]";
             _ = _ipc.SendAsync("set_property", "lavfi-complex", filter);
         }
         else
