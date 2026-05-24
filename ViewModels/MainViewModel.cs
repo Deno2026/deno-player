@@ -425,9 +425,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         IsAtEnd = false;
         _ = _ipc.LoadFile(media.FullPath);
         _ = _ipc.SetPause(false);
+
+        // 오디오 파일이면 mpv lavfi 비주얼라이저로 파형을 비디오 출력에 그림 → 검은 화면 대신.
+        // 비디오/이미지는 lavfi-complex 클리어해서 기본 패스로 복귀.
+        ApplyVisualizer(media.Kind);
+
         if (_isPaused) IsPaused = false;
         NextCommand.RaiseCanExecuteChanged();
         PrevCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ApplyVisualizer(MediaKind kind)
+    {
+        if (kind == MediaKind.Audio)
+        {
+            // DENO green (#57E389) 파형. cline=중앙선 위아래로, 30fps, 1080p target.
+            const string filter =
+                "[aid1]asplit[ao][a1];" +
+                "[a1]showwaves=mode=cline:colors=0x89E357:rate=30:s=1920x540[vo]";
+            _ = _ipc.SendAsync("set_property", "lavfi-complex", filter);
+        }
+        else
+        {
+            _ = _ipc.SendAsync("set_property", "lavfi-complex", "");
+        }
     }
 
     private void Next()
