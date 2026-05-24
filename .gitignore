@@ -6,6 +6,10 @@ publish/
 *.user
 *.suo
 .vs/
+TestResults/
+*.trx
+coverage.cobertura.xml
+*.received.txt
 
 # IDE
 .idea/

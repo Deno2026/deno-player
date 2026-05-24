@@ -69,12 +69,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public async Task ConnectIpcAsync()
     {
+        Services.AppLog.Info($"IPC connect attempt pipe={_mpvProc.PipeName}");
         var ok = await _ipc.ConnectAsync(_mpvProc.PipeName, TimeSpan.FromSeconds(5));
         if (!ok)
         {
+            Services.AppLog.Error("IPC connect failed (timeout)");
             StatusMessage = "mpv IPC 연결 실패";
             State = PlayerState.Failed;
+            return;
         }
+        Services.AppLog.Info("IPC connected");
     }
 
     private async void OnIpcConnected()

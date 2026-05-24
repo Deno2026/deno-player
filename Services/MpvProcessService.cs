@@ -68,13 +68,17 @@ public sealed class MpvProcessService : IDisposable
         Arg("--no-osd-bar");
         Arg("--input-default-bindings=no");
         Arg("--input-vo-keyboard=no");
+        Arg("--input-cursor=yes");          // mouse-pos observe용 (자체 매핑은 no)
+        Arg("--cursor-autohide=no");        // 커서 숨김은 우리 OSD 타이머가 관리
+        Arg("--audio-display=no");          // 오디오 재생 시 cover art 안 띄움
         Arg("--keep-open=yes");
+        Arg("--keep-open-pause=no");        // EOF에서 멈추지 말고 자동 next 트리거
         Arg("--image-display-duration=inf");
         Arg("--hr-seek=yes");
         Arg("--cache=yes");
         Arg("--background=color");
         Arg("--background-color=#0B0E0C");
-        Arg("--osd-font='Segoe UI'");
+        Arg("--osd-font=Segoe UI");
         Arg($"--input-ipc-server={pipePath}");
         Arg($"--wid={videoHostHwnd.ToInt64()}");
 
@@ -83,10 +87,11 @@ public sealed class MpvProcessService : IDisposable
         proc.EnableRaisingEvents = true;
         proc.Exited += (_, _) =>
         {
-            // 호스트 윈도우가 살아있는데 mpv가 죽으면 crash 신호
+            AppLog.Warn($"mpv exited (pid={proc.Id}, exit={proc.ExitCode})");
             Crashed?.Invoke();
         };
         Process = proc;
+        AppLog.Info($"mpv started pid={proc.Id} pipe={pipePath}");
     }
 
     public void Dispose()

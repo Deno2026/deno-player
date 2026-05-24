@@ -9,10 +9,37 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # release 생성용 (tag 푸시 시)
 
 jobs:
-  build:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore DenoPlayer.sln
+
+      - name: Build
+        run: dotnet build DenoPlayer.sln -c Release --no-restore /warnaserror-
+
+      - name: Test
+        run: dotnet test tests/DenoPlayer.Tests/DenoPlayer.Tests.csproj -c Release --no-build --nologo --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/DenoPlayer.Tests/TestResults/*.trx
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,24 +50,65 @@ jobs:
       - name: Restore
         run: dotnet restore DenoPlayer.csproj
 
-      - name: Build (Release)
-        run: dotnet build DenoPlayer.csproj -c Release --no-restore /warnaserror-
-
-      - name: Publish (win-x64, framework-dependent)
-        if: startsWith(github.ref, 'refs/tags/v')
+      # ─ 가벼운 버전: .NET 8 Desktop runtime이 사용자 PC에 있어야 함 (~3 MB)
+      - name: Publish (framework-dependent)
         run: |
           dotnet publish DenoPlayer.csproj `
             -c Release -r win-x64 `
             --self-contained false `
-            -o publish\DenoPlayer-win-x64
+            -o publish\DenoPlayer-${{ github.ref_name }}-win-x64-fxdep
 
-      - name: Zip publish
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: Compress-Archive -Path publish\DenoPlayer-win-x64\* -DestinationPath DenoPlayer-${{ github.ref_name }}-win-x64.zip
+      - name: Zip framework-dependent
+        run: |
+          Compress-Archive `
+            -Path publish\DenoPlayer-${{ github.ref_name }}-win-x64-fxdep\* `
+            -DestinationPath DenoPlayer-${{ github.ref_name }}-win-x64-fxdep.zip
 
-      - name: Upload artifact
-        if: startsWith(github.ref, 'refs/tags/v')
+      # ─ 통째 포함: 런타임 불필요, 받자마자 실행 (~150 MB)
+      - name: Publish (self-contained)
+        run: |
+          dotnet publish DenoPlayer.csproj `
+            -c Release -r win-x64 `
+            --self-contained true `
+            -p:PublishReadyToRun=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o publish\DenoPlayer-${{ github.ref_name }}-win-x64
+
+      - name: Zip self-contained
+        run: |
+          Compress-Archive `
+            -Path publish\DenoPlayer-${{ github.ref_name }}-win-x64\* `
+            -DestinationPath DenoPlayer-${{ github.ref_name }}-win-x64.zip
+
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DenoPlayer-${{ github.ref_name }}-win-x64
-          path: DenoPlayer-${{ github.ref_name }}-win-x64.zip
+          name: DenoPlayer-${{ github.ref_name }}
+          path: |
+            DenoPlayer-${{ github.ref_name }}-win-x64.zip
+            DenoPlayer-${{ github.ref_name }}-win-x64-fxdep.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Deno Player ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            DenoPlayer-${{ github.ref_name }}-win-x64.zip
+            DenoPlayer-${{ github.ref_name }}-win-x64-fxdep.zip
+          body: |
+            ## Deno Player ${{ github.ref_name }}
+
+            로컬 미디어를 빠르게 열어 확인하는 가벼운 mpv 셸 플레이어 (Windows).
+
+            ### 다운로드
+
+            **그냥 받아서 쓰고 싶다면** → `DenoPlayer-${{ github.ref_name }}-win-x64.zip`
+            (.NET 런타임 포함, ~150 MB. 압축 풀고 `tools\install.ps1` 실행하면 끝)
+
+            **이미 .NET 8 Desktop Runtime이 깔려 있다면** → `DenoPlayer-${{ github.ref_name }}-win-x64-fxdep.zip` (~3 MB)
+
+            ### 사용
+            압축 푼 후 `tools\fetch-mpv.ps1`로 mpv를 받고(한 번만),
+            `tools\install.ps1`로 바탕화면 바로가기 + 탐색기 "연결 프로그램" 등록.

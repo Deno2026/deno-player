@@ -10,6 +10,7 @@
     <RootNamespace>DenoPlayer</RootNamespace>
     <AssemblyName>DenoPlayer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
     <Product>Deno Player</Product>
     <AssemblyTitle>Deno Player</AssemblyTitle>
     <Company>DENO</Company>
@@ -32,6 +33,17 @@
     <None Update="runtime\mpv\mpv.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- WPF Window.Icon용 임베디드 리소스 -->
+    <Resource Include="icon.ico" />
+  </ItemGroup>
+
+  <!-- tests 폴더는 별도 프로젝트(tests/DenoPlayer.Tests) — 메인 csproj가 자동으로 끌어들이지 않게 -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <Page Remove="tests\**" />
+    <Resource Remove="tests\**" />
+    <None Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
   </ItemGroup>
 
 </Project>

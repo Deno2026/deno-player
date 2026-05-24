@@ -107,8 +107,6 @@ public partial class MainWindow : Window
         };
     }
 
-    public void OpenFromExternal(string path) => _vm.OpenPath(path);
-
     // ============================================================
     // 초기화
     // ============================================================

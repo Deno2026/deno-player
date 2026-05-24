@@ -5,6 +5,7 @@
         xmlns:h="clr-namespace:DenoPlayer.Helpers"
         xmlns:vm="clr-namespace:DenoPlayer.ViewModels"
         Title="Deno Player"
+        Icon="pack://application:,,,/icon.ico"
         MinWidth="640" MinHeight="380"
         Width="1280" Height="760"
         Background="{StaticResource BrushBgBase}"

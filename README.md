@@ -127,6 +127,17 @@ pwsh -ExecutionPolicy Bypass -File .\tools\fetch-mpv.ps1
 - **오디오** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
 - **이미지** `.jpg .jpeg .png .webp .bmp .gif` (mpv가 표시)
 
+## 진단
+
+- **로그**: `%APPDATA%\DenoPlayer\log.txt` (1 MB 회전, 최대 2 파일).
+  세션 시작·mpv pid·IPC 연결·예외가 시간 스탬프와 함께 들어간다.
+  뭔가 이상하면 이 파일과 함께 알려주면 추적이 빠르다.
+- **단위 테스트**:
+  ```pwsh
+  dotnet test tests\DenoPlayer.Tests\DenoPlayer.Tests.csproj -c Release
+  ```
+  자연 정렬, 확장자 분류, 시간 포맷, 폴더 스캔, 설정 직렬화 회귀 방지.
+
 ## 설정 파일
 
 `%APPDATA%\DenoPlayer\settings.json` — 단일 파일. 설정 UI는 없다.

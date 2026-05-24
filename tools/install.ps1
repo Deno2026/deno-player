@@ -70,6 +70,8 @@ function Find-Exe {
     }
     $candidates = @(
         (Join-Path $repoRoot 'publish\DenoPlayer-win-x64\DenoPlayer.exe'),
+        (Join-Path $repoRoot 'publish\DenoPlayer-win-x64-fxdep\DenoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\Release\net8.0-windows\win-x64\publish\DenoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Release\net8.0-windows\publish\DenoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Release\net8.0-windows\DenoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Debug\net8.0-windows\DenoPlayer.exe'),
