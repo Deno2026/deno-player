@@ -105,9 +105,11 @@
                     Margin="0,16,0,0">
             <Button Style="{StaticResource ActionButton}"
                     Content="취소"
+                    IsCancel="True"
                     Click="OnCancel"/>
             <Button Style="{StaticResource ActionButton}"
                     Content="확인"
+                    IsDefault="True"
                     Foreground="{StaticResource BrushAccent}"
                     Click="OnConfirm"/>
         </StackPanel>

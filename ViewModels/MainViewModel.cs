@@ -25,6 +25,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public event Action? MouseActivity;
     public event Action<double, double>? MpvMousePos;
 
+    /// <summary>잠깐 띄울 OSD toast. 스크린샷 저장 같은 짧은 confirm용.</summary>
+    public event Action<string>? Toast;
+
     public MainViewModel(MpvProcessService mpvProc)
     {
         _mpvProc = mpvProc;
@@ -54,10 +57,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _                    => RepeatMode.None
         });
         ToggleShuffleCommand = new RelayCommand(() => Shuffle = !Shuffle);
-        Seek5ForwardCommand   = new RelayCommand(() => _ = _ipc.SeekRelative(5));
-        Seek5BackwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(-5));
-        Seek30ForwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(30));
-        Seek30BackwardCommand = new RelayCommand(() => _ = _ipc.SeekRelative(-30));
+        Seek5ForwardCommand   = new RelayCommand(() => SeekBy(5));
+        Seek5BackwardCommand  = new RelayCommand(() => SeekBy(-5));
+        Seek30ForwardCommand  = new RelayCommand(() => SeekBy(30));
+        Seek30BackwardCommand = new RelayCommand(() => SeekBy(-30));
         VolumeUpCommand   = new RelayCommand(() => Volume = Math.Min(100, Volume + 5));
         VolumeDownCommand = new RelayCommand(() => Volume = Math.Max(0,   Volume - 5));
         FrameStepCommand  = new RelayCommand(() => _ = _ipc.FrameStep());
@@ -324,6 +327,23 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (CurrentMedia is null) { OpenDialog(); return; }
         if (CurrentMedia.Kind == MediaKind.Image) return; // 이미지는 토글 무의미
+
+        // 영상 끝나서 멈춘 상태 → 처음부터 다시 재생 (사용자가 Space 누른 의도)
+        if (IsAtEnd)
+        {
+            _ = _ipc.SeekAbsolute(0);
+            _ = _ipc.SetPause(false);
+            IsAtEnd = false;
+            return;
+        }
+
+        // 재생 실패 상태에서 Space → 같은 파일 다시 시도
+        if (State == PlayerState.Failed)
+        {
+            PlayMedia(CurrentMedia);
+            return;
+        }
+
         _ = _ipc.SetPause(!IsPaused);
     }
 
@@ -396,13 +416,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (media is null) return;
         foreach (var m in Playlist) m.IsPlaying = false;
         media.IsPlaying = true;
+        media.HasError = false;        // 재시도 = 에러 마크 클리어
+        media.ErrorMessage = null;
         CurrentMedia = media;
         FileNameDisplay = media.FileName;
         State = PlayerState.Loading;
         StatusMessage = "로딩 중...";
+        IsAtEnd = false;
         _ = _ipc.LoadFile(media.FullPath);
-        // 일시정지 상태에서 다음 곡으로 넘어가도 자동 재생되도록 명시
-        // (mpv는 loadfile 직후 이전 pause 상태를 유지함)
         _ = _ipc.SetPause(false);
         if (_isPaused) IsPaused = false;
         NextCommand.RaiseCanExecuteChanged();
@@ -421,6 +442,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         PlayMedia(Playlist[CurrentIndex - 1]);
     }
 
+    private void SeekBy(double delta)
+    {
+        if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image) return;
+        // EOF 상태에서 ← 누르면: 끝에서 delta초 뒤로 + 자동 재생
+        if (IsAtEnd)
+        {
+            var target = Math.Max(0, Duration + delta);
+            _ = _ipc.SeekAbsolute(target);
+            _ = _ipc.SetPause(false);
+            IsAtEnd = false;
+            return;
+        }
+        _ = _ipc.SeekRelative(delta);
+    }
+
     private void TakeScreenshot()
     {
         if (CurrentMedia is null) return;
@@ -434,11 +470,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             var name = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);
             var path = Path.Combine(dir, $"{name}_{stamp}.png");
             _ = _ipc.Screenshot(path);
-            StatusMessage = $"스크린샷 저장: {path}";
+            Toast?.Invoke($"스크린샷 저장 → {path}");
         }
         catch (Exception ex)
         {
-            StatusMessage = "스크린샷 실패: " + ex.Message;
+            Toast?.Invoke("스크린샷 실패: " + ex.Message);
         }
     }
 
@@ -449,11 +485,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _seeking;
     public bool Seeking { get => _seeking; set => Set(ref _seeking, value); }
 
+    /// <summary>mpv 'eof-reached' = true. EOF 멈춤 상태에서 다음 액션 처리에 사용.</summary>
+    private bool _isAtEnd;
+    public bool IsAtEnd
+    {
+        get => _isAtEnd;
+        set => Set(ref _isAtEnd, value);
+    }
+
     public void BeginSeek() => Seeking = true;
     public void EndSeek(double seconds)
     {
         Seeking = false;
         _ = _ipc.SeekAbsolute(seconds);
+        // EOF 상태에서 seek = 그 위치부터 다시 보고 싶다는 의도 → 자동 재생
+        if (IsAtEnd)
+        {
+            _ = _ipc.SetPause(false);
+            IsAtEnd = false;
+        }
     }
 
     // mpv 이벤트가 매 frame (60Hz+) 옴 → UI 스레드 dispatch 폭주를 막아 키 입력 응답성 확보
@@ -518,6 +568,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     if (value is { ValueKind: JsonValueKind.String } se)
                         FileNameDisplay = se.GetString() ?? FileNameDisplay;
                     break;
+                case "eof-reached":
+                    if (TryGetBool(value, out var eof)) IsAtEnd = eof;
+                    break;
                 case "mouse-pos":
                     if (value is { ValueKind: JsonValueKind.Object } obj)
                     {
@@ -536,6 +589,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnUi(() =>
         {
             State = IsPaused ? PlayerState.Paused : PlayerState.Playing;
+            IsAtEnd = false;       // 새 파일 로드 = EOF 상태 해제
             StatusMessage = "";
         });
     }

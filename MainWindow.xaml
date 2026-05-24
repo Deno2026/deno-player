@@ -303,6 +303,25 @@
 
         </Grid>
 
+        <!-- Toast OSD — Screenshot 등 짧은 confirm. 평소엔 안 보임. -->
+        <Border x:Name="ToastBox"
+                Grid.Row="1"
+                VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Background="{StaticResource BrushBgRaised}"
+                BorderBrush="{StaticResource BrushAccent}"
+                BorderThickness="1"
+                CornerRadius="3"
+                Padding="14,8"
+                Margin="0,0,0,16"
+                Opacity="0"
+                IsHitTestVisible="False">
+            <TextBlock x:Name="ToastText"
+                       Style="{StaticResource TextBody}"
+                       FontSize="{StaticResource FontSizeSm}"
+                       MaxWidth="700"
+                       TextTrimming="CharacterEllipsis"/>
+        </Border>
+
         <!-- ============================================================
              BOTTOM CONTROLS — transport
              ============================================================ -->

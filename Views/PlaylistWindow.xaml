@@ -49,6 +49,7 @@
                      Style="{StaticResource PlaylistList}"
                      ItemsSource="{Binding Playlist}"
                      SelectedItem="{Binding CurrentMedia, Mode=OneWay}"
+                     PreviewMouseLeftButtonUp="OnItemClicked"
                      MouseDoubleClick="OnItemDoubleClick">
                 <ListBox.ItemTemplate>
                     <DataTemplate>

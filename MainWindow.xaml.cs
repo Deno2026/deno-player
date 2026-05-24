@@ -80,6 +80,7 @@ public partial class MainWindow : Window
         });
         // mpv의 hwnd 안 마우스 좌표를 받아 우측 hot-zone 감지 (영상 hwnd 위에서는 WPF가 못 잡음)
         _vm.MpvMousePos += (x, y) => Dispatcher.BeginInvoke(() => CheckRightHotZoneFromMpv(x));
+        _vm.Toast       += msg => Dispatcher.BeginInvoke(() => ShowToast(msg));
 
         SourceInitialized += OnSourceInit;
         Loaded   += OnWindowLoaded;
@@ -313,6 +314,40 @@ public partial class MainWindow : Window
             Mouse.OverrideCursor = Cursors.None;
     }
 
+    // ============================================================
+    // Toast — 짧은 OSD confirm (스크린샷 저장 등)
+    // ============================================================
+    private DispatcherTimer? _toastTimer;
+    private void ShowToast(string message)
+    {
+        ToastText.Text = message;
+        var anim = new DoubleAnimation
+        {
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(150),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        ToastBox.BeginAnimation(UIElement.OpacityProperty, anim);
+
+        _toastTimer ??= new DispatcherTimer();
+        _toastTimer.Stop();
+        _toastTimer.Interval = TimeSpan.FromMilliseconds(2200);
+        _toastTimer.Tick -= ToastTimerTick;
+        _toastTimer.Tick += ToastTimerTick;
+        _toastTimer.Start();
+    }
+    private void ToastTimerTick(object? sender, EventArgs e)
+    {
+        _toastTimer?.Stop();
+        var anim = new DoubleAnimation
+        {
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(250),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        ToastBox.BeginAnimation(UIElement.OpacityProperty, anim);
+    }
+
     private static void FadeTo(UIElement el, double target, int ms, bool hideAfter = false)
     {
         var anim = new DoubleAnimation
@@ -348,25 +383,27 @@ public partial class MainWindow : Window
         if (_playlistWin is null) return;
         if (WindowState == WindowState.Minimized) return;
 
-        // 메인 윈도우의 client area 우측 가장자리에 붙이기. 풀스크린/일반 둘 다 처리.
-        var w = WindowState == WindowState.Maximized
-            ? SystemParameters.WorkArea.Width  // taskbar 제외 영역
-            : ActualWidth;
-        var h = WindowState == WindowState.Maximized
-            ? SystemParameters.WorkArea.Height
-            : ActualHeight;
-        var left = WindowState == WindowState.Maximized
-            ? SystemParameters.WorkArea.Left
-            : Left;
-        var top = WindowState == WindowState.Maximized
-            ? SystemParameters.WorkArea.Top
-            : Top;
+        double left, top, w, h;
+        if (WindowStyle == WindowStyle.None && WindowState == WindowState.Maximized)
+        {
+            // 진짜 풀스크린 — Window의 실제 측정값(화면 전체)을 그대로 사용
+            left = Left; top = Top; w = ActualWidth; h = ActualHeight;
+        }
+        else if (WindowState == WindowState.Maximized)
+        {
+            // 일반 Maximized — 작업표시줄 제외 영역
+            var wa = SystemParameters.WorkArea;
+            left = wa.Left; top = wa.Top; w = wa.Width; h = wa.Height;
+        }
+        else
+        {
+            left = Left; top = Top; w = ActualWidth; h = ActualHeight;
+        }
 
-        // top: TopBar(36) 직후
-        var topOffset = 36;
+        const double topOffset = 36;
         _playlistWin.Left = left + w - _playlistWin.Width;
         _playlistWin.Top  = top + topOffset;
-        _playlistWin.Height = Math.Max(200, h - topOffset - 8);   // 하단 살짝 여백
+        _playlistWin.Height = Math.Max(200, h - topOffset - 8);
     }
 
     /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → hot zone 안/밖 즉시 반영.</summary>
