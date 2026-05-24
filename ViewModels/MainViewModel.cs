@@ -289,6 +289,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(RepeatGlyph));
             Raise(nameof(RepeatTooltip));
             Raise(nameof(IsRepeatActive));
+            Services.AppLog.Info($"Repeat set -> {value}");
             // mpv는 단일 곡 반복은 loop-file=inf로 자체 처리, 전체 반복/none은 우리가 OnEndFile에서
             _ = _ipc.SendAsync("set_property", "loop-file", value == RepeatMode.RepeatOne ? "inf" : "no");
         }
@@ -316,6 +317,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (!Set(ref _shuffle, value)) return;
             Settings.Shuffle = value;
             Raise(nameof(ShuffleTooltip));
+            Services.AppLog.Info($"Shuffle set -> {value}");
         }
     }
     public string ShuffleTooltip => _shuffle
@@ -552,12 +554,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         Seeking = false;
         _ = _ipc.SeekAbsolute(seconds);
-        // EOF 상태에서 seek = 그 위치부터 다시 보고 싶다는 의도 → 자동 재생
         if (IsAtEnd)
         {
             _ = _ipc.SetPause(false);
             IsAtEnd = false;
         }
+    }
+    /// <summary>드래그 중 live preview seek — Seeking 유지하며 mpv에만 위치 갱신.</summary>
+    public void LiveSeek(double seconds)
+    {
+        _ = _ipc.SeekAbsolute(seconds);
     }
 
     // mpv 이벤트가 매 frame (60Hz+) 옴 → UI 스레드 dispatch 폭주를 막아 키 입력 응답성 확보

@@ -398,6 +398,9 @@
                             Value="{Binding TimePos, Mode=OneWay}"
                             IsEnabled="{Binding HasMedia}"
                             Margin="10,0"
+                            Thumb.DragStarted="OnSeekDragStarted"
+                            Thumb.DragDelta="OnSeekDragDelta"
+                            Thumb.DragCompleted="OnSeekDragCompleted"
                             PreviewMouseLeftButtonDown="OnSeekDown"
                             PreviewMouseLeftButtonUp="OnSeekUp"
                             MouseWheel="OnSeekWheel"/>

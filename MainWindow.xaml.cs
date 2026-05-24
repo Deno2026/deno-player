@@ -447,6 +447,23 @@ public partial class MainWindow : Window
     {
         if (sender is Slider sl) _vm.EndSeek(sl.Value);
     }
+    private void OnSeekDragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+    {
+        _vm.BeginSeek();
+    }
+    private DateTime _lastLiveSeek;
+    private void OnSeekDragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (sender is not Slider sl) return;
+        var now = DateTime.UtcNow;
+        if (now - _lastLiveSeek < TimeSpan.FromMilliseconds(80)) return;
+        _lastLiveSeek = now;
+        _vm.LiveSeek(sl.Value);
+    }
+    private void OnSeekDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        if (sender is Slider sl) _vm.EndSeek(sl.Value);
+    }
     private void OnSeekWheel(object sender, MouseWheelEventArgs e)
     {
         if (e.Delta > 0) _vm.Seek5ForwardCommand.Execute(null);
