@@ -378,38 +378,56 @@ public partial class MainWindow : Window
         }
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd, out PInvokeRect rect);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct PInvokeRect { public int Left, Top, Right, Bottom; }
+
     private void SyncPlaylistWindowPosition()
     {
         if (_playlistWin is null) return;
         if (WindowState == WindowState.Minimized) return;
 
-        // 풀스크린/Maximized 전환 직후엔 ActualWidth/Height가 측정 전이라 0/작은 값 가능 →
-        // dispatcher 다음 cycle(layout pass 후)에 다시 한 번 보정.
+        // 풀스크린/Maximized/멀티모니터/HiDPI에서 WPF Left/ActualWidth가 부정확할 수 있음.
+        // hwnd의 실제 화면 좌표를 직접 가져온 뒤 DPI scale로 DIP 변환. 이 값은 어떤 환경에서도 신뢰 가능.
         DoSyncOnce();
         Dispatcher.BeginInvoke(new Action(DoSyncOnce), DispatcherPriority.ContextIdle);
 
         void DoSyncOnce()
         {
             if (_playlistWin is null) return;
-            double left, top, w, h;
-            if (WindowStyle == WindowStyle.None && WindowState == WindowState.Maximized)
-            {
-                left = Left; top = Top; w = ActualWidth; h = ActualHeight;
-            }
-            else if (WindowState == WindowState.Maximized)
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            if (!GetWindowRect(hwnd, out var r)) return;
+
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+            var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+
+            var left = r.Left / sx;
+            var top  = r.Top  / sy;
+            var w    = (r.Right  - r.Left) / sx;
+            var h    = (r.Bottom - r.Top)  / sy;
+
+            // 일반 Maximized(WindowChrome 적용)는 chrome border만큼 화면 밖으로 살짝 튀어나옴(보통 -8,-8).
+            // 작업표시줄까지 가는 진짜 풀스크린이 아니라면 work-area로 클램프해 panel이 작업표시줄 밖으로 안 가게.
+            if (WindowStyle != WindowStyle.None && WindowState == WindowState.Maximized)
             {
                 var wa = SystemParameters.WorkArea;
-                left = wa.Left; top = wa.Top; w = wa.Width; h = wa.Height;
+                if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
+                if (top  < wa.Top)  { h -= (wa.Top  - top);  top  = wa.Top;  }
+                if (left + w > wa.Right) w = wa.Right - left;
+                if (top  + h > wa.Bottom) h = wa.Bottom - top;
             }
-            else
-            {
-                left = Left; top = Top; w = ActualWidth; h = ActualHeight;
-            }
+
             if (w <= 0 || h <= 0) return;
 
             const double topOffset = 36;
             _playlistWin.Left = left + w - _playlistWin.Width;
-            _playlistWin.Top = top + topOffset;
+            _playlistWin.Top  = top + topOffset;
             _playlistWin.Height = Math.Max(200, h - topOffset - 8);
         }
     }
