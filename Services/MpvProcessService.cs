@@ -54,8 +54,11 @@ public sealed class MpvProcessService : IDisposable
             FileName = MpvPath,
             UseShellExecute = false,
             CreateNoWindow = true,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false,
+            // mpv가 죽으면 stderr에 사유 찍힘 — 우리 log로 흡수해 진단
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
             WorkingDirectory = Path.GetDirectoryName(MpvPath) ?? AppContext.BaseDirectory,
         };
 
@@ -72,7 +75,8 @@ public sealed class MpvProcessService : IDisposable
         Arg("--cursor-autohide=no");        // 커서 숨김은 우리 OSD 타이머가 관리
         Arg("--audio-display=no");          // 오디오 재생 시 cover art 안 띄움
         Arg("--keep-open=yes");
-        Arg("--keep-open-pause=no");        // EOF에서 멈추지 말고 자동 next 트리거
+        // --keep-open-pause=no 는 일부 mpv 빌드에서 EOF 시점에 crash 유발 (사용자 환경에서 확인).
+        // 기본값(yes)으로 두고 우리는 end-file 이벤트로 next 처리.
         Arg("--image-display-duration=inf");
         Arg("--hr-seek=yes");
         Arg("--cache=yes");
@@ -85,6 +89,13 @@ public sealed class MpvProcessService : IDisposable
         var proc = Process.Start(psi)
             ?? throw new InvalidOperationException("mpv 프로세스를 시작하지 못했습니다.");
         proc.EnableRaisingEvents = true;
+
+        // mpv가 stderr/stdout으로 토해내는 마지막 메시지는 crash 진단에 결정적
+        proc.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) AppLog.Info("mpv> " + e.Data); };
+        proc.ErrorDataReceived  += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) AppLog.Warn("mpv! " + e.Data); };
+        try { proc.BeginOutputReadLine(); } catch { }
+        try { proc.BeginErrorReadLine(); }  catch { }
+
         proc.Exited += (_, _) =>
         {
             AppLog.Warn($"mpv exited (pid={proc.Id}, exit={proc.ExitCode})");
