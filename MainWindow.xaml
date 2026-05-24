@@ -32,6 +32,7 @@
         <h:StateToVisibilityConverter x:Key="ShowVideoHost"
                                        Show="Playing,Paused,Ready,Loading"
                                        Otherwise="Hidden"/>
+        <h:BoolToVisibilityConverter x:Key="BoolVisHiddenAudio" WhenFalse="Hidden"/>
 
         <Style x:Key="PinButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
@@ -188,13 +189,57 @@
         <Grid Grid.Row="1">
             <!-- 영상 호스트 + 오버레이들 (같은 cell, 같은 z-stack) -->
             <Grid ClipToBounds="True">
-                <!-- 영상 — 영상 상태에서만 Visible. NoFile일 땐 Hidden -->
+                <!-- 영상 — 비디오/이미지일 때만 Visible. 오디오/NoFile/Failed일 땐 Hidden -->
                 <Border x:Name="VideoHostContainer"
                         Background="#FF050705"
                         Focusable="False"
-                        Visibility="{Binding State, Converter={StaticResource ShowVideoHost}}">
+                        Visibility="{Binding IsVideoSurfaceVisible, Converter={StaticResource BoolVisHiddenAudio}}">
                     <ContentControl x:Name="VideoHostSlot" Focusable="False"/>
                 </Border>
+
+                <!-- 오디오 재생 중 — 음표 아이콘 + 통통 튀는 애니메이션 -->
+                <Grid Visibility="{Binding IsAudioPlayback, Converter={StaticResource BoolVisHiddenAudio}}"
+                      Background="{StaticResource BrushBgBase}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Viewbox Width="180" Height="180" HorizontalAlignment="Center">
+                            <Grid>
+                                <TextBlock Text="&#xE8D6;"
+                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                           FontSize="140"
+                                           Foreground="{StaticResource BrushAccent}"
+                                           Opacity="0.85"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RenderTransformOrigin="0.5,0.5">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="AudioBounce" Y="0"/>
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Grid>
+                        </Viewbox>
+                        <TextBlock Text="오디오 재생 중"
+                                   Style="{StaticResource TextMono}"
+                                   Foreground="{StaticResource BrushFgMuted}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,20,0,0"/>
+                    </StackPanel>
+                    <Grid.Triggers>
+                        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetName="AudioBounce"
+                                                     Storyboard.TargetProperty="Y"
+                                                     From="0" To="-22"
+                                                     Duration="0:0:0.55">
+                                        <DoubleAnimation.EasingFunction>
+                                            <SineEase EasingMode="EaseInOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Grid.Triggers>
+                </Grid>
 
                 <!-- NoFile / Dragging — 영상 hidden일 때만 표시되는 카드 -->
                 <Grid Visibility="{Binding State, Converter={StaticResource ShowOnNoFile}}"

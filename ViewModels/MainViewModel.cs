@@ -124,7 +124,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     // ============================================================
 
     private PlayerState _state = PlayerState.NoFile;
-    public PlayerState State { get => _state; set => Set(ref _state, value); }
+    public PlayerState State
+    {
+        get => _state;
+        set
+        {
+            if (!Set(ref _state, value)) return;
+            Raise(nameof(IsAudioPlayback));
+            Raise(nameof(IsVideoSurfaceVisible));
+        }
+    }
 
     private string _statusMessage = "";
     public string StatusMessage { get => _statusMessage; set => Set(ref _statusMessage, value); }
@@ -139,8 +148,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public MediaItem? CurrentMedia
     {
         get => _currentMedia;
-        private set { if (Set(ref _currentMedia, value)) { Raise(nameof(HasMedia)); Raise(nameof(HasNext)); Raise(nameof(HasPrev)); } }
+        private set
+        {
+            if (!Set(ref _currentMedia, value)) return;
+            Raise(nameof(HasMedia));
+            Raise(nameof(HasNext));
+            Raise(nameof(HasPrev));
+            Raise(nameof(IsAudioPlayback));
+            Raise(nameof(IsVideoSurfaceVisible));
+        }
     }
+
+    /// <summary>오디오 파일을 재생/로딩 중 — 음표 오버레이를 띄울 조건.</summary>
+    public bool IsAudioPlayback =>
+        CurrentMedia?.Kind == MediaKind.Audio &&
+        State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
+
+    /// <summary>mpv child hwnd를 보여야 할 조건 — 비디오/이미지일 때만. 오디오는 Hidden.</summary>
+    public bool IsVideoSurfaceVisible =>
+        CurrentMedia?.Kind != MediaKind.Audio &&
+        State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
     public bool HasMedia => CurrentMedia is not null;
     public bool HasNext  => CurrentIndex >= 0 && CurrentIndex < Playlist.Count - 1;
     public bool HasPrev  => CurrentIndex > 0;
@@ -437,23 +464,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void ApplyVisualizer(MediaKind kind)
     {
-        if (kind == MediaKind.Audio)
-        {
-            // 부드러운 파형:
-            //   mode=line  → cline의 위아래 mirror 대신 단일 선 (덜 산만)
-            //   colors @0.45 → 그린 반투명, 검은 배경에서 자극 ↓
-            //   rate=12 + n=8192 → 12 fps + frame당 sample 평균 → 변화 천천히
-            //   draw=scale → peak에 따라 부드럽게 채움
-            //   s=1920x260 → 화면 가운데 가는 띠
-            const string filter =
-                "[aid1]asplit[ao][a1];" +
-                "[a1]showwaves=mode=line:colors=0x57E389@0.45:rate=12:n=8192:s=1920x260:draw=scale[vo]";
-            _ = _ipc.SendAsync("set_property", "lavfi-complex", filter);
-        }
-        else
-        {
-            _ = _ipc.SendAsync("set_property", "lavfi-complex", "");
-        }
+        // mpv 비주얼라이저는 사용자 환경에서 안정성/시각 둘 다 별로 — 빼고 WPF 오버레이로 처리.
+        // audio 파일은 mpv에서 video 출력 없이 재생, 우리 영상 host는 Hidden, 그 자리에 음표 아이콘.
+        _ = _ipc.SendAsync("set_property", "lavfi-complex", "");
     }
 
     private void Next()
