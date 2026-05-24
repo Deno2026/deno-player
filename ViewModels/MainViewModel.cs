@@ -601,44 +601,58 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnFileLoaded()
     {
+        Services.AppLog.Info($"OnFileLoaded: {CurrentMedia?.FileName}");
         OnUi(() =>
         {
             State = IsPaused ? PlayerState.Paused : PlayerState.Playing;
-            IsAtEnd = false;       // 새 파일 로드 = EOF 상태 해제
+            IsAtEnd = false;
             StatusMessage = "";
         });
+        // EOF 후 자동 next 시: mpv가 keep-open=yes로 pause=true 상태일 수 있음.
+        // 새 파일 로드되면 무조건 재생되도록 한 번 더 보장.
+        _ = _ipc.SetPause(false);
     }
 
     private static readonly Random _rng = new();
 
     private void OnEndFile(string? reason)
     {
+        Services.AppLog.Info($"OnEndFile reason={reason} repeat={Repeat} shuffle={Shuffle} hasNext={HasNext} idx={CurrentIndex} count={Playlist.Count}");
         OnUi(() =>
         {
-            if (reason == "eof")
+            // mpv는 EOF/redirect/unknown 등 다양한 reason을 보낸다. 진행성 사유는 모두 next로 처리
+            var progress = reason is "eof" or "redirect" or "unknown" or null;
+            if (progress)
             {
-                // RepeatOne은 mpv가 loop-file=inf로 자체 처리 → eof 이벤트 보통 안 옴. 안전망으로:
                 if (Repeat == RepeatMode.RepeatOne && CurrentMedia is not null)
                 {
+                    Services.AppLog.Info("  -> RepeatOne replay");
                     PlayMedia(CurrentMedia);
                     return;
                 }
 
                 if (Shuffle && Playlist.Count > 1)
                 {
+                    Services.AppLog.Info("  -> Shuffle next");
                     PlayRandomNext();
                     return;
                 }
 
                 if (HasNext)
                 {
+                    Services.AppLog.Info("  -> Next");
                     Next();
+                    return;
                 }
-                else if (Repeat == RepeatMode.RepeatAll && Playlist.Count > 0)
+
+                if (Repeat == RepeatMode.RepeatAll && Playlist.Count > 0)
                 {
+                    Services.AppLog.Info("  -> RepeatAll wrap to first");
                     PlayMedia(Playlist[0]);
+                    return;
                 }
-                // 그 외엔 그냥 멈춤
+
+                Services.AppLog.Info("  -> stop (no more, no repeat/shuffle)");
             }
             else if (reason == "error")
             {
