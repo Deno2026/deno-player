@@ -102,6 +102,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             await _ipc.SetVolume(Volume);
             await _ipc.SetMute(IsMuted);
             await _ipc.SetSpeed(Speed);
+            // 시작 시 mpv loop-file을 우리 Repeat 모드와 sync (settings에서 RepeatOne 복원된 경우 등)
+            await _ipc.CommandAsync("set_property", "loop-file",
+                _repeat == RepeatMode.RepeatOne ? "inf" : "no");
 
             await _ipc.ObserveProperty("time-pos");
             await _ipc.ObserveProperty("duration");
@@ -290,8 +293,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(RepeatTooltip));
             Raise(nameof(IsRepeatActive));
             Services.AppLog.Info($"Repeat set -> {value}");
-            // mpv는 단일 곡 반복은 loop-file=inf로 자체 처리, 전체 반복/none은 우리가 OnEndFile에서
-            _ = _ipc.SendAsync("set_property", "loop-file", value == RepeatMode.RepeatOne ? "inf" : "no");
+            _ = SyncLoopFileToMpv();
+        }
+    }
+
+    /// <summary>
+    /// mpv loop-file을 현재 Repeat 모드와 강제 동기화. SendAsync는 fire-and-forget이라
+    /// 가끔 씹히고 mpv가 file 간에 상태를 carry-over하므로 CommandAsync로 응답 확인 + log.
+    /// </summary>
+    private async Task SyncLoopFileToMpv()
+    {
+        var val = _repeat == RepeatMode.RepeatOne ? "inf" : "no";
+        if (!_ipc.IsConnected) return;
+        try
+        {
+            await _ipc.CommandAsync("set_property", "loop-file", val);
+            Services.AppLog.Info($"  mpv loop-file = {val} OK");
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Warn($"  mpv loop-file = {val} FAILED: {ex.Message}");
         }
     }
     public bool IsRepeatActive => _repeat != RepeatMode.None;
@@ -445,7 +466,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (media is null) return;
         foreach (var m in Playlist) m.IsPlaying = false;
         media.IsPlaying = true;
-        media.HasError = false;        // 재시도 = 에러 마크 클리어
+        media.HasError = false;
         media.ErrorMessage = null;
         CurrentMedia = media;
         FileNameDisplay = media.FileName;
@@ -454,9 +475,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         IsAtEnd = false;
         _ = _ipc.LoadFile(media.FullPath);
         _ = _ipc.SetPause(false);
-
-        // 오디오 파일이면 mpv lavfi 비주얼라이저로 파형을 비디오 출력에 그림 → 검은 화면 대신.
-        // 비디오/이미지는 lavfi-complex 클리어해서 기본 패스로 복귀.
+        // mpv는 loop-file을 file 간에 유지. 새 파일 로드마다 우리 Repeat 모드와 강제 sync.
+        _ = SyncLoopFileToMpv();
         ApplyVisualizer(media.Kind);
 
         if (_isPaused) IsPaused = false;
