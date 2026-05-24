@@ -33,6 +33,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _volume = Settings.Volume;
         _muted = Settings.Muted;
         _speed = Settings.PlaybackRate;
+        _isPlaylistOpen = Settings.PlaylistPanelEnabled;
 
         PlayPauseCommand = new RelayCommand(TogglePlayPause);
         NextCommand      = new RelayCommand(Next, () => HasNext);
@@ -42,6 +43,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         FullscreenCommand= new RelayCommand(() => IsFullscreen = !IsFullscreen);
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
+        TogglePlaylistCommand = new RelayCommand(() => IsPlaylistOpen = !IsPlaylistOpen);
         Seek5ForwardCommand   = new RelayCommand(() => _ = _ipc.SeekRelative(5));
         Seek5BackwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(-5));
         Seek30ForwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(30));
@@ -211,6 +213,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (Set(ref _isAlwaysOnTop, value)) Settings.AlwaysOnTop = value; }
     }
 
+    private bool _isPlaylistOpen = true;
+    public bool IsPlaylistOpen
+    {
+        get => _isPlaylistOpen;
+        set
+        {
+            if (!Set(ref _isPlaylistOpen, value)) return;
+            Settings.PlaylistPanelEnabled = value;
+            Raise(nameof(PlaylistColumnWidth));
+        }
+    }
+    public System.Windows.GridLength PlaylistColumnWidth =>
+        _isPlaylistOpen ? new System.Windows.GridLength(320) : new System.Windows.GridLength(0);
+
     // ============================================================
     // commands
     // ============================================================
@@ -223,6 +239,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand FullscreenCommand { get; }
     public RelayCommand ScreenshotCommand { get; }
     public RelayCommand AlwaysOnTopCommand { get; }
+    public RelayCommand TogglePlaylistCommand { get; }
     public RelayCommand Seek5ForwardCommand { get; }
     public RelayCommand Seek5BackwardCommand { get; }
     public RelayCommand Seek30ForwardCommand { get; }
