@@ -1,0 +1,2 @@
+// This folder must contain mpv.exe (Windows 64-bit build).
+// See README.md "mpv 설치" section or run tools/fetch-mpv.ps1

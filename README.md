@@ -1,0 +1,165 @@
+# Deno Player
+
+윈도우에서 가볍게 실행되는 **로컬 미디어 셸 플레이어**. 영상/오디오/이미지 파일을
+탐색기에서 빠르게 열어 확인하는 게 전부다. 광고, 계정, 클라우드, 추천, 스토어,
+플러그인, 라이브러리 색인 — 전부 없음.
+
+```
+ ┌──────────────────────────────────────────────────────────┐
+ │● clip.mp4                            📌 📷 🗀 — □ ✕     │
+ │                                                          │
+ │                                                          │
+ │                    [ 영상 영역 ]                          │
+ │                                                          │
+ │                                                          │
+ │ 00:12 ━━━━━●─────────────────────────────────────── 04:58│
+ │   ⏮  ▶  ⏭             🔇━●━━━━  1.0x   ⛶                │
+ └──────────────────────────────────────────────────────────┘
+                                       │  hover →  재생목록 │
+```
+
+## 설계 요약
+
+- **C# .NET 8 + WPF**. 단일 EXE. Electron/webview 없음.
+- **mpv를 별도 프로세스로 띄우고 named pipe JSON IPC로 제어**.
+- 영상은 child Win32 window(`--wid`)에 attach.
+- 코덱/디코더는 mpv에 위임. 자체 디코더 없음.
+- 컨트롤 오버레이는 마우스가 움직일 때만 잠깐 보이고 곧 사라진다.
+- 같은 폴더의 지원 미디어를 자연 정렬로 즉석 재생목록.
+- 네트워크/계정/텔레메트리 코드 0줄.
+
+## 빌드
+
+```pwsh
+# 1) .NET 8 SDK가 있어야 한다 (winget으로 설치 가능)
+winget install Microsoft.DotNet.SDK.8
+
+# 2) mpv.exe 가져오기 (한 번만)
+pwsh -ExecutionPolicy Bypass -File .\tools\fetch-mpv.ps1
+
+# 3) 빌드
+dotnet build -c Release
+
+# 4) 실행
+.\bin\Release\net8.0-windows\DenoPlayer.exe
+# 또는 파일을 인자로
+.\bin\Release\net8.0-windows\DenoPlayer.exe "C:\path\to\video.mp4"
+```
+
+릴리스 배포용 publish:
+
+```pwsh
+dotnet publish -c Release -r win-x64 --self-contained false -o .\publish
+```
+
+`publish\` 폴더를 그대로 배포하면 된다. mpv.exe는 사용자가 직접
+`runtime\mpv\mpv.exe` 자리에 넣게 한다 (라이선스 분리).
+
+## mpv 설치
+
+Deno Player는 **mpv.exe를 같이 배포하지 않는다** (GPL/LGPL 라이선스 분리).
+다음 중 하나로 받는다.
+
+### A. 자동 (권장)
+
+```pwsh
+pwsh -ExecutionPolicy Bypass -File .\tools\fetch-mpv.ps1
+```
+
+스크립트는 [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild)
+최신 릴리스의 x86_64 빌드를 받아 `runtime\mpv\mpv.exe`에 둔다. 7-Zip이
+설치돼 있어야 자동 압축 해제까지 끝난다 (`winget install 7zip.7zip`).
+
+### B. 수동
+
+1. https://mpv.io/installation/ 의 Windows 빌드 (`shinchiro` / `zhongfly`
+   등) 중 64-bit 정적 빌드를 받는다.
+2. 압축 해제 후 `mpv.exe`(+ 보조 DLL이 있다면)를 다음 경로에 둔다:
+   ```
+   <repo or install dir>\runtime\mpv\mpv.exe
+   ```
+3. Deno Player를 실행한다. `mpv.exe`가 없으면 시작 화면에 안내가 표시된다.
+
+## 단축키
+
+| 키 | 동작 |
+|---|---|
+| `Space` | 재생/일시정지 |
+| `←` / `→` | 5초 뒤로/앞으로 |
+| `Shift + ← / →` | 30초 뒤로/앞으로 |
+| `↑` / `↓` | 볼륨 5% |
+| `M` | 음소거 |
+| `F` / `F11` / `Alt+Enter` | 전체화면 토글 |
+| `Esc` | 전체화면 해제 |
+| `PageUp` / `PageDown` | 이전/다음 파일 |
+| `Shift + . / ,` | 배속 +0.25 / -0.25 |
+| `.` / `,` | 프레임 step / back step |
+| `Ctrl + O` | 파일 열기 |
+| `Ctrl + S` | 스크린샷 (Pictures\DenoPlayer\) |
+| `Ctrl + T` | 항상 위 토글 |
+| 더블클릭 | 전체화면 토글 |
+| 마우스 휠 | 볼륨 |
+| 우측 끝 24px hover | 재생목록 패널 |
+
+## 지원 파일
+
+- **비디오** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
+- **오디오** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **이미지** `.jpg .jpeg .png .webp .bmp .gif` (mpv가 표시)
+
+## 설정 파일
+
+`%APPDATA%\DenoPlayer\settings.json` — 단일 파일. 설정 UI는 없다.
+저장 값:
+
+- `windowWidth/Height`, `windowLeft/Top`, `windowMaximized`
+- `volume`, `muted`, `playbackRate`
+- `lastOpenedFolder`
+- `autoPlayNext`
+- `controlAutoHideMs` (기본 2500)
+- `playlistPanelEnabled` (기본 true)
+- `alwaysOnTop`
+
+마지막 재생 위치는 저장하지 않는다 (재생목록 자동 진행만 유지).
+
+## 명령줄
+
+```
+DenoPlayer.exe                       # 빈 상태로 실행
+DenoPlayer.exe "C:\path\video.mp4"   # 파일 즉시 열기 + 같은 폴더 재생목록
+```
+
+탐색기에서 "연결 프로그램"으로 등록하면 더블클릭 한 번에 열린다 (자동 등록 UI는
+없음 — Windows의 기본 앱 설정에서 직접 지정).
+
+## 의도적으로 없는 것
+
+광고 · 계정 · 로그인 · 클라우드 · 텔레메트리 · 분석 · 추천 · 뉴스 · 스토어 ·
+스킨 마켓 · 플러그인 시스템 · 코덱팩 권유 · 자동 업데이트 · 영상 변환 · 영상 편집 ·
+캡처/녹화(스크린샷 외) · AI 기능 · 자막 싱크 편집기 · 미디어 라이브러리 색인 ·
+폴더 전체 DB 스캔.
+
+## 구조
+
+```
+DenoPlayer.csproj
+App.xaml / App.xaml.cs                — 진입점, 명령줄 인자 처리
+MainWindow.xaml / .xaml.cs            — 셸 화면, 컨트롤 자동 숨김, 풀스크린
+Themes/DesignTokens.xaml              — 색·간격·시간 단일 출처(디자인 DNA)
+Models/MediaKind.cs                   — 확장자 분류 단일 출처
+Models/MediaItem.cs                   — 재생목록 항목
+Models/AppSettings.cs                 — 설정 모델
+Services/MpvProcessService.cs         — mpv.exe 프로세스 관리(시작/종료/crash)
+Services/MpvIpcClient.cs              — Windows named pipe JSON IPC 클라이언트
+Services/PlaylistService.cs           — 폴더 스캔 + 자연 정렬
+Services/SettingsService.cs           — %APPDATA%\DenoPlayer\settings.json
+ViewModels/MainViewModel.cs           — 상태/명령
+Helpers/                              — Win32 child window, RelayCommand, 자연정렬, …
+runtime/mpv/mpv.exe                   — 사용자가 직접 배치
+tools/fetch-mpv.ps1                   — mpv 자동 다운로드
+```
+
+## 라이선스
+
+코드 본체는 **MIT**. 자세한 건 [LICENSE](LICENSE) / [NOTICE.md](NOTICE.md).
+mpv 바이너리는 별도 GPLv2+/LGPLv2.1+, 사용자가 직접 받아 사용.

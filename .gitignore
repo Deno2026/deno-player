@@ -1,0 +1,27 @@
+# Build
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+.vs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Runtime — mpv.exe는 라이선스가 별도(GPL) — 사용자에게 받게 한다
+runtime/mpv/mpv.exe
+runtime/mpv/*.dll
+runtime/mpv/*.7z
+runtime/mpv/*.zip
+
+# Local
+*.local.json
+*.log

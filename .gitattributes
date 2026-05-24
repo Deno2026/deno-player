@@ -1,0 +1,27 @@
+# Default behavior: auto-detect text vs binary, normalize text to LF in repo
+* text=auto eol=lf
+
+# Source code — LF in repo, CRLF in working dir (Visual Studio expects)
+*.cs       text eol=crlf
+*.xaml     text eol=crlf
+*.csproj   text eol=crlf
+*.manifest text eol=crlf
+
+# Build/cmd scripts
+*.ps1      text eol=crlf
+*.cmd      text eol=crlf
+*.bat      text eol=crlf
+
+# Markdown/docs
+*.md       text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+
+# Binary — never normalize
+*.png      binary
+*.jpg      binary
+*.ico      binary
+*.exe      binary
+*.dll      binary
+*.7z       binary
+*.zip      binary
