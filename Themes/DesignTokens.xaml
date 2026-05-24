@@ -229,22 +229,27 @@
 
     <Style x:Key="SeekThumb" TargetType="Thumb">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
-        <Setter Property="Height" Value="14"/>
-        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Width" Value="16"/>
         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Grid>
+                    <!-- Grid Background=Transparent: hit-test 영역을 thumb 전체로 확보.
+                         (Background null이면 빈 픽셀은 hit 안 받아 드래그 실패) -->
+                    <Grid Background="Transparent">
+                        <!-- Halo는 시각 효과만 — mouse는 안 가로챔 -->
                         <Ellipse x:Name="Halo"
                                  Fill="{StaticResource BrushAccent}"
-                                 Opacity="0"/>
-                        <!-- 평소에도 보이는 원형 indicator (현 위치) -->
+                                 Opacity="0"
+                                 IsHitTestVisible="False"/>
+                        <!-- 평소에도 보이는 원형 indicator -->
                         <Ellipse x:Name="Dot"
                                  Width="12" Height="12"
                                  Fill="{StaticResource BrushAccent}"
                                  Stroke="{StaticResource BrushBgBase}"
-                                 StrokeThickness="2"/>
+                                 StrokeThickness="2"
+                                 IsHitTestVisible="False"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type Slider}}, Path=IsMouseOver}" Value="True">
@@ -254,7 +259,7 @@
                         <Trigger Property="IsDragging" Value="True">
                             <Setter TargetName="Dot" Property="Width" Value="14"/>
                             <Setter TargetName="Dot" Property="Height" Value="14"/>
-                            <Setter TargetName="Halo" Property="Opacity" Value="0.3"/>
+                            <Setter TargetName="Halo" Property="Opacity" Value="0.25"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
