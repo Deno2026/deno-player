@@ -99,33 +99,67 @@ function Install-DenoPlayer {
     Write-Host ">>> Registering Deno Player" -ForegroundColor Cyan
     Write-Host "    exe: $exe" -ForegroundColor DarkGray
 
-    # 1) HKCU Application key (shows up in "Open with")
+    $hkcu = [Microsoft.Win32.Registry]::CurrentUser
+    $progId        = 'DenoPlayer.Media'
+    $openWithProg  = 'Applications\DenoPlayer.exe'
+    $capabilities  = 'Software\DenoPlayer\Capabilities'
+
+    # 1) HKCU Application key — "Open with" menu / SupportedTypes
     New-Item -Path $AppRegKey -Force | Out-Null
     Set-ItemProperty -Path $AppRegKey -Name 'FriendlyAppName' -Value 'Deno Player' -Force
-
     New-Item -Path "$AppRegKey\shell\open\command" -Force | Out-Null
-    Set-ItemProperty -Path "$AppRegKey\shell\open\command" -Name '(Default)' -Value ('"' + $exe + '" "%1"') -Force
-
-    # SupportedTypes — extensions this app accepts (for "Open with" dialog)
+    Set-ItemProperty -Path "$AppRegKey\shell\open\command" -Name '(Default)' `
+        -Value ('"' + $exe + '" "%1"') -Force
     New-Item -Path "$AppRegKey\SupportedTypes" -Force | Out-Null
     foreach ($e in $AllExt) {
         Set-ItemProperty -Path "$AppRegKey\SupportedTypes" -Name $e -Value '' -Force
     }
 
-    # 2) Per-extension OpenWithProgids so each file type lists Deno Player
-    #    PowerShell's Set-ItemProperty -Name silently drops names containing
-    #    backslashes ("Applications\DenoPlayer.exe"), so use the .NET API
-    #    directly to preserve the literal value name.
-    $hkcu = [Microsoft.Win32.Registry]::CurrentUser
+    # 2) ProgID — required to be selectable as a real default app
+    New-Item -Path "HKCU:\Software\Classes\$progId" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
+        -Name '(Default)' -Value 'Deno Player Media File' -Force
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
+        -Name 'FriendlyTypeName' -Value 'Deno Player 미디어' -Force
+    New-Item -Path "HKCU:\Software\Classes\$progId\DefaultIcon" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\DefaultIcon" `
+        -Name '(Default)' -Value ('"' + $exe + '",0') -Force
+    New-Item -Path "HKCU:\Software\Classes\$progId\shell\open\command" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\shell\open\command" `
+        -Name '(Default)' -Value ('"' + $exe + '" "%1"') -Force
+
+    # 3) Capabilities + RegisteredApplications — Settings "기본 앱"에 등장
+    New-Item -Path "HKCU:\$capabilities" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\$capabilities" `
+        -Name 'ApplicationName' -Value 'Deno Player' -Force
+    Set-ItemProperty -Path "HKCU:\$capabilities" `
+        -Name 'ApplicationDescription' `
+        -Value '로컬 미디어를 빠르게 여는 가벼운 mpv 셸 플레이어' -Force
+    Set-ItemProperty -Path "HKCU:\$capabilities" `
+        -Name 'ApplicationIcon' -Value ('"' + $exe + '",0') -Force
+
+    New-Item -Path "HKCU:\$capabilities\FileAssociations" -Force | Out-Null
+    foreach ($e in $AllExt) {
+        Set-ItemProperty -Path "HKCU:\$capabilities\FileAssociations" `
+            -Name $e -Value $progId -Force
+    }
+    New-Item -Path 'HKCU:\Software\RegisteredApplications' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' `
+        -Name 'Deno Player' -Value $capabilities -Force
+
+    # 4) Per-extension OpenWithProgids — Set-ItemProperty가 backslash 포함 값 이름을
+    #    silently drop하므로 .NET API 직접 사용. ProgID + Applications\... 둘 다 추가
     foreach ($e in $AllExt) {
         $sub = $hkcu.CreateSubKey("Software\Classes\$e\OpenWithProgids", $true)
         try {
-            $sub.SetValue('Applications\DenoPlayer.exe', [byte[]]@(),
+            $sub.SetValue($progId, [byte[]]@(),
+                          [Microsoft.Win32.RegistryValueKind]::None)
+            $sub.SetValue($openWithProg, [byte[]]@(),
                           [Microsoft.Win32.RegistryValueKind]::None)
         } finally { $sub.Close() }
     }
 
-    # 3) Shortcuts
+    # 5) Shortcuts
     if (-not $NoDesktop) {
         New-Shortcut -target $exe -lnk $DesktopLnk -workdir $work -desc 'Deno Player — local media shell'
         Write-Host "    desktop:    $DesktopLnk" -ForegroundColor DarkGray
@@ -147,14 +181,28 @@ function Install-DenoPlayer {
 
 function Uninstall-DenoPlayer {
     Write-Host ">>> Removing Deno Player registrations" -ForegroundColor Cyan
+    $progId = 'DenoPlayer.Media'
     if (Test-Path $AppRegKey) {
         Remove-Item -Path $AppRegKey -Recurse -Force
         Write-Host "    removed $AppRegKey" -ForegroundColor DarkGray
+    }
+    if (Test-Path "HKCU:\Software\Classes\$progId") {
+        Remove-Item -Path "HKCU:\Software\Classes\$progId" -Recurse -Force
+        Write-Host "    removed ProgID $progId" -ForegroundColor DarkGray
+    }
+    if (Test-Path 'HKCU:\Software\DenoPlayer') {
+        Remove-Item -Path 'HKCU:\Software\DenoPlayer' -Recurse -Force
+        Write-Host "    removed Capabilities" -ForegroundColor DarkGray
+    }
+    if (Test-Path 'HKCU:\Software\RegisteredApplications') {
+        Remove-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' `
+            -Name 'Deno Player' -ErrorAction SilentlyContinue
     }
     foreach ($e in $AllExt) {
         $extKey = "HKCU:\Software\Classes\$e\OpenWithProgids"
         if (Test-Path $extKey) {
             Remove-ItemProperty -Path $extKey -Name 'Applications\DenoPlayer.exe' -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $extKey -Name $progId -ErrorAction SilentlyContinue
         }
     }
     if (Test-Path $DesktopLnk)   { Remove-Item $DesktopLnk -Force }
