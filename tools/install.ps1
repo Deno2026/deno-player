@@ -120,7 +120,7 @@ function Install-DenoPlayer {
     Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
         -Name '(Default)' -Value 'Deno Player Media File' -Force
     Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
-        -Name 'FriendlyTypeName' -Value 'Deno Player 미디어' -Force
+        -Name 'FriendlyTypeName' -Value 'Deno Player Media' -Force
     New-Item -Path "HKCU:\Software\Classes\$progId\DefaultIcon" -Force | Out-Null
     Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\DefaultIcon" `
         -Name '(Default)' -Value ('"' + $exe + '",0') -Force
@@ -134,7 +134,7 @@ function Install-DenoPlayer {
         -Name 'ApplicationName' -Value 'Deno Player' -Force
     Set-ItemProperty -Path "HKCU:\$capabilities" `
         -Name 'ApplicationDescription' `
-        -Value '로컬 미디어를 빠르게 여는 가벼운 mpv 셸 플레이어' -Force
+        -Value 'Lightweight local media shell player (mpv backend)' -Force
     Set-ItemProperty -Path "HKCU:\$capabilities" `
         -Name 'ApplicationIcon' -Value ('"' + $exe + '",0') -Force
 
