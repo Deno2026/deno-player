@@ -23,5 +23,12 @@ public sealed class AppSettings
     public bool PlaylistPanelEnabled { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = false;
 
+    // 0=None, 1=RepeatAll, 2=RepeatOne
+    public int RepeatMode { get; set; } = 0;
+    public bool Shuffle { get; set; } = false;
+
+    // 환경설정에서 사용자가 등록한 확장자 — null/빈이면 전체 default 사용
+    public List<string>? RegisteredExtensions { get; set; }
+
     public static AppSettings Defaults() => new();
 }

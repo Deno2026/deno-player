@@ -48,6 +48,22 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="RepeatToggleButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRepeatActive}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ShuffleToggleButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Shuffle}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
@@ -127,6 +143,10 @@
                             Content="&#xE8E5;"
                             ToolTip="파일 열기 (Ctrl+O)"
                             Command="{Binding OpenCommand}"/>
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE713;"
+                            ToolTip="환경설정 — 연결 프로그램 등록"
+                            Click="OnSettingsClicked"/>
                     <Border Width="1" Height="16" Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
                     <Button Style="{StaticResource IconButton}" Content="&#xE921;" ToolTip="최소화" Click="OnMinimize"/>
                     <Button x:Name="MaxRestoreBtn" Style="{StaticResource IconButton}"
@@ -343,6 +363,16 @@
                                 Content="&#xE893;"
                                 ToolTip="다음 파일 (PageDown)"
                                 Command="{Binding NextCommand}"/>
+                        <Border Width="1" Height="18"
+                                Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
+                        <Button Style="{StaticResource RepeatToggleButton}"
+                                Content="{Binding RepeatGlyph}"
+                                ToolTip="{Binding RepeatTooltip}"
+                                Command="{Binding CycleRepeatCommand}"/>
+                        <Button Style="{StaticResource ShuffleToggleButton}"
+                                Content="&#xE8B1;"
+                                ToolTip="셔플 (랜덤 재생)"
+                                Command="{Binding ToggleShuffleCommand}"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal">

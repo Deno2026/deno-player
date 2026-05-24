@@ -19,7 +19,6 @@ public partial class MainWindow : Window
     private readonly Win32VideoHost _videoHost = new();
     private readonly MainViewModel _vm;
     private readonly DispatcherTimer _controlsHideTimer;
-    private bool _wasMaximizedBeforeFs;
     private WindowStyle _savedStyle;
     private ResizeMode _savedResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
@@ -28,8 +27,7 @@ public partial class MainWindow : Window
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
-    private const int HotZoneWidth = 24;            // 우측 끝 24px hover trigger
-    private DateTime _lastHoverCheck;
+    private const int HotZoneWidth = 80;            // 우측 끝 80px hover trigger — 근처 가면 바로 펼침
 
     public MainWindow()
     {
@@ -512,6 +510,21 @@ public partial class MainWindow : Window
     // ============================================================
     // Window chrome buttons
     // ============================================================
+    private void OnSettingsClicked(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dlg = new SettingsWindow(_vm.Settings) { Owner = this };
+            dlg.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Error("Open SettingsWindow", ex);
+            MessageBox.Show(this, "환경설정 창을 열 수 없습니다:\n" + ex.Message,
+                "Deno Player", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void OnMinimize(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void OnMaxRestore(object? sender, RoutedEventArgs e)
         => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;

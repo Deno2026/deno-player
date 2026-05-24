@@ -34,6 +34,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _muted = Settings.Muted;
         _speed = Settings.PlaybackRate;
         _isPlaylistOpen = Settings.PlaylistPanelEnabled;
+        _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
+        _shuffle = Settings.Shuffle;
 
         PlayPauseCommand = new RelayCommand(TogglePlayPause);
         NextCommand      = new RelayCommand(Next, () => HasNext);
@@ -45,6 +47,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
         TogglePlaylistCommand = new RelayCommand(() => IsPlaylistOpen = !IsPlaylistOpen);
+        CycleRepeatCommand = new RelayCommand(() => Repeat = Repeat switch
+        {
+            RepeatMode.None      => RepeatMode.RepeatAll,
+            RepeatMode.RepeatAll => RepeatMode.RepeatOne,
+            _                    => RepeatMode.None
+        });
+        ToggleShuffleCommand = new RelayCommand(() => Shuffle = !Shuffle);
         Seek5ForwardCommand   = new RelayCommand(() => _ = _ipc.SeekRelative(5));
         Seek5BackwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(-5));
         Seek30ForwardCommand  = new RelayCommand(() => _ = _ipc.SeekRelative(30));
@@ -236,6 +245,49 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public System.Windows.GridLength PlaylistColumnWidth =>
         _isPlaylistOpen ? new System.Windows.GridLength(320) : new System.Windows.GridLength(0);
 
+    // ────────────────────────────────────────────────────────
+    // Repeat / Shuffle
+    // ────────────────────────────────────────────────────────
+    private RepeatMode _repeat = RepeatMode.None;
+    public RepeatMode Repeat
+    {
+        get => _repeat;
+        set
+        {
+            if (!Set(ref _repeat, value)) return;
+            Settings.RepeatMode = (int)value;
+            Raise(nameof(RepeatGlyph));
+            Raise(nameof(RepeatTooltip));
+            Raise(nameof(IsRepeatActive));
+            // mpv는 단일 곡 반복은 loop-file=inf로 자체 처리, 전체 반복/none은 우리가 OnEndFile에서
+            _ = _ipc.SendAsync("set_property", "loop-file", value == RepeatMode.RepeatOne ? "inf" : "no");
+        }
+    }
+    public bool IsRepeatActive => _repeat != RepeatMode.None;
+    public string RepeatGlyph => _repeat switch
+    {
+        RepeatMode.RepeatOne => "",   // Repeat1
+        _ => ""                        // RepeatAll
+    };
+    public string RepeatTooltip => _repeat switch
+    {
+        RepeatMode.None      => "반복 끔 (클릭: 전체 반복)",
+        RepeatMode.RepeatAll => "전체 반복 (클릭: 한 곡 반복)",
+        RepeatMode.RepeatOne => "한 곡 반복 (클릭: 끔)",
+        _ => ""
+    };
+
+    private bool _shuffle;
+    public bool Shuffle
+    {
+        get => _shuffle;
+        set
+        {
+            if (!Set(ref _shuffle, value)) return;
+            Settings.Shuffle = value;
+        }
+    }
+
     // ============================================================
     // commands
     // ============================================================
@@ -250,6 +302,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand ScreenshotCommand { get; }
     public RelayCommand AlwaysOnTopCommand { get; }
     public RelayCommand TogglePlaylistCommand { get; }
+    public RelayCommand CycleRepeatCommand { get; }
+    public RelayCommand ToggleShuffleCommand { get; }
     public RelayCommand Seek5ForwardCommand { get; }
     public RelayCommand Seek5BackwardCommand { get; }
     public RelayCommand Seek30ForwardCommand { get; }
@@ -482,13 +536,36 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         });
     }
 
+    private static readonly Random _rng = new();
+
     private void OnEndFile(string? reason)
     {
         OnUi(() =>
         {
-            if (reason == "eof" && Settings.AutoPlayNext && HasNext)
+            if (reason == "eof")
             {
-                Next();
+                // RepeatOne은 mpv가 loop-file=inf로 자체 처리 → eof 이벤트 보통 안 옴. 안전망으로:
+                if (Repeat == RepeatMode.RepeatOne && CurrentMedia is not null)
+                {
+                    PlayMedia(CurrentMedia);
+                    return;
+                }
+
+                if (Shuffle && Playlist.Count > 1)
+                {
+                    PlayRandomNext();
+                    return;
+                }
+
+                if (HasNext)
+                {
+                    Next();
+                }
+                else if (Repeat == RepeatMode.RepeatAll && Playlist.Count > 0)
+                {
+                    PlayMedia(Playlist[0]);
+                }
+                // 그 외엔 그냥 멈춤
             }
             else if (reason == "error")
             {
@@ -501,6 +578,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 StatusMessage = "이 파일을 재생할 수 없습니다.";
             }
         });
+    }
+
+    private void PlayRandomNext()
+    {
+        if (Playlist.Count <= 1) return;
+        var curIdx = CurrentIndex;
+        int next;
+        do { next = _rng.Next(Playlist.Count); }
+        while (next == curIdx);
+        PlayMedia(Playlist[next]);
     }
 
     // ============================================================
