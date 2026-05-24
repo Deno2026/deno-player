@@ -341,6 +341,9 @@
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
         <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        <!-- ListBox가 ↑↓ 키를 가로채면 Window의 볼륨 단축키가 안 먹음 -->
+        <Setter Property="KeyboardNavigation.DirectionalNavigation" Value="None"/>
+        <Setter Property="Focusable" Value="False"/>
     </Style>
 
     <!-- ============================================================

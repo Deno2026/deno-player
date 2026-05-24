@@ -60,7 +60,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ipc.EndFile        += OnEndFile;
         _ipc.FileLoaded     += OnFileLoaded;
         _ipc.Connected      += OnIpcConnected;
-        _ipc.Disconnected   += () => OnUi(() => State = PlayerState.NoFile);
+        _ipc.Disconnected   += () => OnUi(() =>
+        {
+            // Failed 상태(예: mpv crash 메시지)는 보존. 그 외엔 NoFile로.
+            if (State != PlayerState.Failed) State = PlayerState.NoFile;
+        });
     }
 
     public async Task ConnectIpcAsync()
@@ -300,6 +304,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             StatusMessage = $"지원하지 않는 형식: {Path.GetExtension(path)}";
             return;
         }
+        if (!_ipc.IsConnected)
+        {
+            State = PlayerState.Failed;
+            StatusMessage = "mpv 백엔드 연결이 끊겼습니다. 앱을 다시 시작해주세요.";
+            return;
+        }
 
         var folder = Path.GetDirectoryName(path);
         Settings.LastOpenedFolder = folder;
@@ -325,6 +335,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         State = PlayerState.Loading;
         StatusMessage = "로딩 중...";
         _ = _ipc.LoadFile(media.FullPath);
+        // 일시정지 상태에서 다음 곡으로 넘어가도 자동 재생되도록 명시
+        // (mpv는 loadfile 직후 이전 pause 상태를 유지함)
+        _ = _ipc.SetPause(false);
+        if (_isPaused) IsPaused = false;
         NextCommand.RaiseCanExecuteChanged();
         PrevCommand.RaiseCanExecuteChanged();
     }

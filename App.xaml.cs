@@ -1,17 +1,26 @@
 using System.Windows;
 using System.Windows.Threading;
+using DenoPlayer.Services;
 
 namespace DenoPlayer;
 
 public partial class App : Application
 {
     public static string[] StartupArgs { get; private set; } = Array.Empty<string>();
+    private SingleInstance? _single;
 
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
         StartupArgs = e.Args ?? Array.Empty<string>();
 
-        // 미처리 예외는 사용자에게 짧게 알려주고 앱 보존
+        // ─ Single instance ─ 이미 떠 있으면 첫 인스턴스에 인자 보내고 종료
+        _single = new SingleInstance();
+        if (!_single.TryClaim(StartupArgs))
+        {
+            Shutdown(0);
+            return;
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, ex) =>
         {
             var msg = ex.ExceptionObject?.ToString() ?? "unknown";
@@ -29,17 +38,16 @@ public partial class App : Application
         MainWindow = win;
         win.Show();
 
-        if (StartupArgs.Length > 0)
+        _single.ArgsReceived += args =>
         {
-            // 첫 번째 인자가 파일이면 그 파일 열기
-            var first = StartupArgs[0];
-            if (System.IO.File.Exists(first))
-                win.OpenFromExternal(first);
-        }
+            // 다른 인스턴스가 보낸 인자 → 메인 윈도우 활성화 + 파일 열기
+            (MainWindow as MainWindow)?.ReceiveExternalArgs(args);
+        };
     }
 
     private void OnAppExit(object sender, ExitEventArgs e)
     {
-        // 명시적 정리는 MainWindow.Closing에서 처리; 이중 안전.
+        _single?.Dispose();
+        _single = null;
     }
 }

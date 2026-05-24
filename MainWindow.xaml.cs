@@ -23,6 +23,9 @@ public partial class MainWindow : Window
     private ResizeMode _savedResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _closing;
+    private int _mpvRestartCount;
+    private DateTime _lastMpvRestartAt = DateTime.MinValue;
+    private const int MaxMpvRestarts = 3;
 
     public MainWindow()
     {
@@ -53,7 +56,19 @@ public partial class MainWindow : Window
         _mpvProc.Crashed += () => Dispatcher.BeginInvoke(() =>
         {
             if (_closing) return;
-            _vm.StatusMessage = "mpv 프로세스가 종료되었습니다.";
+            // 자동 재시작 — 한 세션에서 일정 한도까지만 (무한 루프 방지)
+            if (_mpvRestartCount < MaxMpvRestarts &&
+                DateTime.UtcNow - _lastMpvRestartAt > TimeSpan.FromSeconds(5))
+            {
+                _mpvRestartCount++;
+                _lastMpvRestartAt = DateTime.UtcNow;
+                _ = RestartMpvAsync();
+            }
+            else
+            {
+                _vm.State = PlayerState.Failed;
+                _vm.StatusMessage = "mpv 프로세스가 반복 종료되었습니다. 앱을 다시 시작해주세요.";
+            }
         });
 
         // 영상 hwnd 위에서의 마우스 활동은 mpv가 보고해 줘야 잡힘
@@ -73,10 +88,22 @@ public partial class MainWindow : Window
 
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.IsFullscreen))
-                ApplyFullscreen(_vm.IsFullscreen);
-            else if (e.PropertyName == nameof(MainViewModel.IsAlwaysOnTop))
-                Topmost = _vm.IsAlwaysOnTop;
+            switch (e.PropertyName)
+            {
+                case nameof(MainViewModel.IsFullscreen):
+                    ApplyFullscreen(_vm.IsFullscreen);
+                    break;
+                case nameof(MainViewModel.IsAlwaysOnTop):
+                    Topmost = _vm.IsAlwaysOnTop;
+                    break;
+                case nameof(MainViewModel.CurrentMedia):
+                    // 재생 항목으로 자동 스크롤 — 큰 폴더에서 위치 잃지 않게
+                    if (_vm.CurrentMedia is not null && PlaylistListBox is not null)
+                        Dispatcher.BeginInvoke(new Action(() =>
+                            PlaylistListBox.ScrollIntoView(_vm.CurrentMedia)),
+                            DispatcherPriority.Background);
+                    break;
+            }
         };
     }
 
@@ -98,6 +125,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_videoHost.Hwnd == IntPtr.Zero)
+        {
+            _vm.State = PlayerState.Failed;
+            _vm.StatusMessage = "내부 오류: 비디오 호스트 hwnd가 생성되지 않았습니다.";
+            return;
+        }
+
         try
         {
             _mpvProc.Start(_videoHost.Hwnd);
@@ -110,12 +144,56 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 명령줄 인자 처리
+        // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
+        OpenInitialPathIfAny();
+    }
+
+    private async Task RestartMpvAsync()
+    {
+        try
+        {
+            _mpvProc.Dispose();
+            await Task.Delay(200);
+            if (_closing) return;
+            _mpvProc.Start(_videoHost.Hwnd);
+            await _vm.ConnectIpcAsync();
+            _vm.StatusMessage = "";
+            // 재생 중이었으면 같은 파일 다시 열기
+            if (_vm.CurrentMedia is { } cm) _vm.PlayMedia(cm);
+        }
+        catch (Exception ex)
+        {
+            _vm.State = PlayerState.Failed;
+            _vm.StatusMessage = "mpv 재시작 실패: " + ex.Message;
+        }
+    }
+
+    /// <summary>App.StartupArgs / SecondInstanceArgs 첫 인자가 파일이면 열기.</summary>
+    private void OpenInitialPathIfAny()
+    {
         if (App.StartupArgs.Length > 0)
         {
             var first = App.StartupArgs[0];
             if (File.Exists(first)) _vm.OpenPath(first);
         }
+    }
+
+    /// <summary>다른 인스턴스가 인자를 보냄 (single-instance hand-off).</summary>
+    public void ReceiveExternalArgs(string[] args)
+    {
+        if (args is null || args.Length == 0) return;
+        if (Dispatcher.CheckAccess()) ApplyExternalArgs(args);
+        else Dispatcher.BeginInvoke(new Action(() => ApplyExternalArgs(args)));
+    }
+
+    private void ApplyExternalArgs(string[] args)
+    {
+        // 윈도우 활성화
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true; Topmost = _vm.IsAlwaysOnTop; // bring-to-front trick
+        var first = args[0];
+        if (File.Exists(first)) _vm.OpenPath(first);
     }
 
     // ============================================================
@@ -189,8 +267,13 @@ public partial class MainWindow : Window
         _controlsHideTimer.Start();
     }
 
+    // 현재 OSD 표시 상태 — animation 재트리거 방지 (mpv mouse-pos가 픽셀당 보고)
+    private bool _osdShown = true;
+
     private void ShowControls()
     {
+        if (_osdShown && TopBar.Visibility == Visibility.Visible) return;
+        _osdShown = true;
         TopBar.Visibility = Visibility.Visible;
         BottomBar.Visibility = Visibility.Visible;
         FadeTo(TopBar, 1.0, 120);
@@ -203,6 +286,8 @@ public partial class MainWindow : Window
         if (ControlsAlwaysOn) return;
         if (TopBar.IsMouseOver || BottomBar.IsMouseOver) { RestartHideTimer(); return; }
         if (_vm.Seeking) { RestartHideTimer(); return; }
+        if (!_osdShown) return;
+        _osdShown = false;
 
         FadeTo(TopBar, 0.0, 200, hideAfter: true);
         FadeTo(BottomBar, 0.0, 200, hideAfter: true);
@@ -266,11 +351,21 @@ public partial class MainWindow : Window
 
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is DependencyObject d &&
-            (FindAncestor<Slider>(d) is not null ||
-             FindAncestor<Button>(d) is not null ||
-             FindAncestor<ListBox>(d) is not null))
-            return;
+        // TopBar/BottomBar/재생목록 위 더블클릭은 풀스크린 토글 아님.
+        // (TopBar 빈 영역 더블클릭은 OnDragArea_MouseDown에서 max/restore로 이미 처리)
+        if (e.OriginalSource is DependencyObject d)
+        {
+            if (FindAncestor<Slider>(d) is not null) return;
+            if (FindAncestor<Button>(d) is not null) return;
+            if (FindAncestor<ListBox>(d) is not null) return;
+            // TopBar/BottomBar 영역인지 확인
+            var parent = d;
+            while (parent is not null)
+            {
+                if (parent == TopBar || parent == BottomBar) return;
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+        }
         _vm.FullscreenCommand.Execute(null);
         e.Handled = true;
     }
