@@ -203,11 +203,14 @@
     <!-- ============================================================
          Slider — transport seek/volume 공용
          ============================================================ -->
-    <!-- 미재생 영역(우측) — 어둠 -->
+    <!-- 미재생 영역(우측) — 어둠. IsHitTestVisible=False: 클릭은 Slider가 받아서
+         IsMoveToPointEnabled으로 thumb을 그 위치로 점프시키게 한다 (안 그러면
+         RepeatButton이 클릭을 가로채서 LargeChange만 발생). -->
     <Style x:Key="SliderRepeatIncrease" TargetType="RepeatButton">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
@@ -217,11 +220,12 @@
         </Setter>
     </Style>
 
-    <!-- 재생된 영역(좌측) — DENO green. 현 위치는 자동으로 thumb까지 채워짐 -->
+    <!-- 재생된 영역(좌측) — DENO green. -->
     <Style x:Key="SliderRepeatDecrease" TargetType="RepeatButton">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">

@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
-    private const int HotZoneWidth = 160;           // 우측 hover trigger — 충분히 넓게 (1080~1440p 가운데 비율 적정)
+    private const int HotZoneWidth = 280;           // 우측 hover trigger — 매우 넓게 (사용자 요청 점진 확대)
 
     public MainWindow()
     {
