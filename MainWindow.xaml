@@ -65,6 +65,7 @@
         <KeyBinding Key="F"        Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="F11"      Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="Enter"    Modifiers="Alt" Command="{Binding FullscreenCommand}"/>
+        <KeyBinding Key="Escape"   Command="{Binding ExitFullscreenCommand}"/>
         <KeyBinding Key="Left"     Command="{Binding Seek5BackwardCommand}"/>
         <KeyBinding Key="Right"    Command="{Binding Seek5ForwardCommand}"/>
         <KeyBinding Key="Left"     Modifiers="Shift" Command="{Binding Seek30BackwardCommand}"/>

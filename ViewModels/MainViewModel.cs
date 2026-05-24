@@ -41,6 +41,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OpenCommand      = new RelayCommand(OpenDialog);
         MuteCommand      = new RelayCommand(() => IsMuted = !IsMuted);
         FullscreenCommand= new RelayCommand(() => IsFullscreen = !IsFullscreen);
+        ExitFullscreenCommand = new RelayCommand(() => { if (IsFullscreen) IsFullscreen = false; });
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
         TogglePlaylistCommand = new RelayCommand(() => IsPlaylistOpen = !IsPlaylistOpen);
@@ -245,6 +246,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand OpenCommand { get; }
     public RelayCommand MuteCommand { get; }
     public RelayCommand FullscreenCommand { get; }
+    public RelayCommand ExitFullscreenCommand { get; }
     public RelayCommand ScreenshotCommand { get; }
     public RelayCommand AlwaysOnTopCommand { get; }
     public RelayCommand TogglePlaylistCommand { get; }
