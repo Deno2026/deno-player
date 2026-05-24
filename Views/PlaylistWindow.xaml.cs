@@ -30,6 +30,8 @@ internal static class VisualSearch
 public partial class PlaylistWindow : Window
 {
     public bool IsShown { get; private set; }
+    /// <summary>Show/Hide 시작 시점 통지 — MainWindow가 영상 host margin sync용.</summary>
+    public event Action<bool>? ShownChanged;
     public new MainViewModel? DataContext
     {
         get => base.DataContext as MainViewModel;
@@ -46,6 +48,7 @@ public partial class PlaylistWindow : Window
     {
         if (IsShown) return;
         IsShown = true;
+        ShownChanged?.Invoke(true);
         var slide = new DoubleAnimation
         {
             To = 0,
@@ -63,6 +66,7 @@ public partial class PlaylistWindow : Window
     {
         if (!IsShown) return;
         IsShown = false;
+        ShownChanged?.Invoke(false);
         var slide = new DoubleAnimation
         {
             To = Width,

@@ -373,9 +373,29 @@ public partial class MainWindow : Window
         {
             _playlistWin = new PlaylistWindow { Owner = this };
             _playlistWin.DataContext = _vm;
+            _playlistWin.ShownChanged += OnPlaylistShownChanged;
             _playlistWin.Show();
             SyncPlaylistWindowPosition();
         }
+    }
+
+    /// <summary>
+    /// 재생목록 panel이 영상 위에 떠 있으면 mpv가 가려진 영역 redraw하면서 사용자 눈에
+    /// '영상이 흔들림'으로 보인다. panel show/hide와 동기해서 영상 host에 우측 margin을
+    /// 추가/제거 → 영상 영역이 panel과 안 겹치게.
+    /// </summary>
+    private void OnPlaylistShownChanged(bool shown)
+    {
+        var target = shown ? new Thickness(0, 0, _playlistWin?.Width ?? 320, 0) : new Thickness(0);
+        var anim = new System.Windows.Media.Animation.ThicknessAnimation
+        {
+            To = target,
+            Duration = TimeSpan.FromMilliseconds(100),
+            EasingFunction = shown
+                ? new CubicEase { EasingMode = EasingMode.EaseOut }
+                : new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        VideoHostContainer.BeginAnimation(MarginProperty, anim);
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
