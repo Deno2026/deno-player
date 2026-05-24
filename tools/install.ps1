@@ -113,10 +113,16 @@ function Install-DenoPlayer {
     }
 
     # 2) Per-extension OpenWithProgids so each file type lists Deno Player
+    #    PowerShell's Set-ItemProperty -Name silently drops names containing
+    #    backslashes ("Applications\DenoPlayer.exe"), so use the .NET API
+    #    directly to preserve the literal value name.
+    $hkcu = [Microsoft.Win32.Registry]::CurrentUser
     foreach ($e in $AllExt) {
-        $extKey = "HKCU:\Software\Classes\$e\OpenWithProgids"
-        New-Item -Path $extKey -Force | Out-Null
-        Set-ItemProperty -Path $extKey -Name 'Applications\DenoPlayer.exe' -Value '' -Force
+        $sub = $hkcu.CreateSubKey("Software\Classes\$e\OpenWithProgids", $true)
+        try {
+            $sub.SetValue('Applications\DenoPlayer.exe', [byte[]]@(),
+                          [Microsoft.Win32.RegistryValueKind]::None)
+        } finally { $sub.Close() }
     }
 
     # 3) Shortcuts
