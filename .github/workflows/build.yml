@@ -24,7 +24,9 @@ jobs:
         run: dotnet restore DenoPlayer.sln
 
       - name: Build
-        run: dotnet build DenoPlayer.sln -c Release --no-restore /warnaserror-
+        # /warnaserror-는 SDK 8까지만 인식. CI runner SDK 10에서 MSB1001로 reject되므로 제거.
+        # 우리 csproj는 TreatWarningsAsErrors 기본값(false)이라 동등.
+        run: dotnet build DenoPlayer.sln -c Release --no-restore
 
       - name: Test
         run: dotnet test tests/DenoPlayer.Tests/DenoPlayer.Tests.csproj -c Release --no-build --nologo --logger "trx;LogFileName=test-results.trx"
