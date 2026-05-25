@@ -98,6 +98,12 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
         SizeChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
 
+        // main window가 deactivate(focus 다른 곳)되면 Space hold가 stuck될 수 있어 강제 복귀
+        Deactivated += (_, _) =>
+        {
+            if (_spaceHeld) { _vm.Speed = _speedBeforeHold; _spaceHeld = false; }
+        };
+
         _vm.PropertyChanged += (_, e) =>
         {
             switch (e.PropertyName)
@@ -605,14 +611,11 @@ public partial class MainWindow : Window
 
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        // TopBar/BottomBar/재생목록 위 더블클릭은 풀스크린 토글 아님.
-        // (TopBar 빈 영역 더블클릭은 OnDragArea_MouseDown에서 max/restore로 이미 처리)
         if (e.OriginalSource is DependencyObject d)
         {
             if (FindAncestor<Slider>(d) is not null) return;
             if (FindAncestor<Button>(d) is not null) return;
             if (FindAncestor<ListBox>(d) is not null) return;
-            // TopBar/BottomBar 영역인지 확인
             var parent = d;
             while (parent is not null)
             {
@@ -620,6 +623,9 @@ public partial class MainWindow : Window
                 parent = VisualTreeHelper.GetParent(parent);
             }
         }
+        // 우/좌 가장자리 hint 영역 (3px)에서의 더블클릭은 무시 (사용자가 hover 의도로 본 영역)
+        var pos = e.GetPosition(Root);
+        if (pos.X < 4 || pos.X > Root.ActualWidth - 4) return;
         _vm.FullscreenCommand.Execute(null);
         e.Handled = true;
     }
@@ -689,7 +695,8 @@ public partial class MainWindow : Window
     private void OnSpaceDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
-        // OS 자동 키 리피트 = hold로 판단. 첫 IsRepeat 시 2x 진입.
+        // hold 동작 중에도 OSD 살아 있게
+        ShowControls(); RestartHideTimer();
         if (e.IsRepeat)
         {
             if (!_spaceHeld)
@@ -702,7 +709,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 누른 순간엔 아무것도 안 함. KeyUp에서 toggle vs hold 결정.
             e.Handled = true;
         }
     }
@@ -710,18 +716,22 @@ public partial class MainWindow : Window
     private void OnSpaceUp(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
+        EndSpaceHoldOrToggle();
+        e.Handled = true;
+    }
+
+    /// <summary>main window가 비활성화돼도 hold 상태가 stuck되지 않게 안전 복귀.</summary>
+    private void EndSpaceHoldOrToggle()
+    {
         if (_spaceHeld)
         {
-            // hold 끝 → 이전 속도 복귀
             _vm.Speed = _speedBeforeHold;
             _spaceHeld = false;
         }
         else
         {
-            // 짧게 누름 → Play/Pause toggle
             _vm.PlayPauseCommand.Execute(null);
         }
-        e.Handled = true;
     }
 
     // ============================================================

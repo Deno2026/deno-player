@@ -82,7 +82,6 @@ public partial class PlaylistWindow : Window
 
     private void OnItemClicked(object sender, MouseButtonEventArgs e)
     {
-        // 단일 클릭으로 즉시 재생. 사용자 의도가 명확한 미디어 플레이어 관행.
         if (e.OriginalSource is DependencyObject d)
         {
             var lbi = VisualSearch.FindAncestor<ListBoxItem>(d);
@@ -90,6 +89,8 @@ public partial class PlaylistWindow : Window
             {
                 DataContext?.PlayMedia(mi);
                 e.Handled = true;
+                // 같은 폴더 안에서 곡 바꾸는 경우 panel은 그대로 둠 (사용자가 다른 곡 또
+                // 빠르게 고르기 편하게). Recent와 달리 흐름이 끊기지 않음.
             }
         }
     }

@@ -64,6 +64,8 @@ public partial class RecentWindow : Window
             {
                 DataContext?.OpenPath(ri.FullPath);
                 e.Handled = true;
+                // 곡 골랐으니 panel 즉시 접기 (사용자가 mouse 이동 안 해도 자연스럽게)
+                HideSlide();
             }
         }
     }
