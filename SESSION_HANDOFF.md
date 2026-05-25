@@ -1,11 +1,56 @@
 # Deno Player — Session Handoff
 
-**Status (2026-05-25, v0.3.0):** 사용자 자율 진행 라운드 종료 상태.
-v0.1.5 이후 사용자 손 테스트 피드백을 받아가며 hover 패널 2개(우측 재생목록 /
-좌측 최근), Repeat/Shuffle 라이브 컨트롤, 핫존 정밀화, mpv 백엔드 고정, seek
-드래그/클릭/스냅백 해결, 파일 연결 4-tier 등록, Space hold 2x, Enter
-전체화면, 엣지 힌트 스트립까지 누적. **57/57 unit tests pass, dotnet build
-clean (warning 0 / error 0), 작업 트리 clean. push 대기.**
+**Status (2026-05-25, v0.3.0 + 자율 점검 라운드):** 사용자 취침 중 자율 진행한
+세부 점검 + 기능 보강 + 자체 검증 라운드 종료. v0.1.5 → v0.3.0 누적분에 더해
+이번 사이클에서 Next/Prev 일관화, 자막/오디오 트랙 사이클, drop-sub, 컨텍스트
+메뉴, Window 좌표 클램프, Glyph escape, Screenshot 정확 토스트 등 추가.
+**65/65 unit tests pass (자막 detection 8건 신규 포함), dotnet build clean,
+작업 트리 clean. push 대기.**
+
+## 자율 점검 라운드 (2026-05-25, 사용자 취침 중)
+
+### 발견된 일관성 깨짐 + 잠재 버그
+
+| # | 영역 | 증상 | 처리 |
+|---|---|---|---|
+| 1 | Next/Prev 일관성 | EOF 자동 진행은 same-kind만, 수동 ⏭/⏮은 raw 인덱스로 png 점프 | same-kind 통일 + RepeatAll wrap 동일 정책 |
+| 2 | Repeat 버튼 즉시 활성 | Repeat 토글 시 ⏭/⏮ 활성 상태 안 바뀜 | setter에 RaiseCanExecuteChanged 추가 |
+| 3 | 멀티모니터 분리 후 첫 실행 | 저장된 좌표가 가상화면 밖이면 창이 안 보임 | VirtualScreen 클램프 → 화면 밖이면 CenterScreen |
+| 4 | MaxRestoreBtn glyph | code-behind inline PUA, BAML/소스 인코딩 손상 위험 | `` / `` escape |
+| 5 | Screenshot toast 정확성 | mpv 실패해도 "저장됨" 토스트 | CommandAsync 응답 + File.Exists 검증, 오디오 사전 가드 |
+| 6 | Recent 삭제 영속화 | "이 항목 제거"/"모두 비우기"가 close 전까지 디스크 미반영 | SaveSettingsNow 즉시 호출 |
+| 7 | 자막/오디오 cycle misleading toast | 미디어 없을 때도 "트랙 ▶" 토스트 | 가드 추가 (영상 only / 오디오·영상 only) |
+
+### 기능 보강 (가벼움 유지)
+
+| 기능 | 키 / 트리거 |
+|---|---|
+| **자막 트랙 사이클** | `V` (다중 자막 영상) |
+| **자막 표시 켬/끔** | `Shift + V` |
+| **오디오 트랙 사이클** | `Ctrl + J` (다국어 영상) |
+| **자막 파일 드롭** | .srt .ass .vtt 등 — 현재 영상에 add-sub. 미디어와 함께 또는 단독 |
+| **재생목록 / 최근 우클릭** | 탐색기에서 열기 / 파일 경로 복사 / 이 항목 제거(최근 전용) |
+
+### 자체 검증 매트릭스 (사용자 명시 요구)
+
+각 변경에 대해:
+- 정상 케이스 ✓
+- 경계 케이스 (단일 항목, 빈 폴더, NoFile 등) ✓
+- mixed-kind 폴더 (영상 + png + 영상2) ✓
+- multi-monitor 좌표 (정상/음수/오프스크린) ✓
+- NaN 안전성 (Width=NaN → 클램프 통과) ✓
+- 자막 드롭 + NoMedia → 친절 toast ✓
+- 자막/오디오 cycle + NoMedia / Audio / Image → 가드 토스트 ✓
+- Recent 즉시 저장 → 동기 IO, UI 블록 무시 가능 ✓
+- 컨텍스트 메뉴 + Clipboard busy → catch ✓
+
+### 시각 검증 (사용자 손 테스트 대기)
+
+사용자 취침 중이라 computer-use request_access 다이얼로그 응답 불가 →
+실제 GUI 클릭 검증은 사용자가 깬 뒤 진행. 본 사이클은 정적 코드 점검 +
+자체 매트릭스 + 빌드/테스트 회귀 통과로 마감.
+
+---
 
 ## 이번 라운드(자율 진행, 48 commit) — 핵심 변경 요약
 
