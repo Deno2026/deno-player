@@ -28,8 +28,8 @@ public partial class MainWindow : Window
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
     private RecentWindow?   _recentWin;
-    private const int HotZoneWidth = 280;           // 우측 hover trigger
-    private const int LeftHotZoneWidth = 240;       // 좌측 hover trigger (최근 재생)
+    private const int HotZoneWidth = 180;           // 우측 hover trigger (이전 280 → 2/3 수준)
+    private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
 
     public MainWindow()
     {
