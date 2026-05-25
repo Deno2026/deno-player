@@ -33,6 +33,15 @@
     <None Update="runtime\mpv\mpv.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- 사용자 설치용 파일들 — dotnet publish 시 output 폴더에 함께 복사 -->
+    <None Include="START_HERE.bat;UNINSTALL.bat;README.md;LICENSE;NOTICE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Include="tools\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
     <!-- WPF Window.Icon용 임베디드 리소스 -->
     <Resource Include="icon.ico" />
   </ItemGroup>

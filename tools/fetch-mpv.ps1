@@ -25,7 +25,8 @@ param(
     [string]$Owner = "zhongfly",
     [string]$Repo  = "mpv-winbuild",
     [string]$Dest  = "",
-    [string]$Match = "mpv-x86_64-(?!.*v3-).*\.7z$"
+    [string]$Match = "mpv-x86_64-(?!.*v3-).*\.7z$",
+    [switch]$SkipIfExists  # skip download if mpv.exe already exists in Dest
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,12 +49,22 @@ $Dest = (Resolve-Path $destParent).Path + "\" + (Split-Path $Dest -Leaf)
 New-Item -ItemType Directory -Path $Dest -Force | Out-Null
 
 function Find-7Zip {
+    # 우선순위: 1) tools/7zr.exe (번들된 standalone, 사용자 7-Zip 설치 불필요)
+    #         2) system 7-Zip
     $candidates = @(
+        (Join-Path $scriptRoot "7zr.exe"),
         "$env:ProgramFiles\7-Zip\7z.exe",
         "${env:ProgramFiles(x86)}\7-Zip\7z.exe",
         (Get-Command 7z -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
     ) | Where-Object { $_ -and (Test-Path $_) }
     return $candidates | Select-Object -First 1
+}
+
+$existingMpv = Join-Path $Dest "mpv.exe"
+if ($SkipIfExists -and (Test-Path $existingMpv)) {
+    Write-Host ">>> mpv.exe already at $existingMpv - skipping download (-SkipIfExists)." -ForegroundColor Yellow
+    & $existingMpv --version | Select-Object -First 1
+    exit 0
 }
 
 Write-Host ">>> Resolving latest mpv release from $Owner/$Repo ..." -ForegroundColor Cyan
@@ -73,10 +84,9 @@ Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $t
 
 $sz = Find-7Zip
 if (-not $sz) {
-    Write-Warning "7-Zip not found. Extract the archive manually and copy mpv.exe to: $Dest"
+    Write-Warning "7-Zip not found (bundled 7zr.exe missing too?). Extract manually and copy mpv.exe to: $Dest"
     Write-Host    "   Downloaded archive: $tmp7z" -ForegroundColor Yellow
-    Write-Host    "   (To install 7-Zip: winget install 7zip.7zip)" -ForegroundColor Yellow
-    exit 0
+    exit 1
 }
 
 $extractDir = Join-Path $env:TEMP ("mpv-extract-" + [Guid]::NewGuid().ToString("N").Substring(0,8))
