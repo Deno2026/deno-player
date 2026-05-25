@@ -542,15 +542,18 @@ public partial class MainWindow : Window
     {
         if (sender is Slider sl)
         {
-            // IsMoveToPointEnabled가 click 시 Slider Value를 클릭 위치로 옮겨놨어야 함.
-            // 만약 sl.Value가 그대로 옛 위치면 mpv hit-test 또는 template 문제.
-            // 위치 변환: e.GetPosition으로 마우스 X 좌표 → Slider의 Value scale로 직접 계산해 둠.
+            // 마우스 마지막 위치 X 기준으로 target time 계산. click이든 drag-end든 동일하게.
+            // Slider.Value(IsMoveToPointEnabled가 잘 옮긴 값)는 신뢰하되, 다르면 mouse-X 우선.
             var pos = e.GetPosition(sl);
             var ratio = sl.ActualWidth > 0 ? Math.Clamp(pos.X / sl.ActualWidth, 0, 1) : 0;
             var clickValue = sl.Minimum + (sl.Maximum - sl.Minimum) * ratio;
-            Services.AppLog.Info($"OnSeekUp: slider.Value={sl.Value:F2} click={clickValue:F2} ratio={ratio:F3}");
-            // Slider가 못 옮긴 경우 click 좌표 기준으로 우리가 직접 seek
             var target = Math.Abs(sl.Value - clickValue) > 0.5 ? clickValue : sl.Value;
+            Services.AppLog.Info($"OnSeekUp: slider.Value={sl.Value:F2} click={clickValue:F2} -> seek {target:F2}");
+
+            // Slider Value도 target으로 강제 동기 → mpv가 응답하기 전 thumb이 옛 위치로
+            // 잠깐 끌려가 보이는 깜빡임 방지.
+            try { sl.Value = target; } catch { }
+
             _vm.EndSeek(target);
         }
     }
@@ -570,11 +573,11 @@ public partial class MainWindow : Window
     }
     private void OnSeekDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
-        if (sender is Slider sl)
-        {
-            Services.AppLog.Info($"OnSeekDragCompleted: value={sl.Value:F2}");
-            _vm.EndSeek(sl.Value);
-        }
+        // 의도적 no-op. mouse up 직후 OnSeekUp이 단일 EndSeek 호출함.
+        // 여기서도 EndSeek 호출하면 click 케이스(IsMoveToPointEnabled가 simulate한 drag)에서
+        // 두 EndSeek가 서로 다른 위치(slider.Value vs mouse-x click)로 보내져 mpv가 두 번
+        // seek → thumb이 옛↔새 사이 깜빡임. OnSeekUp 한 군데로 일원화.
+        Services.AppLog.Info("OnSeekDragCompleted (no-op, OnSeekUp will handle)");
     }
     private void OnSeekWheel(object sender, MouseWheelEventArgs e)
     {
