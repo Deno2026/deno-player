@@ -78,9 +78,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         DecreaseSpeedCommand = new RelayCommand(() => Speed = Math.Max(0.25, Math.Round(Speed - 0.25, 2)));
         ResetSpeedCommand    = new RelayCommand(() => Speed = 1.0);
         // 자막 / 오디오 트랙 — mpv 측 사이클. UI에 트랙 list까지 띄우면 무거워지므로 키만.
-        CycleSubtitleCommand           = new RelayCommand(() => { _ = _ipc.CycleSubtitle();           Toast?.Invoke("자막 트랙 ▶"); });
-        ToggleSubtitleVisibilityCommand= new RelayCommand(() => { _ = _ipc.CycleSubtitleVisibility(); Toast?.Invoke("자막 표시 토글"); });
-        CycleAudioCommand              = new RelayCommand(() => { _ = _ipc.CycleAudio();              Toast?.Invoke("오디오 트랙 ▶"); });
+        // 미디어 없을 때 toast가 misleading하지 않게 가드. 자막은 비디오 전용, 오디오 사이클은 오디오/비디오 둘 다.
+        CycleSubtitleCommand           = new RelayCommand(() =>
+        {
+            if (CurrentMedia is null || CurrentMedia.Kind != MediaKind.Video)
+            { Toast?.Invoke("자막은 영상에서만 동작합니다"); return; }
+            _ = _ipc.CycleSubtitle();           Toast?.Invoke("자막 트랙 ▶");
+        });
+        ToggleSubtitleVisibilityCommand= new RelayCommand(() =>
+        {
+            if (CurrentMedia is null || CurrentMedia.Kind != MediaKind.Video)
+            { Toast?.Invoke("자막은 영상에서만 동작합니다"); return; }
+            _ = _ipc.CycleSubtitleVisibility(); Toast?.Invoke("자막 표시 토글");
+        });
+        CycleAudioCommand              = new RelayCommand(() =>
+        {
+            if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
+            { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
+            _ = _ipc.CycleAudio();              Toast?.Invoke("오디오 트랙 ▶");
+        });
 
         _ipc.PropertyChanged += OnMpvPropertyChanged;
         _ipc.EndFile        += OnEndFile;
