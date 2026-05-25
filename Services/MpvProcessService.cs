@@ -75,11 +75,19 @@ public sealed class MpvProcessService : IDisposable
         Arg("--cursor-autohide=no");        // 커서 숨김은 우리 OSD 타이머가 관리
         Arg("--audio-display=no");          // 오디오 재생 시 cover art 안 띄움
         // ⚠ --keep-open=yes 는 우리 child Win32 window(--wid) 환경에서 EOF 시 mpv가
-        //   silent crash (exit -1)함. 그래서 자동 next가 안 됐다. idle=yes로 mpv는
-        //   파일 끝나도 살아 있고, end-file(reason=eof) 이벤트는 정상 emit되어
-        //   우리 OnEndFile이 Next/RepeatAll/Shuffle을 트리거한다.
-        //   trade-off: 마지막 frame 안 남고 잠깐 검은 화면 → 다음 곡 즉시 로드.
+        //   silent crash (exit -1)함. idle=yes로 mpv는 파일 끝나도 살아 있고,
+        //   end-file(reason=eof) 이벤트는 정상 emit되어 OnEndFile이 next 트리거.
         Arg("--keep-open=no");
+        // 우리 child hwnd 위에 다른 owned window(재생목록/최근)가 슬라이드 인할 때
+        // mpv가 visible region 변경을 surface 재생성으로 응답하면서 영상이 잠깐 흔들림.
+        // d3d11 백엔드를 명시하고 video sync를 audio에 묶어두면 surface 재생성 빈도가
+        // 줄어 GPU compositor에 의한 partial-occlusion redraw에 안정적으로 반응한다.
+        Arg("--vo=gpu");
+        Arg("--gpu-api=d3d11");
+        Arg("--video-sync=audio");
+        Arg("--hwdec=auto-safe");
+        // mpv 내부 OSD/창 드래그 핸들러 무력화 (우리 WPF가 chrome 관리)
+        Arg("--no-window-dragging");
         Arg("--image-display-duration=inf");
         Arg("--hr-seek=yes");
         Arg("--cache=yes");
