@@ -362,8 +362,9 @@
         <Setter Property="ItemContainerStyle" Value="{StaticResource PlaylistItem}"/>
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        <!-- IsVirtualizing=False — owned child window가 처음 show될 때 viewport 0인 상태로
+             items realize 안 되는 케이스 발견 (panel 떴는데 contents 빈 검은 사각형). -->
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="False"/>
         <!-- ListBox가 ↑↓ 키를 가로채면 Window의 볼륨 단축키가 안 먹음 -->
         <Setter Property="KeyboardNavigation.DirectionalNavigation" Value="None"/>
         <Setter Property="Focusable" Value="False"/>
