@@ -77,7 +77,9 @@
     </shell:WindowChrome.WindowChrome>
 
     <Window.InputBindings>
-        <KeyBinding Key="Space"    Command="{Binding PlayPauseCommand}"/>
+        <!-- Space는 hold(꾹 누르면 2x) 처리를 직접 해야 해서 KeyBinding 대신 KeyDown/KeyUp 핸들러로. -->
+        <!-- <KeyBinding Key="Space"    Command="{Binding PlayPauseCommand}"/> -->
+
         <KeyBinding Key="M"        Command="{Binding MuteCommand}"/>
         <KeyBinding Key="F"        Command="{Binding FullscreenCommand}"/>
         <KeyBinding Key="F11"      Command="{Binding FullscreenCommand}"/>

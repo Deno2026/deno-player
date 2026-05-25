@@ -92,6 +92,8 @@ public partial class MainWindow : Window
         DragLeave += OnDragLeave;
         Drop      += OnDrop;
         KeyDown   += OnAnyKey;
+        KeyDown   += OnSpaceDown;
+        PreviewKeyUp += OnSpaceUp;
         StateChanged += OnStateChanged;
         LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
         SizeChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
@@ -676,6 +678,50 @@ public partial class MainWindow : Window
     private void OnAnyKey(object sender, KeyEventArgs e)
     {
         ShowControls(); RestartHideTimer();
+    }
+
+    // ============================================================
+    // Space: 짧게 누름 = Play/Pause, 꾹 누르면 = 2x 재생 (놓으면 원래 속도)
+    // ============================================================
+    private bool _spaceHeld;
+    private double _speedBeforeHold = 1.0;
+
+    private void OnSpaceDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space) return;
+        // OS 자동 키 리피트 = hold로 판단. 첫 IsRepeat 시 2x 진입.
+        if (e.IsRepeat)
+        {
+            if (!_spaceHeld)
+            {
+                _spaceHeld = true;
+                _speedBeforeHold = _vm.Speed;
+                _vm.Speed = 2.0;
+            }
+            e.Handled = true;
+        }
+        else
+        {
+            // 누른 순간엔 아무것도 안 함. KeyUp에서 toggle vs hold 결정.
+            e.Handled = true;
+        }
+    }
+
+    private void OnSpaceUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space) return;
+        if (_spaceHeld)
+        {
+            // hold 끝 → 이전 속도 복귀
+            _vm.Speed = _speedBeforeHold;
+            _spaceHeld = false;
+        }
+        else
+        {
+            // 짧게 누름 → Play/Pause toggle
+            _vm.PlayPauseCommand.Execute(null);
+        }
+        e.Handled = true;
     }
 
     // ============================================================
