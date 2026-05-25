@@ -93,13 +93,7 @@ public partial class MainWindow : Window
             }
         });
 
-        // 영상 hwnd 위에서의 마우스 활동은 mpv가 보고해 줘야 잡힘
-        _vm.MouseActivity += () => Dispatcher.BeginInvoke(() =>
-        {
-            ShowControls(); RestartHideTimer();
-        });
-        // mpv의 hwnd 안 마우스 좌표를 받아 hot-zone 감지 (영상 hwnd 위에서는 WPF가 못 잡음)
-        _vm.MpvMousePos += (x, y) => Dispatcher.BeginInvoke(() => CheckRightHotZoneFromMpv(x, y));
+        // mouse hot zone / mouse activity 둘 다 GetCursorPos polling tick에서 처리.
         _vm.Toast       += msg => Dispatcher.BeginInvoke(() => ShowToast(msg));
 
         SourceInitialized += OnSourceInit;
@@ -517,17 +511,6 @@ public partial class MainWindow : Window
         UpdateHotZones(posInRoot.X, posInRoot.Y, w, h);
     }
 
-    /// <summary>
-    /// mpv가 보고한 영상 hwnd 안 X,Y 좌표 → 좌/우 hot zone 둘 다 검사.
-    /// (현재 GetCursorPos polling이 주 경로 — 이건 backup. mpv mouse-pos 좌표계가
-    ///  환경/영상마다 일관성 없어 신뢰 못 함.)
-    /// </summary>
-    private void CheckRightHotZoneFromMpv(double mpvX, double mpvY)
-    {
-        // 비활성화 — GetCursorPos polling이 모든 mouse-pos detection 담당.
-        // _vm.MpvMousePos는 ShowControls trigger용 mouse activity만 사용.
-    }
-
     // ============================================================
     // GetCursorPos polling — mpv IPC mouse-pos는 좌표계 신뢰 어려움(host hwnd 안
     // native pixel/logical/video pixel 어떤지 환경마다 다름) + WPF MouseMove는 HwndHost
@@ -541,6 +524,7 @@ public partial class MainWindow : Window
     private struct PinvokePoint { public int X; public int Y; }
 
     private DispatcherTimer? _hotZonePoll;
+    private Point _lastPollMouse;
 
     private void StartHotZonePolling()
     {
@@ -592,6 +576,20 @@ public partial class MainWindow : Window
             ? System.Windows.SystemParameters.WorkArea.Height
             : ActualHeight;
         if (w <= 0 || h <= 0) return;
+
+        // Mouse 움직임 감지 → ShowControls (이전엔 mpv MouseActivity event가 담당).
+        // 풀스크린 모드에서 마우스 움직일 때 OSD 다시 보이게 하는 게 핵심.
+        if (Math.Abs(ptLogical.X - _lastPollMouse.X) > 0.5 ||
+            Math.Abs(ptLogical.Y - _lastPollMouse.Y) > 0.5)
+        {
+            _lastPollMouse = ptLogical;
+            if (relX >= 0 && relX < w && relY >= 0 && relY < h)
+            {
+                ShowControls();
+                RestartHideTimer();
+            }
+        }
+
         UpdateHotZones(relX, relY, w, h);
     }
 

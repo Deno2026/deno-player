@@ -23,9 +23,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<RecentItem> Recents { get; } = new();
     private const int MaxRecents = 30;
 
-    /// <summary>mpv가 보고하는 마우스 활동(영상 hwnd 위는 WPF가 못 잡음 — IPC로 대체)</summary>
-    public event Action? MouseActivity;
-    public event Action<double, double>? MpvMousePos;
+    // (MouseActivity / MpvMousePos events 폐기 — 이제 MainWindow가 GetCursorPos polling으로 직접 처리.)
 
     /// <summary>잠깐 띄울 OSD toast. 스크린샷 저장 같은 짧은 confirm용.</summary>
     public event Action<string>? Toast;
@@ -146,7 +144,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             await _ipc.ObserveProperty("eof-reached");
             await _ipc.ObserveProperty("file-format");
             await _ipc.ObserveProperty("seekable");
-            await _ipc.ObserveProperty("mouse-pos");
+            // mouse-pos는 더 이상 observe 안 함 — GetCursorPos polling으로 우회
         }
         catch { /* IPC 일찍 끊겨도 앱 계속 */ }
     }
@@ -686,7 +684,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     // mpv 이벤트가 매 frame (60Hz+) 옴 → UI 스레드 dispatch 폭주를 막아 키 입력 응답성 확보
     private DateTime _lastTimePosAt;
-    private DateTime _lastMouseActAt;
 
     private void OnMpvPropertyChanged(string name, JsonElement? value)
     {
@@ -696,12 +693,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             var now = DateTime.UtcNow;
             if (now - _lastTimePosAt < TimeSpan.FromMilliseconds(120)) return;
             _lastTimePosAt = now;
-        }
-        else if (name == "mouse-pos")
-        {
-            var now = DateTime.UtcNow;
-            if (now - _lastMouseActAt < TimeSpan.FromMilliseconds(150)) return;
-            _lastMouseActAt = now;
         }
 
         OnUi(() =>
@@ -749,15 +740,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 case "eof-reached":
                     if (TryGetBool(value, out var eof)) IsAtEnd = eof;
                     break;
-                case "mouse-pos":
-                    if (value is { ValueKind: JsonValueKind.Object } obj)
-                    {
-                        var x = obj.TryGetProperty("x", out var xe) && xe.TryGetDouble(out var xd) ? xd : 0;
-                        var y = obj.TryGetProperty("y", out var ye) && ye.TryGetDouble(out var yd) ? yd : 0;
-                        MpvMousePos?.Invoke(x, y);
-                    }
-                    MouseActivity?.Invoke();
-                    break;
+                // mouse-pos observe 폐기 — MainWindow의 GetCursorPos polling이 mouse 활동
+                // 감지 + hot zone trigger 둘 다 담당. mpv 좌표계 신뢰 못 함.
             }
         });
     }
