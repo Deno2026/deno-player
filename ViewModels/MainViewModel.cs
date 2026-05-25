@@ -77,6 +77,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         IncreaseSpeedCommand = new RelayCommand(() => Speed = Math.Min(4.0, Math.Round(Speed + 0.25, 2)));
         DecreaseSpeedCommand = new RelayCommand(() => Speed = Math.Max(0.25, Math.Round(Speed - 0.25, 2)));
         ResetSpeedCommand    = new RelayCommand(() => Speed = 1.0);
+        // 자막 / 오디오 트랙 — mpv 측 사이클. UI에 트랙 list까지 띄우면 무거워지므로 키만.
+        CycleSubtitleCommand           = new RelayCommand(() => { _ = _ipc.CycleSubtitle();           Toast?.Invoke("자막 트랙 ▶"); });
+        ToggleSubtitleVisibilityCommand= new RelayCommand(() => { _ = _ipc.CycleSubtitleVisibility(); Toast?.Invoke("자막 표시 토글"); });
+        CycleAudioCommand              = new RelayCommand(() => { _ = _ipc.CycleAudio();              Toast?.Invoke("오디오 트랙 ▶"); });
 
         _ipc.PropertyChanged += OnMpvPropertyChanged;
         _ipc.EndFile        += OnEndFile;
@@ -181,8 +185,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CurrentMedia?.Kind != MediaKind.Audio &&
         State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
     public bool HasMedia => CurrentMedia is not null;
-    public bool HasNext  => CurrentIndex >= 0 && CurrentIndex < Playlist.Count - 1;
-    public bool HasPrev  => CurrentIndex > 0;
+    // ⏭/⏮은 자동 진행과 같은 same-kind 규칙을 따른다. 영상 + png + 영상2 폴더에서 영상 보다가
+    // ⏭ 누르면 png가 아니라 영상2로. RepeatAll이면 마지막 곡에서도 처음으로 wrap (자동 EOF와 일치).
+    public bool HasNext  => CurrentIndex >= 0 &&
+                            (NextOfSameKind() is not null ||
+                             (Repeat == RepeatMode.RepeatAll && FirstOfSameKind() is { } first && first != CurrentMedia));
+    public bool HasPrev  => CurrentIndex >= 0 &&
+                            (PrevOfSameKind() is not null ||
+                             (Repeat == RepeatMode.RepeatAll && LastOfSameKind() is { } last && last != CurrentMedia));
 
     public int CurrentIndex
     {
@@ -301,6 +311,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(RepeatGlyph));
             Raise(nameof(RepeatTooltip));
             Raise(nameof(IsRepeatActive));
+            Raise(nameof(IsRepeatOne));
+            Raise(nameof(IsRepeatAll));
+            // RepeatAll 켜면 마지막 곡에서도 ⏭ 활성. 끄면 비활성. HasNext/HasPrev 다시 평가.
+            Raise(nameof(HasNext));
+            Raise(nameof(HasPrev));
+            NextCommand.RaiseCanExecuteChanged();
+            PrevCommand.RaiseCanExecuteChanged();
             Services.AppLog.Info($"Repeat set -> {value}");
             _ = SyncLoopFileToMpv();
         }
@@ -343,6 +360,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
     public bool IsRepeatActive => _repeat != RepeatMode.None;
+    public bool IsRepeatOne    => _repeat == RepeatMode.RepeatOne;
+    public bool IsRepeatAll    => _repeat == RepeatMode.RepeatAll;
+    /// <summary>
+    /// Segoe MDL2 Assets 글리프 (Fluent Icons도 동일 코드).
+    ///   None / RepeatAll →  (RepeatAll: 좌→우 루프 화살표)
+    ///   RepeatOne        →  (RepeatOne: 루프 + "1")
+    /// 색상으로 None ↔ Active를 구분. \u-escape로 BAML 인코딩 손상 위험 차단.
+    /// </summary>
     public string RepeatGlyph => _repeat switch
     {
         RepeatMode.RepeatOne => "",   // Repeat1
@@ -399,6 +424,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand IncreaseSpeedCommand { get; }
     public RelayCommand DecreaseSpeedCommand { get; }
     public RelayCommand ResetSpeedCommand { get; }
+    public RelayCommand CycleSubtitleCommand { get; }
+    public RelayCommand ToggleSubtitleVisibilityCommand { get; }
+    public RelayCommand CycleAudioCommand { get; }
 
     private void TogglePlayPause()
     {
@@ -521,14 +549,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void Next()
     {
-        if (!HasNext) return;
-        PlayMedia(Playlist[CurrentIndex + 1]);
+        if (CurrentMedia is null) return;
+        var target = NextOfSameKind() ??
+                     (Repeat == RepeatMode.RepeatAll ? FirstOfSameKind() : null);
+        if (target is not null && target != CurrentMedia) PlayMedia(target);
     }
 
     private void Prev()
     {
-        if (!HasPrev) return;
-        PlayMedia(Playlist[CurrentIndex - 1]);
+        if (CurrentMedia is null) return;
+        var target = PrevOfSameKind() ??
+                     (Repeat == RepeatMode.RepeatAll ? LastOfSameKind() : null);
+        if (target is not null && target != CurrentMedia) PlayMedia(target);
     }
 
     private void SeekBy(double delta)
@@ -546,7 +578,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ = _ipc.SeekRelative(delta);
     }
 
-    private void TakeScreenshot()
+    private async void TakeScreenshot()
     {
         Services.AppLog.Info($"TakeScreenshot invoked: media={CurrentMedia?.FileName ?? "(null)"} ipc={_ipc.IsConnected}");
         if (CurrentMedia is null)
@@ -557,6 +589,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (!_ipc.IsConnected)
         {
             Toast?.Invoke("mpv 연결이 끊겼습니다 — 앱 재시작 필요");
+            return;
+        }
+        if (CurrentMedia.Kind == MediaKind.Audio)
+        {
+            Toast?.Invoke("오디오 파일은 스크린샷할 수 없습니다");
             return;
         }
         try
@@ -572,13 +609,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (string.IsNullOrWhiteSpace(safe)) safe = "screenshot";
             var path = Path.Combine(dir, $"{safe}_{stamp}.png");
             Services.AppLog.Info($"Screenshot -> {path}");
-            _ = _ipc.Screenshot(path);
-            Toast?.Invoke($"스크린샷 저장 → {dir}");
+            // mpv 응답 받아서 실패면 정확히 알림. 성공이면 실제 파일 생성도 확인.
+            var ok = await _ipc.ScreenshotChecked(path).ConfigureAwait(false);
+            OnUi(() =>
+            {
+                if (ok && File.Exists(path))
+                    Toast?.Invoke($"스크린샷 저장 → {Path.GetFileName(path)}");
+                else
+                    Toast?.Invoke("스크린샷 실패 — mpv 응답 없음");
+            });
         }
         catch (Exception ex)
         {
             Services.AppLog.Error("Screenshot", ex);
-            Toast?.Invoke("스크린샷 실패: " + ex.Message);
+            OnUi(() => Toast?.Invoke("스크린샷 실패: " + ex.Message));
         }
     }
 
@@ -791,12 +835,34 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         return null;
     }
 
+    /// <summary>현재 항목 이전 인덱스부터 거꾸로 가서 같은 kind인 첫 항목.</summary>
+    private MediaItem? PrevOfSameKind()
+    {
+        if (CurrentMedia is null) return null;
+        var kind = CurrentMedia.Kind;
+        var idx = CurrentIndex;
+        if (idx < 0) return null;
+        for (var i = idx - 1; i >= 0; i--)
+            if (Playlist[i].Kind == kind) return Playlist[i];
+        return null;
+    }
+
     /// <summary>재생목록 처음부터 같은 kind인 첫 항목 (RepeatAll wrap용).</summary>
     private MediaItem? FirstOfSameKind()
     {
         if (CurrentMedia is null) return null;
         var kind = CurrentMedia.Kind;
         return Playlist.FirstOrDefault(m => m.Kind == kind);
+    }
+
+    /// <summary>재생목록 마지막부터 거꾸로 가서 같은 kind인 첫 항목 (RepeatAll wrap-prev용).</summary>
+    private MediaItem? LastOfSameKind()
+    {
+        if (CurrentMedia is null) return null;
+        var kind = CurrentMedia.Kind;
+        for (var i = Playlist.Count - 1; i >= 0; i--)
+            if (Playlist[i].Kind == kind) return Playlist[i];
+        return null;
     }
 
     /// <summary>같은 kind 중 현재 곡 외에서 랜덤 하나 (Shuffle 자동 next).</summary>
@@ -827,24 +893,58 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool TryOpenDroppedFiles(string[] files)
     {
         if (files is null || files.Length == 0) return false;
-        // 폴더 드롭이면 첫 미디어 파일 사용
-        foreach (var f in files)
+        // 1. 미디어 + 자막 분리. 미디어가 있으면 그걸 열고, 자막만 있으면 현재 영상에 add-sub.
+        var media = files.FirstOrDefault(f => File.Exists(f) && MediaKindExtensions.IsSupported(f));
+        var subs  = files.Where(f => File.Exists(f) && MediaKindExtensions.IsSubtitle(f)).ToList();
+
+        // 폴더 드롭: 첫 미디어 파일 사용
+        if (media is null)
         {
-            if (Directory.Exists(f))
+            foreach (var f in files)
             {
-                var first = Directory.EnumerateFiles(f)
-                    .Where(MediaKindExtensions.IsSupported)
-                    .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-                    .FirstOrDefault();
-                if (first is not null) { OpenPath(first); return true; }
-                continue;
-            }
-            if (MediaKindExtensions.IsSupported(f))
-            {
-                OpenPath(f);
-                return true;
+                if (Directory.Exists(f))
+                {
+                    media = Directory.EnumerateFiles(f)
+                        .Where(MediaKindExtensions.IsSupported)
+                        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                        .FirstOrDefault();
+                    if (media is not null) break;
+                }
             }
         }
+
+        if (media is not null)
+        {
+            OpenPath(media);
+            // 자막도 같이 떨어졌으면 add-sub. mpv는 동일 파일명+다른 ext도 자동 로드하지만 명시적 add가 신뢰성↑
+            foreach (var s in subs)
+            {
+                _ = _ipc.LoadSubtitle(s);
+            }
+            return true;
+        }
+
+        // 자막만 드롭됐고 현재 영상이 있으면 add-sub
+        if (subs.Count > 0 && _ipc.IsConnected)
+        {
+            if (CurrentMedia is null)
+            {
+                Toast?.Invoke("자막을 추가할 영상이 없습니다 — 먼저 영상을 여세요");
+                return true;
+            }
+            if (CurrentMedia.Kind != MediaKind.Video)
+            {
+                Toast?.Invoke("자막은 영상 파일에만 추가할 수 있습니다");
+                return true;
+            }
+            foreach (var s in subs)
+            {
+                _ = _ipc.LoadSubtitle(s);
+            }
+            Toast?.Invoke($"자막 {subs.Count}개 추가됨");
+            return true;
+        }
+
         return false;
     }
 
@@ -889,6 +989,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Settings.WindowMaximized = maximized;
         _settingsSvc.Save(Settings);
     }
+
+    /// <summary>
+    /// 사용자 명시 액션(Recent 항목 제거/모두 비우기) 직후 디스크 즉시 반영.
+    /// Volume/Speed 같은 자주 변하는 값은 close 시 batch save로 두고, 사용자 인지 액션만 즉시.
+    /// </summary>
+    public void SaveSettingsNow() => _settingsSvc.Save(Settings);
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Raise([CallerMemberName] string? n = null)
