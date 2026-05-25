@@ -598,16 +598,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public void BeginSeek() => Seeking = true;
-    public void EndSeek(double seconds)
+
+    /// <summary>
+    /// 사용자가 새 위치로 seek 확정. mpv가 seek 명령을 적용하기 직전까지 이전 위치의
+    /// time-pos를 마지막으로 한 번 더 emit하는 경우가 있어, Seeking=true 상태를 짧게
+    /// 더 유지해 그 stale 값이 thumb을 원래 자리로 끌어오는 'snap back'을 방지한다.
+    /// </summary>
+    public async void EndSeek(double seconds)
     {
-        Seeking = false;
         _ = _ipc.SeekAbsolute(seconds);
         if (IsAtEnd)
         {
             _ = _ipc.SetPause(false);
             IsAtEnd = false;
         }
+        // mpv가 새 위치를 반영한 time-pos를 보내기 충분한 시간 동안 Seeking 유지
+        try { await Task.Delay(250).ConfigureAwait(false); }
+        catch { /* 무해 */ }
+        OnUi(() => Seeking = false);
     }
+
     /// <summary>드래그 중 live preview seek — Seeking 유지하며 mpv에만 위치 갱신.</summary>
     public void LiveSeek(double seconds)
     {
