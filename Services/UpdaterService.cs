@@ -33,10 +33,11 @@ public static class UpdaterService
     }
 
     /// <summary>
-    /// 백그라운드로 update check + download. UI thread block 안 함. 새 버전 받으면 다음
-    /// launch 시 자동 적용 (Velopack가 처리).
+    /// 백그라운드 update check만 (download/install 안 함). 새 버전 발견하면 새 version
+    /// string 반환 — UI가 버튼 활성화. download/install은 사용자 click 후 ApplyAsync.
+    /// 강제 강제 안 함 = opt-in pull 패턴.
     /// </summary>
-    public static async Task CheckAndStageAsync()
+    public static async Task<(bool available, string? newVersion, UpdateInfo? info)> CheckAsync()
     {
         try
         {
@@ -45,31 +46,54 @@ public static class UpdaterService
             AppLog.Info($"Updater: checking {url}");
             var source = new GithubSource(url, null, prerelease: false);
             var mgr = new UpdateManager(source);
-
-            if (!mgr.IsInstalled)
-            {
-                // 개발 빌드 / portable 실행. Velopack 설치 안 됨. skip.
-                AppLog.Info("Updater: not installed via Velopack — skipping (likely dev/portable build)");
-                return;
-            }
-
             var info = await mgr.CheckForUpdatesAsync().ConfigureAwait(false);
-            if (info is null)
-            {
-                AppLog.Info("Updater: no updates available");
-                return;
-            }
-
-            AppLog.Info($"Updater: new version {info.TargetFullRelease.Version} available — downloading");
-            await mgr.DownloadUpdatesAsync(info).ConfigureAwait(false);
-            AppLog.Info("Updater: downloaded. Will apply on next launch.");
-            // 즉시 재시작은 사용자 흐름 방해 — 다음 launch에 자동 적용. 사용자가 원하면
-            // 다음 라운드에 "지금 재시작" UI를 추가할 수 있음 (예: mgr.ApplyUpdatesAndRestart(info)).
+            if (info is null) { AppLog.Info("Updater: no updates"); return (false, null, null); }
+            var ver = info.TargetFullRelease.Version.ToString();
+            AppLog.Info($"Updater: new version {ver} available (opt-in)");
+            return (true, ver, info);
         }
         catch (Exception ex)
         {
-            // 네트워크 단절, 잘못된 URL, 권한 문제 등 — 앱 동작에 영향 안 줌.
             AppLog.Warn($"Updater: check failed: {ex.Message}");
+            return (false, null, null);
+        }
+    }
+
+    /// <summary>
+    /// 사용자가 UI 버튼 click 시 호출 — download + apply + 재시작.
+    /// Velopack install된 경우 자동 install + restart. portable 실행이면 browser로 release page 열기.
+    /// </summary>
+    public static async Task<bool> ApplyAsync(UpdateInfo info)
+    {
+        try
+        {
+            var url = Environment.GetEnvironmentVariable("DENO_PLAYER_UPDATE_URL")
+                      ?? DefaultChannelUrl;
+            var source = new GithubSource(url, null, prerelease: false);
+            var mgr = new UpdateManager(source);
+
+            if (!mgr.IsInstalled)
+            {
+                // portable / dev build — 자동 install 못함. release page 열기 (사용자가 수동 다운).
+                AppLog.Info("Updater: portable mode — opening release page in browser");
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = $"{url}/releases/latest",
+                    UseShellExecute = true
+                });
+                return true;
+            }
+
+            AppLog.Info($"Updater: downloading {info.TargetFullRelease.Version}...");
+            await mgr.DownloadUpdatesAsync(info).ConfigureAwait(false);
+            AppLog.Info("Updater: applying + restarting");
+            mgr.ApplyUpdatesAndRestart(info);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Updater.ApplyAsync", ex);
+            return false;
         }
     }
 }

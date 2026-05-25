@@ -137,6 +137,18 @@
                 <!-- 우: 기능 + 창 컨트롤 (Dock=Right가 우선 측정되어 자기 크기 확보) -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                             VerticalAlignment="Center">
+                    <!-- 업데이트 button — 새 버전 발견 시만 visible, accent green. opt-in pull. -->
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE896;"
+                            Foreground="{StaticResource BrushAccent}"
+                            Command="{Binding ApplyUpdateCommand}"
+                            Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolVis}}"
+                            ToolTipService.InitialShowDelay="0"
+                            ToolTipService.ShowDuration="4000">
+                        <Button.ToolTip>
+                            <ToolTip Content="{Binding UpdateTooltip}"/>
+                        </Button.ToolTip>
+                    </Button>
                     <Button Style="{StaticResource PlaylistToggleButton}"
                             Content="&#xE8FD;"
                             ToolTip="재생목록 (P)"

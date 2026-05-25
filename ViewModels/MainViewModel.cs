@@ -75,6 +75,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         IncreaseSpeedCommand = new RelayCommand(() => Speed = Math.Min(4.0, Math.Round(Speed + 0.25, 2)));
         DecreaseSpeedCommand = new RelayCommand(() => Speed = Math.Max(0.25, Math.Round(Speed - 0.25, 2)));
         ResetSpeedCommand    = new RelayCommand(() => Speed = 1.0);
+        ApplyUpdateCommand = new RelayCommand(_ =>
+        {
+            if (_pendingUpdate is not null)
+                _ = Services.UpdaterService.ApplyAsync(_pendingUpdate);
+        }, _ => IsUpdateAvailable);
+
         // 자막 / 오디오 트랙 — mpv 측 사이클. UI에 트랙 list까지 띄우면 무거워지므로 키만.
         // 미디어 없을 때 toast가 misleading하지 않게 가드. 자막은 비디오 전용, 오디오 사이클은 오디오/비디오 둘 다.
         CycleSubtitleCommand           = new RelayCommand(() =>
@@ -290,6 +296,35 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _isFullscreen;
     public bool IsFullscreen { get => _isFullscreen; set => Set(ref _isFullscreen, value); }
 
+    // 자동 update 후보. UpdaterService.CheckAsync가 새 버전 발견 시 채워줌.
+    // UI: TopBar에 update button visible 여부 binding.
+    private Velopack.UpdateInfo? _pendingUpdate;
+    private bool _isUpdateAvailable;
+    public bool IsUpdateAvailable
+    {
+        get => _isUpdateAvailable;
+        set { if (Set(ref _isUpdateAvailable, value)) { Raise(nameof(UpdateTooltip)); ApplyUpdateCommand.RaiseCanExecuteChanged(); } }
+    }
+    private string? _updateNewVersion;
+    public string? UpdateNewVersion
+    {
+        get => _updateNewVersion;
+        set { if (Set(ref _updateNewVersion, value)) Raise(nameof(UpdateTooltip)); }
+    }
+    public string UpdateTooltip => _isUpdateAvailable && _updateNewVersion is not null
+        ? $"새 버전 {_updateNewVersion} — 클릭해서 업데이트"
+        : "업데이트 확인 중";
+    /// <summary>UpdaterService.CheckAsync 결과를 받아서 state 갱신 + UI에 button 표시 trigger.</summary>
+    public void SetPendingUpdate(string newVersion, Velopack.UpdateInfo info)
+    {
+        OnUi(() =>
+        {
+            _pendingUpdate = info;
+            UpdateNewVersion = newVersion;
+            IsUpdateAvailable = true;
+        });
+    }
+
     private bool _isAlwaysOnTop;
     public bool IsAlwaysOnTop
     {
@@ -438,6 +473,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand IncreaseSpeedCommand { get; }
     public RelayCommand DecreaseSpeedCommand { get; }
     public RelayCommand ResetSpeedCommand { get; }
+    public RelayCommand ApplyUpdateCommand { get; }
     public RelayCommand CycleSubtitleCommand { get; }
     public RelayCommand ToggleSubtitleVisibilityCommand { get; }
     public RelayCommand CycleAudioCommand { get; }

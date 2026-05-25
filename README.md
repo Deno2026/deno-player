@@ -36,6 +36,18 @@
 
 ---
 
+## 🔄 자동 업데이트
+
+새 버전이 publish되면 **다음 실행 시** Deno Player가 자동으로 확인합니다.
+새 버전이 있으면 좌상단 도구 막대 가장 왼쪽에 **녹색 업데이트 아이콘** 이
+나타납니다. **클릭 = 다운로드 + 적용 + 재시작**. 클릭 안 하면 그대로 작동
+(강제 안 함, pull 방식).
+
+기본 update channel: `github.com/Deno2026/deno-player-releases` 별도 public
+repo. 다른 host를 쓰려면 환경변수 `DENO_PLAYER_UPDATE_URL`을 설정하세요.
+
+---
+
 ## 단축키
 
 | 키 | 동작 |

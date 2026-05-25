@@ -48,8 +48,14 @@ public partial class App : Application
         MainWindow = _win;
         _win.Show();
 
-        // 백그라운드 update check — UI 막지 않음. 새 버전 있으면 다음 launch에 적용.
-        _ = Task.Run(UpdaterService.CheckAndStageAsync);
+        // 백그라운드 update check (강제 X, opt-in). 새 버전 발견하면 ViewModel.IsUpdateAvailable=true
+        // → TopBar update button 활성. 사용자가 click 시 download + 적용 + 재시작.
+        _ = Task.Run(async () =>
+        {
+            var (available, ver, info) = await UpdaterService.CheckAsync();
+            if (available && ver is not null && info is not null && _win?.DataContext is ViewModels.MainViewModel vm)
+                vm.SetPendingUpdate(ver, info);
+        });
 
         _single.ArgsReceived += args =>
         {
