@@ -510,10 +510,12 @@ public partial class MainWindow : Window
 
     private void UpdateHotZones(double x, double y, double w, double h)
     {
-        // 하단 transport bar 영역(+ 약간 여유)은 hot zone에서 제외. 사용자가 재생바 근처
-        // 다루는 동안 패널이 튀어나와 컨트롤을 덮는 짜증 차단.
+        // 하단 transport bar 영역은 hot zone에서 제외.
         var bottomReserved = (BottomBar?.ActualHeight ?? 80) + 12;
         var inLowerStrip = y >= h - bottomReserved;
+        // 좌측 패널(최근 재생)은 화면 세로 상반부에서만 활성. 작업 중 무심코 좌측
+        // 내리다가 panel이 튀어나오는 것 방지.
+        var inUpperHalf = y < h / 2;
 
         if (_playlistWin is not null)
         {
@@ -523,7 +525,7 @@ public partial class MainWindow : Window
         }
         if (_recentWin is not null)
         {
-            var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip;
+            var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip && inUpperHalf;
             if (inLeft) _recentWin.ShowSlide();
             else if (_recentWin.IsShown && !_recentWin.IsMouseOver) _recentWin.HideSlide();
         }
