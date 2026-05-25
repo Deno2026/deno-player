@@ -80,8 +80,8 @@ public partial class MainWindow : Window
         {
             ShowControls(); RestartHideTimer();
         });
-        // mpv의 hwnd 안 마우스 좌표를 받아 우측 hot-zone 감지 (영상 hwnd 위에서는 WPF가 못 잡음)
-        _vm.MpvMousePos += (x, y) => Dispatcher.BeginInvoke(() => CheckRightHotZoneFromMpv(x));
+        // mpv의 hwnd 안 마우스 좌표를 받아 hot-zone 감지 (영상 hwnd 위에서는 WPF가 못 잡음)
+        _vm.MpvMousePos += (x, y) => Dispatcher.BeginInvoke(() => CheckRightHotZoneFromMpv(x, y));
         _vm.Toast       += msg => Dispatcher.BeginInvoke(() => ShowToast(msg));
 
         SourceInitialized += OnSourceInit;
@@ -419,9 +419,10 @@ public partial class MainWindow : Window
             }
             if (w <= 0 || h <= 0) return;
             const double topOffset = 36;
+            var bottomReserved = (BottomBar?.ActualHeight ?? 80) + 12;
             _recentWin.Left = left;
             _recentWin.Top  = top + topOffset;
-            _recentWin.Height = Math.Max(200, h - topOffset - 8);
+            _recentWin.Height = Math.Max(160, h - topOffset - bottomReserved);
         }
     }
 
@@ -480,9 +481,10 @@ public partial class MainWindow : Window
             if (w <= 0 || h <= 0) return;
 
             const double topOffset = 36;
+            var bottomReserved = (BottomBar?.ActualHeight ?? 80) + 12;
             _playlistWin.Left = left + w - _playlistWin.Width;
             _playlistWin.Top  = top + topOffset;
-            _playlistWin.Height = Math.Max(200, h - topOffset - 8);
+            _playlistWin.Height = Math.Max(160, h - topOffset - bottomReserved);
         }
     }
 
@@ -491,35 +493,40 @@ public partial class MainWindow : Window
     {
         if (_closing) return;
         var w = Root.ActualWidth;
-        if (w <= 0) return;
-        UpdatePlaylistFromHotZone(posInRoot.X, w);
-        UpdateRecentFromHotZone(posInRoot.X);
+        var h = Root.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        UpdateHotZones(posInRoot.X, posInRoot.Y, w, h);
     }
 
-    /// <summary>mpv가 보고한 영상 hwnd 안 X 좌표 → 좌/우 hot zone 둘 다 검사.</summary>
-    private void CheckRightHotZoneFromMpv(double mpvX)
+    /// <summary>mpv가 보고한 영상 hwnd 안 X,Y 좌표 → 좌/우 hot zone 둘 다 검사.</summary>
+    private void CheckRightHotZoneFromMpv(double mpvX, double mpvY)
     {
         if (_closing) return;
         var w = ActualWidth;
-        if (w <= 0) return;
-        UpdatePlaylistFromHotZone(mpvX, w);
-        UpdateRecentFromHotZone(mpvX);
+        var h = ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        UpdateHotZones(mpvX, mpvY, w, h);
     }
 
-    private void UpdatePlaylistFromHotZone(double x, double w)
+    private void UpdateHotZones(double x, double y, double w, double h)
     {
-        if (_playlistWin is null) return;
-        var inHotZone = x >= w - HotZoneWidth;
-        if (inHotZone) _playlistWin.ShowSlide();
-        else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
-    }
+        // 하단 transport bar 영역(+ 약간 여유)은 hot zone에서 제외. 사용자가 재생바 근처
+        // 다루는 동안 패널이 튀어나와 컨트롤을 덮는 짜증 차단.
+        var bottomReserved = (BottomBar?.ActualHeight ?? 80) + 12;
+        var inLowerStrip = y >= h - bottomReserved;
 
-    private void UpdateRecentFromHotZone(double x)
-    {
-        if (_recentWin is null) return;
-        var inHotZone = x >= 0 && x < LeftHotZoneWidth;
-        if (inHotZone) _recentWin.ShowSlide();
-        else if (_recentWin.IsShown && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+        if (_playlistWin is not null)
+        {
+            var inRight = x >= w - HotZoneWidth && !inLowerStrip;
+            if (inRight) _playlistWin.ShowSlide();
+            else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+        }
+        if (_recentWin is not null)
+        {
+            var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip;
+            if (inLeft) _recentWin.ShowSlide();
+            else if (_recentWin.IsShown && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+        }
     }
 
     // ============================================================
