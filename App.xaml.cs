@@ -12,6 +12,9 @@ public partial class App : Application
 
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
+        // Velopack 진입점 — 첫 줄 필수. update 적용 흐름 / restart 후 routing 처리.
+        UpdaterService.RunVelopack(e.Args ?? Array.Empty<string>());
+
         StartupArgs = e.Args ?? Array.Empty<string>();
         AppLog.Start("startup");
         if (StartupArgs.Length > 0) AppLog.Info($"args: {string.Join(" | ", StartupArgs)}");
@@ -44,6 +47,9 @@ public partial class App : Application
         _win = new MainWindow();
         MainWindow = _win;
         _win.Show();
+
+        // 백그라운드 update check — UI 막지 않음. 새 버전 있으면 다음 launch에 적용.
+        _ = Task.Run(UpdaterService.CheckAndStageAsync);
 
         _single.ArgsReceived += args =>
         {
