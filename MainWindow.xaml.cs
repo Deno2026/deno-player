@@ -45,8 +45,23 @@ public partial class MainWindow : Window
         }
         if (s.WindowLeft is { } l && s.WindowTop is { } t)
         {
-            WindowStartupLocation = WindowStartupLocation.Manual;
-            Left = l; Top = t;
+            // 멀티 모니터 분리/해상도 변경으로 저장된 좌표가 현재 화면 밖이면 가운데로 강제.
+            // 그렇지 않으면 다음 실행 시 창이 보이지 않는 자리에 뜸.
+            var vw = SystemParameters.VirtualScreenWidth;
+            var vh = SystemParameters.VirtualScreenHeight;
+            var vl = SystemParameters.VirtualScreenLeft;
+            var vt = SystemParameters.VirtualScreenTop;
+            var onScreen = l + 80 < vl + vw && l + Width - 80 > vl &&
+                           t + 40 < vt + vh && t + Height - 40 > vt;
+            if (onScreen)
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = l; Top = t;
+            }
+            else
+            {
+                WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
         }
         if (s.WindowMaximized) WindowState = WindowState.Maximized;
         Topmost = s.AlwaysOnTop;
@@ -240,7 +255,7 @@ public partial class MainWindow : Window
     private void OnStateChanged(object? sender, EventArgs e)
     {
         if (MaxRestoreBtn != null)
-            MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "" : "";
+            MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
         SyncPlaylistWindowPosition();
         // 최소화될 때 playlist도 같이 숨김 (Owner가 minimize면 자동이긴 하지만 명시)
         if (WindowState == WindowState.Minimized) _playlistWin?.HideSlide();
@@ -648,9 +663,10 @@ public partial class MainWindow : Window
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop)!;
+            // 미디어, 폴더, 또는 자막(현재 영상에 add-sub 의도) — 셋 중 하나라도 있으면 accept
             var ok = files.Any(f =>
                 Directory.Exists(f) ||
-                (File.Exists(f) && MediaKindExtensions.IsSupported(f)));
+                (File.Exists(f) && (MediaKindExtensions.IsSupported(f) || MediaKindExtensions.IsSubtitle(f))));
             e.Effects = ok ? DragDropEffects.Copy : DragDropEffects.None;
             if (ok && _vm.State != PlayerState.Dragging && _vm.State == PlayerState.NoFile)
                 _vm.State = PlayerState.Dragging;

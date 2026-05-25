@@ -215,7 +215,23 @@ public sealed class MpvIpcClient : IDisposable
     public Task Stop()                     => SendAsync("stop");
     public Task FrameStep()                => SendAsync("frame-step");
     public Task FrameBackStep()            => SendAsync("frame-back-step");
+
+    /// <summary>
+    /// mpv screenshot-to-file. mpv가 실패하면(권한/디스크/경로 문자 등) error 응답 옴.
+    /// CommandAsync로 보내 응답 확인 → 호출자가 toast 메시지 정확히 결정 가능.
+    /// </summary>
+    public async Task<bool> ScreenshotChecked(string path)
+    {
+        try { await CommandAsync("screenshot-to-file", path); return true; }
+        catch { return false; }
+    }
     public Task Screenshot(string path)    => SendAsync("screenshot-to-file", path);
+
+    // ─ 자막/오디오 트랙 사이클 — 다국어 영상 / 다중 자막 영상에서 즉시 전환 ─
+    public Task CycleSubtitle()            => SendAsync("cycle", "sub");
+    public Task CycleSubtitleVisibility()  => SendAsync("cycle", "sub-visibility");
+    public Task CycleAudio()               => SendAsync("cycle", "audio");
+    public Task LoadSubtitle(string path)  => SendAsync("sub-add", path, "select");
 
     public void Dispose()
     {

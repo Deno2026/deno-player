@@ -105,6 +105,10 @@
         <KeyBinding Key="T"        Modifiers="Control" Command="{Binding AlwaysOnTopCommand}"/>
         <KeyBinding Key="P"        Command="{Binding TogglePlaylistCommand}"/>
         <KeyBinding Key="L"        Modifiers="Control" Command="{Binding TogglePlaylistCommand}"/>
+        <!-- 자막/오디오 트랙 사이클 — mpv가 트랙 메타로 cycle. UI에 트랙 list까지 안 띄움(가벼움) -->
+        <KeyBinding Key="V"        Command="{Binding CycleSubtitleCommand}"/>
+        <KeyBinding Key="V"        Modifiers="Shift" Command="{Binding ToggleSubtitleVisibilityCommand}"/>
+        <KeyBinding Key="J"        Modifiers="Control" Command="{Binding CycleAudioCommand}"/>
     </Window.InputBindings>
 
     <Grid x:Name="Root"

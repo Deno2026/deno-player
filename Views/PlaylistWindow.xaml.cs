@@ -103,4 +103,30 @@ public partial class PlaylistWindow : Window
             e.Handled = true;
         }
     }
+
+    private void OnRevealInExplorer(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is MediaItem mi)
+            RevealInExplorer(mi.FullPath);
+    }
+
+    private void OnCopyPath(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is MediaItem mi)
+        {
+            try { System.Windows.Clipboard.SetText(mi.FullPath); } catch { /* clipboard busy */ }
+        }
+    }
+
+    internal static void RevealInExplorer(string path)
+    {
+        try
+        {
+            if (System.IO.File.Exists(path))
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+            else if (System.IO.Directory.Exists(path))
+                System.Diagnostics.Process.Start("explorer.exe", $"\"{path}\"");
+        }
+        catch { /* explorer 못 띄워도 무해 */ }
+    }
 }

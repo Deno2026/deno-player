@@ -72,7 +72,33 @@ public partial class RecentWindow : Window
 
     private void OnClearAll(object? sender, RoutedEventArgs e)
     {
-        DataContext?.Recents.Clear();
-        if (DataContext?.Settings is { } s) s.RecentFiles = new List<string>();
+        if (DataContext is not { } vm) return;
+        vm.Recents.Clear();
+        vm.Settings.RecentFiles = new List<string>();
+        vm.SaveSettingsNow();
+    }
+
+    private void OnRevealInExplorer(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is RecentItem ri)
+            PlaylistWindow.RevealInExplorer(ri.FullPath);
+    }
+
+    private void OnCopyPath(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is RecentItem ri)
+        {
+            try { System.Windows.Clipboard.SetText(ri.FullPath); } catch { }
+        }
+    }
+
+    private void OnRemoveOne(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is RecentItem ri && DataContext is { } vm)
+        {
+            vm.Recents.Remove(ri);
+            vm.Settings.RecentFiles = vm.Recents.Select(r => r.FullPath).ToList();
+            vm.SaveSettingsNow();
+        }
     }
 }

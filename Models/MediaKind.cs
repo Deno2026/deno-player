@@ -28,6 +28,12 @@ public static class MediaKindExtensions
         ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"
     };
 
+    /// <summary>드롭 시 자막으로 인식하는 확장자. 새 미디어가 아니라 현재 영상에 add-sub.</summary>
+    private static readonly HashSet<string> SubtitleExt = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup", ".smi"
+    };
+
     public static MediaKind FromPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return MediaKind.Unknown;
@@ -39,6 +45,11 @@ public static class MediaKindExtensions
     }
 
     public static bool IsSupported(string path) => FromPath(path) != MediaKind.Unknown;
+    public static bool IsSubtitle(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        return SubtitleExt.Contains(Path.GetExtension(path));
+    }
 
     public static IEnumerable<string> AllSupportedExtensions()
         => VideoExt.Concat(AudioExt).Concat(ImageExt);

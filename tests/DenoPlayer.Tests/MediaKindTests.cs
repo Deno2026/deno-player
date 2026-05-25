@@ -56,4 +56,22 @@ public class MediaKindTests
         Assert.True(MediaKindExtensions.IsSupported("a.mp4"));
         Assert.False(MediaKindExtensions.IsSupported("a.txt"));
     }
+
+    [Theory]
+    [InlineData("ko.srt", true)]
+    [InlineData("en.SRT", true)]
+    [InlineData("style.ass", true)]
+    [InlineData("track.vtt", true)]
+    [InlineData("clip.mp4", false)]     // 미디어는 IsSubtitle=false
+    [InlineData("readme.txt", false)]
+    [InlineData("", false)]
+    public void DetectsSubtitle(string path, bool expected)
+        => Assert.Equal(expected, MediaKindExtensions.IsSubtitle(path));
+
+    [Fact] public void IsSupportedAndIsSubtitleAreDistinct()
+    {
+        // 자막은 미디어가 아니어야 함 — drop 처리에서 갈래가 다르므로
+        Assert.False(MediaKindExtensions.IsSupported("ko.srt"));
+        Assert.True (MediaKindExtensions.IsSubtitle("ko.srt"));
+    }
 }

@@ -58,6 +58,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
+                            <Grid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="탐색기에서 열기" Click="OnRevealInExplorer"/>
+                                    <MenuItem Header="파일 경로 복사" Click="OnCopyPath"/>
+                                </ContextMenu>
+                            </Grid.ContextMenu>
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="{Binding FileName}"
                                            Style="{StaticResource TextBody}"

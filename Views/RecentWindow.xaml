@@ -54,6 +54,14 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel>
+                            <StackPanel.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="탐색기에서 열기" Click="OnRevealInExplorer"/>
+                                    <MenuItem Header="파일 경로 복사" Click="OnCopyPath"/>
+                                    <Separator/>
+                                    <MenuItem Header="이 항목 제거" Click="OnRemoveOne"/>
+                                </ContextMenu>
+                            </StackPanel.ContextMenu>
                             <TextBlock Text="{Binding FileName}"
                                        Style="{StaticResource TextBody}"
                                        FontSize="{StaticResource FontSizeSm}"
