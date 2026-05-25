@@ -356,7 +356,12 @@ public partial class MainWindow : Window
     // ============================================================
     private void ShowToast(string message)
     {
-        _toastWin?.Show(message);
+        if (_toastWin is null)
+        {
+            try { _toastWin = new ToastWindow { Owner = this }; }
+            catch { return; }
+        }
+        _toastWin.Show(message);
     }
 
     private static void FadeTo(UIElement el, double target, int ms, bool hideAfter = false)
@@ -393,12 +398,8 @@ public partial class MainWindow : Window
             _recentWin.DataContext = _vm;
             _recentWin.Show();
         }
-        if (_toastWin is null)
-        {
-            // ShowActivated=False라 Show()해도 owner focus 안 뺏음. Opacity=0으로 안 보임.
-            _toastWin = new ToastWindow { Owner = this };
-            _toastWin.Show();
-        }
+        // _toastWin은 lazy create — 첫 ShowToast 시점에 생성. 항상 떠있으면 mouse-pos
+        // routing이나 다른 owned window들 layout에 영향 가능.
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
     }
@@ -511,14 +512,22 @@ public partial class MainWindow : Window
         UpdateHotZones(posInRoot.X, posInRoot.Y, w, h);
     }
 
-    /// <summary>mpv가 보고한 영상 hwnd 안 X,Y 좌표 → 좌/우 hot zone 둘 다 검사.</summary>
+    /// <summary>
+    /// mpv가 보고한 영상 hwnd 안 X,Y 좌표 → 좌/우 hot zone 둘 다 검사.
+    /// mpv는 native pixel을 보고, ActualWidth는 WPF logical. DPI scale로 mpv 좌표를
+    /// logical로 변환해 비교 기준 일치시킨다 (이 변환 없으면 HiDPI 125%/150% 환경에서
+    /// 우측 hot zone trigger가 절대 안 됨 — 1400px를 보내도 925px로 받아 hot zone 못 들어감).
+    /// </summary>
     private void CheckRightHotZoneFromMpv(double mpvX, double mpvY)
     {
         if (_closing) return;
         var w = ActualWidth;
         var h = ActualHeight;
         if (w <= 0 || h <= 0) return;
-        UpdateHotZones(mpvX, mpvY, w, h);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+        var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+        UpdateHotZones(mpvX / sx, mpvY / sy, w, h);
     }
 
     private void UpdateHotZones(double x, double y, double w, double h)
