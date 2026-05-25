@@ -533,13 +533,30 @@ public partial class MainWindow : Window
     // Seek bar / speed wheel
     // ============================================================
     private void OnSeekDown(object sender, MouseButtonEventArgs e)
-        => _vm.BeginSeek();
+    {
+        if (sender is Slider sl)
+            Services.AppLog.Info($"OnSeekDown: cur={sl.Value:F2} max={sl.Maximum:F2}");
+        _vm.BeginSeek();
+    }
     private void OnSeekUp(object sender, MouseButtonEventArgs e)
     {
-        if (sender is Slider sl) _vm.EndSeek(sl.Value);
+        if (sender is Slider sl)
+        {
+            // IsMoveToPointEnabled가 click 시 Slider Value를 클릭 위치로 옮겨놨어야 함.
+            // 만약 sl.Value가 그대로 옛 위치면 mpv hit-test 또는 template 문제.
+            // 위치 변환: e.GetPosition으로 마우스 X 좌표 → Slider의 Value scale로 직접 계산해 둠.
+            var pos = e.GetPosition(sl);
+            var ratio = sl.ActualWidth > 0 ? Math.Clamp(pos.X / sl.ActualWidth, 0, 1) : 0;
+            var clickValue = sl.Minimum + (sl.Maximum - sl.Minimum) * ratio;
+            Services.AppLog.Info($"OnSeekUp: slider.Value={sl.Value:F2} click={clickValue:F2} ratio={ratio:F3}");
+            // Slider가 못 옮긴 경우 click 좌표 기준으로 우리가 직접 seek
+            var target = Math.Abs(sl.Value - clickValue) > 0.5 ? clickValue : sl.Value;
+            _vm.EndSeek(target);
+        }
     }
     private void OnSeekDragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
     {
+        Services.AppLog.Info("OnSeekDragStarted");
         _vm.BeginSeek();
     }
     private DateTime _lastLiveSeek;
@@ -553,7 +570,11 @@ public partial class MainWindow : Window
     }
     private void OnSeekDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
-        if (sender is Slider sl) _vm.EndSeek(sl.Value);
+        if (sender is Slider sl)
+        {
+            Services.AppLog.Info($"OnSeekDragCompleted: value={sl.Value:F2}");
+            _vm.EndSeek(sl.Value);
+        }
     }
     private void OnSeekWheel(object sender, MouseWheelEventArgs e)
     {
