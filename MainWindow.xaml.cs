@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
     private RecentWindow?   _recentWin;
+    private ToastWindow?    _toastWin;
     private const int HotZoneWidth = 180;           // 우측 hover trigger (이전 280 → 2/3 수준)
     private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
 
@@ -243,8 +244,10 @@ public partial class MainWindow : Window
         _closing = true;
         try { _playlistWin?.Close(); } catch { }
         try { _recentWin?.Close(); } catch { }
+        try { _toastWin?.Close(); } catch { }
         _playlistWin = null;
         _recentWin = null;
+        _toastWin = null;
         var (l, t) = (WindowState == WindowState.Normal ? (double?)Left : null,
                        WindowState == WindowState.Normal ? (double?)Top  : null);
         var (w, h) = (WindowState == WindowState.Normal ? Width  : RestoreBounds.Width,
@@ -349,37 +352,11 @@ public partial class MainWindow : Window
     }
 
     // ============================================================
-    // Toast — 짧은 OSD confirm (스크린샷 저장 등)
+    // Toast — owned ToastWindow로 위임 (WPF airspace 우회)
     // ============================================================
-    private DispatcherTimer? _toastTimer;
     private void ShowToast(string message)
     {
-        ToastText.Text = message;
-        var anim = new DoubleAnimation
-        {
-            To = 1.0,
-            Duration = TimeSpan.FromMilliseconds(150),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        ToastBox.BeginAnimation(UIElement.OpacityProperty, anim);
-
-        _toastTimer ??= new DispatcherTimer();
-        _toastTimer.Stop();
-        _toastTimer.Interval = TimeSpan.FromMilliseconds(2200);
-        _toastTimer.Tick -= ToastTimerTick;
-        _toastTimer.Tick += ToastTimerTick;
-        _toastTimer.Start();
-    }
-    private void ToastTimerTick(object? sender, EventArgs e)
-    {
-        _toastTimer?.Stop();
-        var anim = new DoubleAnimation
-        {
-            To = 0.0,
-            Duration = TimeSpan.FromMilliseconds(250),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-        };
-        ToastBox.BeginAnimation(UIElement.OpacityProperty, anim);
+        _toastWin?.Show(message);
     }
 
     private static void FadeTo(UIElement el, double target, int ms, bool hideAfter = false)
@@ -415,6 +392,12 @@ public partial class MainWindow : Window
             _recentWin = new RecentWindow { Owner = this };
             _recentWin.DataContext = _vm;
             _recentWin.Show();
+        }
+        if (_toastWin is null)
+        {
+            // ShowActivated=False라 Show()해도 owner focus 안 뺏음. Opacity=0으로 안 보임.
+            _toastWin = new ToastWindow { Owner = this };
+            _toastWin.Show();
         }
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
