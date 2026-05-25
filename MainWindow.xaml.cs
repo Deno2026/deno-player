@@ -180,6 +180,9 @@ public partial class MainWindow : Window
 
         // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
         OpenInitialPathIfAny();
+
+        // mouse hot zone polling 시작 (mpv IPC mouse-pos 우회 — 좌표계 신뢰 안 됨)
+        StartHotZonePolling();
     }
 
     private async Task RestartMpvAsync()
@@ -242,6 +245,8 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _closing = true;
+        try { _hotZonePoll?.Stop(); } catch { }
+        _hotZonePoll = null;
         try { _playlistWin?.Close(); } catch { }
         try { _recentWin?.Close(); } catch { }
         try { _toastWin?.Close(); } catch { }
@@ -514,20 +519,80 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// mpv가 보고한 영상 hwnd 안 X,Y 좌표 → 좌/우 hot zone 둘 다 검사.
-    /// mpv는 native pixel을 보고, ActualWidth는 WPF logical. DPI scale로 mpv 좌표를
-    /// logical로 변환해 비교 기준 일치시킨다 (이 변환 없으면 HiDPI 125%/150% 환경에서
-    /// 우측 hot zone trigger가 절대 안 됨 — 1400px를 보내도 925px로 받아 hot zone 못 들어감).
+    /// (현재 GetCursorPos polling이 주 경로 — 이건 backup. mpv mouse-pos 좌표계가
+    ///  환경/영상마다 일관성 없어 신뢰 못 함.)
     /// </summary>
     private void CheckRightHotZoneFromMpv(double mpvX, double mpvY)
     {
+        // 비활성화 — GetCursorPos polling이 모든 mouse-pos detection 담당.
+        // _vm.MpvMousePos는 ShowControls trigger용 mouse activity만 사용.
+    }
+
+    // ============================================================
+    // GetCursorPos polling — mpv IPC mouse-pos는 좌표계 신뢰 어려움(host hwnd 안
+    // native pixel/logical/video pixel 어떤지 환경마다 다름) + WPF MouseMove는 HwndHost
+    // 위에서 fire 안 됨. Win32 GetCursorPos로 직접 screen coord 받아 main window
+    // 안 logical 좌표 변환 + hot zone 검사. 80ms tick은 60Hz 영상에 충분.
+    // ============================================================
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out PinvokePoint lpPoint);
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct PinvokePoint { public int X; public int Y; }
+
+    private DispatcherTimer? _hotZonePoll;
+
+    private void StartHotZonePolling()
+    {
+        if (_hotZonePoll is not null) return;
+        _hotZonePoll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _hotZonePoll.Tick += OnHotZonePollTick;
+        _hotZonePoll.Start();
+    }
+
+    private void OnHotZonePollTick(object? sender, EventArgs e)
+    {
         if (_closing) return;
-        var w = ActualWidth;
-        var h = ActualHeight;
+        if (!IsActive)
+        {
+            // 다른 앱이 foreground면 panel은 mouse-over 아닐 때 닫음.
+            if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+            if (_recentWin?.IsShown == true && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+            return;
+        }
+        if (!GetCursorPos(out var pt)) return;
+        var src = System.Windows.PresentationSource.FromVisual(this);
+        if (src?.CompositionTarget is null) return;
+
+        // Screen native pixel → WPF DIP (logical) — DPI-aware.
+        var fromDevice = src.CompositionTarget.TransformFromDevice;
+        var ptLogical = fromDevice.Transform(new Point(pt.X, pt.Y));
+
+        // main window-relative.
+        var winLeft = WindowState == WindowState.Maximized
+            ? (Left < -10 ? RestoreBounds.Left : Left) // Maximized면 Left 음수 가능
+            : Left;
+        var winTop = WindowState == WindowState.Maximized
+            ? (Top < -10 ? RestoreBounds.Top : Top)
+            : Top;
+        // 위 단순화: Maximized 시 chrome border만큼 음수일 수 있어 WorkArea로 클램프
+        // 가 더 정확하지만 일단 SystemParameters.WorkArea로:
+        if (WindowState == WindowState.Maximized)
+        {
+            var wa = System.Windows.SystemParameters.WorkArea;
+            winLeft = wa.Left;
+            winTop = wa.Top;
+        }
+        var relX = ptLogical.X - winLeft;
+        var relY = ptLogical.Y - winTop;
+        var w = WindowState == WindowState.Maximized
+            ? System.Windows.SystemParameters.WorkArea.Width
+            : ActualWidth;
+        var h = WindowState == WindowState.Maximized
+            ? System.Windows.SystemParameters.WorkArea.Height
+            : ActualHeight;
         if (w <= 0 || h <= 0) return;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
-        var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
-        UpdateHotZones(mpvX / sx, mpvY / sy, w, h);
+        UpdateHotZones(relX, relY, w, h);
     }
 
     private void UpdateHotZones(double x, double y, double w, double h)
