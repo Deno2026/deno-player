@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -30,6 +31,7 @@ public partial class MainWindow : Window
     private RecentWindow?   _recentWin;
     private const int HotZoneWidth = 180;           // 우측 hover trigger (이전 280 → 2/3 수준)
     private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
+
 
     public MainWindow()
     {
@@ -303,6 +305,11 @@ public partial class MainWindow : Window
     {
         ShowControls();
         RestartHideTimer();
+        // 영상 위(=mpv child hwnd) click 시 OS가 mpv hwnd에 keyboard focus를 줘서
+        // WPF KeyBinding이 fire 안 됨 (F/V/Ctrl+S 등 단축키 죽음).
+        // click마다 Root grid(Focusable=True)에 focus 강제 — WPF visual tree 안 element가
+        // focus 가지면 Window.InputBindings가 keyboard input 받음.
+        try { Root.Focus(); Keyboard.Focus(Root); } catch { }
     }
 
     private void RestartHideTimer()
@@ -575,9 +582,11 @@ public partial class MainWindow : Window
             var target = Math.Abs(sl.Value - clickValue) > 0.5 ? clickValue : sl.Value;
             Services.AppLog.Info($"OnSeekUp: slider.Value={sl.Value:F2} click={clickValue:F2} -> seek {target:F2}");
 
-            // Slider Value도 target으로 강제 동기 → mpv가 응답하기 전 thumb이 옛 위치로
-            // 잠깐 끌려가 보이는 깜빡임 방지.
-            try { sl.Value = target; } catch { }
+            // Slider Value를 target으로 임시 동기 — mpv가 응답하기 전 thumb이 옛 위치로
+            // 잠깐 끌려가 보이는 깜빡임 방지. SetCurrentValue를 써서 OneWay binding을
+            // disconnect하지 않는다. (sl.Value = ... 는 local value로 마크돼 이후 mpv가
+            // 보내는 time-pos가 thumb에 못 반영됨 = thumb stuck 버그)
+            try { sl.SetCurrentValue(Slider.ValueProperty, target); } catch { }
 
             _vm.EndSeek(target);
         }
@@ -702,6 +711,7 @@ public partial class MainWindow : Window
         ShowControls(); RestartHideTimer();
     }
 
+
     // ============================================================
     // Space: 짧게 누름 = Play/Pause, 꾹 누르면 = 2x 재생 (놓으면 원래 속도)
     // ============================================================
@@ -817,6 +827,9 @@ public partial class MainWindow : Window
 
         if (fs)
         {
+            // 풀스크린 진입 시 mpv hwnd가 keyboard focus를 가지고 있으면 ESC/F 같은 키가
+            // WPF로 안 와서 풀스크린 못 풀림 — Root grid로 focus 강제.
+            try { Root.Focus(); Keyboard.Focus(Root); } catch { }
             _savedStyle = WindowStyle;
             _savedResize = ResizeMode;
             // 풀스크린 해제는 항상 "창 모드"로 갈 것이므로 normal-mode 좌표를 보존.

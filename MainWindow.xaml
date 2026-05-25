@@ -111,7 +111,7 @@
         <KeyBinding Key="J"        Modifiers="Control" Command="{Binding CycleAudioCommand}"/>
     </Window.InputBindings>
 
-    <Grid x:Name="Root"
+    <Grid x:Name="Root" Focusable="True" FocusVisualStyle="{x:Null}"
           MouseMove="OnRootMouseMove"
           MouseLeave="OnRootMouseLeave"
           PreviewMouseDown="OnRootPreviewMouseDown"

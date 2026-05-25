@@ -14,6 +14,10 @@ public sealed class PlaylistService
     {
         var list = new List<MediaItem>();
         if (string.IsNullOrWhiteSpace(filePath)) return list;
+        // CLI 인자/드롭에서 forward-slash로 들어올 수 있어 GetFullPath로 백슬래시 정규화.
+        // 정규화 안 하면 EnumerateFiles(폴더, ...) 결과와 시드 경로가 string equals 비교에서
+        // 다르게 보여 시드 파일을 못 찾고 list.Insert(0, ...)으로 중복 등록되는 버그.
+        try { filePath = Path.GetFullPath(filePath); } catch { /* invalid path 무시 */ }
         var folder = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
         {
