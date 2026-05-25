@@ -30,5 +30,8 @@ public sealed class AppSettings
     // 환경설정에서 사용자가 등록한 확장자 — null/빈이면 전체 default 사용
     public List<string>? RegisteredExtensions { get; set; }
 
+    // 최근 재생 기록 (최신 → 오래된 순). 최대 30개 유지.
+    public List<string>? RecentFiles { get; set; }
+
     public static AppSettings Defaults() => new();
 }

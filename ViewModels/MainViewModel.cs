@@ -20,6 +20,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public AppSettings Settings { get; private set; }
     public ObservableCollection<MediaItem> Playlist { get; } = new();
+    public ObservableCollection<RecentItem> Recents { get; } = new();
+    private const int MaxRecents = 30;
 
     /// <summary>mpv가 보고하는 마우스 활동(영상 hwnd 위는 WPF가 못 잡음 — IPC로 대체)</summary>
     public event Action? MouseActivity;
@@ -39,6 +41,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _isPlaylistOpen = Settings.PlaylistPanelEnabled;
         _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
         _shuffle = Settings.Shuffle;
+
+        // 최근 재생 목록 복원 — 파일 존재 여부와 무관하게 다 보여줌 (열 때 파일 없으면 Failed로)
+        if (Settings.RecentFiles is { Count: > 0 })
+        {
+            foreach (var p in Settings.RecentFiles)
+                Recents.Add(new RecentItem(p));
+        }
 
         PlayPauseCommand = new RelayCommand(TogglePlayPause);
         NextCommand      = new RelayCommand(Next, () => HasNext);
@@ -466,6 +475,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         var folder = Path.GetDirectoryName(path);
         Settings.LastOpenedFolder = folder;
+        TouchRecent(path);
 
         var list = _playlistSvc.BuildFromFile(path);
         Playlist.Clear();
@@ -780,6 +790,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>같은 kind 중 현재 곡 외에서 랜덤 하나 (Shuffle 자동 next).</summary>
+    private void TouchRecent(string path)
+    {
+        // 같은 path 있으면 제거 후 맨 위에 다시 → 최신이 0번
+        for (var i = Recents.Count - 1; i >= 0; i--)
+            if (string.Equals(Recents[i].FullPath, path, StringComparison.OrdinalIgnoreCase))
+                Recents.RemoveAt(i);
+        Recents.Insert(0, new RecentItem(path));
+        while (Recents.Count > MaxRecents) Recents.RemoveAt(Recents.Count - 1);
+        Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+    }
+
     private MediaItem? PickRandomOfSameKind()
     {
         if (CurrentMedia is null) return null;

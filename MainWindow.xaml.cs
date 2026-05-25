@@ -27,7 +27,9 @@ public partial class MainWindow : Window
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
-    private const int HotZoneWidth = 280;           // 우측 hover trigger — 매우 넓게 (사용자 요청 점진 확대)
+    private RecentWindow?   _recentWin;
+    private const int HotZoneWidth = 280;           // 우측 hover trigger
+    private const int LeftHotZoneWidth = 240;       // 좌측 hover trigger (최근 재생)
 
     public MainWindow()
     {
@@ -91,8 +93,8 @@ public partial class MainWindow : Window
         Drop      += OnDrop;
         KeyDown   += OnAnyKey;
         StateChanged += OnStateChanged;
-        LocationChanged += (_, _) => SyncPlaylistWindowPosition();
-        SizeChanged += (_, _) => SyncPlaylistWindowPosition();
+        LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
+        SizeChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
 
         _vm.PropertyChanged += (_, e) =>
         {
@@ -215,7 +217,9 @@ public partial class MainWindow : Window
     {
         _closing = true;
         try { _playlistWin?.Close(); } catch { }
+        try { _recentWin?.Close(); } catch { }
         _playlistWin = null;
+        _recentWin = null;
         var (l, t) = (WindowState == WindowState.Normal ? (double?)Left : null,
                        WindowState == WindowState.Normal ? (double?)Top  : null);
         var (w, h) = (WindowState == WindowState.Normal ? Width  : RestoreBounds.Width,
@@ -375,7 +379,49 @@ public partial class MainWindow : Window
             _playlistWin.DataContext = _vm;
             _playlistWin.ShownChanged += OnPlaylistShownChanged;
             _playlistWin.Show();
-            SyncPlaylistWindowPosition();
+        }
+        if (_recentWin is null)
+        {
+            _recentWin = new RecentWindow { Owner = this };
+            _recentWin.DataContext = _vm;
+            _recentWin.Show();
+        }
+        SyncPlaylistWindowPosition();
+        SyncRecentWindowPosition();
+    }
+
+    private void SyncRecentWindowPosition()
+    {
+        if (_recentWin is null || WindowState == WindowState.Minimized) return;
+        DoSyncOnce();
+        Dispatcher.BeginInvoke(new Action(DoSyncOnce), DispatcherPriority.ContextIdle);
+
+        void DoSyncOnce()
+        {
+            if (_recentWin is null) return;
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            if (!GetWindowRect(hwnd, out var r)) return;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+            var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+            var left = r.Left / sx;
+            var top  = r.Top  / sy;
+            var w    = (r.Right  - r.Left) / sx;
+            var h    = (r.Bottom - r.Top)  / sy;
+            if (WindowStyle != WindowStyle.None && WindowState == WindowState.Maximized)
+            {
+                var wa = SystemParameters.WorkArea;
+                if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
+                if (top  < wa.Top)  { h -= (wa.Top  - top);  top  = wa.Top;  }
+                if (left + w > wa.Right) w = wa.Right - left;
+                if (top  + h > wa.Bottom) h = wa.Bottom - top;
+            }
+            if (w <= 0 || h <= 0) return;
+            const double topOffset = 36;
+            _recentWin.Left = left;
+            _recentWin.Top  = top + topOffset;
+            _recentWin.Height = Math.Max(200, h - topOffset - 8);
         }
     }
 
@@ -440,36 +486,40 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → hot zone 안/밖 즉시 반영.</summary>
+    /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → 좌/우 hot zone 둘 다 즉시 반영.</summary>
     private void CheckRightHotZoneFromWpf(Point posInRoot)
     {
-        if (_playlistWin is null || _closing) return;
+        if (_closing) return;
         var w = Root.ActualWidth;
         if (w <= 0) return;
         UpdatePlaylistFromHotZone(posInRoot.X, w);
+        UpdateRecentFromHotZone(posInRoot.X);
     }
 
-    /// <summary>mpv가 보고한 영상 hwnd 안 X 좌표 → hot zone 안/밖 즉시 반영.</summary>
+    /// <summary>mpv가 보고한 영상 hwnd 안 X 좌표 → 좌/우 hot zone 둘 다 검사.</summary>
     private void CheckRightHotZoneFromMpv(double mpvX)
     {
-        if (_playlistWin is null || _closing) return;
+        if (_closing) return;
         var w = ActualWidth;
         if (w <= 0) return;
         UpdatePlaylistFromHotZone(mpvX, w);
+        UpdateRecentFromHotZone(mpvX);
     }
 
     private void UpdatePlaylistFromHotZone(double x, double w)
     {
+        if (_playlistWin is null) return;
         var inHotZone = x >= w - HotZoneWidth;
-        if (inHotZone)
-        {
-            _playlistWin!.ShowSlide();
-        }
-        else if (_playlistWin!.IsShown && !_playlistWin.IsMouseOver)
-        {
-            // hot zone 밖이고 panel 위도 아니면 즉시 hide
-            _playlistWin.HideSlide();
-        }
+        if (inHotZone) _playlistWin.ShowSlide();
+        else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+    }
+
+    private void UpdateRecentFromHotZone(double x)
+    {
+        if (_recentWin is null) return;
+        var inHotZone = x >= 0 && x < LeftHotZoneWidth;
+        if (inHotZone) _recentWin.ShowSlide();
+        else if (_recentWin.IsShown && !_recentWin.IsMouseOver) _recentWin.HideSlide();
     }
 
     // ============================================================
@@ -656,10 +706,9 @@ public partial class MainWindow : Window
     // ============================================================
     private void ApplyFullscreen(bool fs)
     {
-        // 풀스크린 전환은 mpv가 video output을 재초기화하는 동안 panel이 떠 있으면
-        // 사용자 시각엔 '멈춘 듯' 보임. 전환 동안 panel 무조건 숨기고 사용자가 다시
-        // hot zone 호버해야 나오게.
+        // 풀스크린 전환 중엔 두 panel 모두 숨김
         _playlistWin?.HideSlide();
+        _recentWin?.HideSlide();
 
         if (fs)
         {
@@ -710,5 +759,6 @@ public partial class MainWindow : Window
             ShowControls();
         }
         SyncPlaylistWindowPosition();
+        SyncRecentWindowPosition();
     }
 }
