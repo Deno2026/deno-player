@@ -717,6 +717,16 @@ public partial class MainWindow : Window
         else _vm.DecreaseSpeedCommand.Execute(null);
         e.Handled = true;
     }
+    private void OnSpeedButtonClick(object sender, RoutedEventArgs e)
+    {
+        // 좌클릭 시 attached ContextMenu(=speed preset 메뉴) 펼치기. YouTube/VLC 패턴.
+        if (sender is Button b && b.ContextMenu is not null)
+        {
+            b.ContextMenu.PlacementTarget = b;
+            b.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            b.ContextMenu.IsOpen = true;
+        }
+    }
     private void OnRootMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (e.Handled) return;

@@ -528,13 +528,30 @@
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="4,0"/>
 
-                        <Button Style="{StaticResource GhostButton}"
+                        <Button x:Name="SpeedButton"
+                                Style="{StaticResource GhostButton}"
                                 Content="{Binding SpeedDisplay}"
-                                Command="{Binding ResetSpeedCommand}"
-                                ToolTip="배속 (Shift+. / Shift+, — 클릭=1.0x, 휠 가능)"
+                                ToolTip="배속 — 클릭=프리셋 메뉴, 휠=±0.25, Shift+./, =±0.25"
+                                Click="OnSpeedButtonClick"
                                 MouseWheel="OnSpeedWheel"
-                                MinWidth="50"
-                                Margin="2,0"/>
+                                MinWidth="56"
+                                Margin="2,0">
+                            <Button.ContextMenu>
+                                <ContextMenu x:Name="SpeedMenu" Placement="Top">
+                                    <MenuItem Header="0.25x" Command="{Binding SetSpeedCommand}" CommandParameter="0.25"/>
+                                    <MenuItem Header="0.5x"  Command="{Binding SetSpeedCommand}" CommandParameter="0.5"/>
+                                    <MenuItem Header="0.75x" Command="{Binding SetSpeedCommand}" CommandParameter="0.75"/>
+                                    <MenuItem Header="1.0x ─ 기본" Command="{Binding SetSpeedCommand}" CommandParameter="1.0"/>
+                                    <MenuItem Header="1.25x" Command="{Binding SetSpeedCommand}" CommandParameter="1.25"/>
+                                    <MenuItem Header="1.5x"  Command="{Binding SetSpeedCommand}" CommandParameter="1.5"/>
+                                    <MenuItem Header="1.75x" Command="{Binding SetSpeedCommand}" CommandParameter="1.75"/>
+                                    <MenuItem Header="2.0x"  Command="{Binding SetSpeedCommand}" CommandParameter="2.0"/>
+                                    <Separator/>
+                                    <MenuItem Header="3.0x"  Command="{Binding SetSpeedCommand}" CommandParameter="3.0"/>
+                                    <MenuItem Header="4.0x"  Command="{Binding SetSpeedCommand}" CommandParameter="4.0"/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
 
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="4,0"/>

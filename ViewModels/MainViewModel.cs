@@ -77,7 +77,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         FrameBackCommand  = new RelayCommand(() => _ = _ipc.FrameBackStep());
         IncreaseSpeedCommand = new RelayCommand(() => Speed = Math.Min(4.0, Math.Round(Speed + 0.25, 2)));
         DecreaseSpeedCommand = new RelayCommand(() => Speed = Math.Max(0.25, Math.Round(Speed - 0.25, 2)));
-        ResetSpeedCommand    = new RelayCommand(() => Speed = 1.0);
+        ResetSpeedCommand    = new RelayCommand(() => SetSpeedForce(1.0));
+        // 메뉴 preset에서 호출 — CommandParameter로 문자열 "0.5"/"1.25" 등 전달, 안전하게 parse 후 force-set.
+        SetSpeedCommand      = new RelayCommand(p =>
+        {
+            if (p is double d) { SetSpeedForce(d); return; }
+            if (p is string s && double.TryParse(s, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v)) SetSpeedForce(v);
+        });
         ApplyUpdateCommand = new RelayCommand(_ =>
         {
             if (_pendingUpdate is not null)
@@ -296,6 +303,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
     public string SpeedDisplay => _speed == 1.0 ? "1.0x" : _speed.ToString("0.00") + "x";
 
+    /// <summary>
+    /// 메뉴 preset / reset 버튼 전용. 일반 Speed setter는 동일값이면 early-return이라
+    /// "이미 1.0인데 1.0 다시 click" 같은 케이스에서 IPC가 안 보내져 dead처럼 보임.
+    /// 여기서는 항상 IPC SetSpeed 보내고 SpeedDisplay raise.
+    /// </summary>
+    private void SetSpeedForce(double value)
+    {
+        var v = Math.Round(Math.Clamp(value, 0.25, 4.0), 2);
+        _speed = v;
+        Settings.PlaybackRate = v;
+        _ = _ipc.SetSpeed(v);
+        Raise(nameof(Speed));
+        Raise(nameof(SpeedDisplay));
+    }
+
     private bool _isFullscreen;
     public bool IsFullscreen { get => _isFullscreen; set => Set(ref _isFullscreen, value); }
 
@@ -481,6 +503,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand IncreaseSpeedCommand { get; }
     public RelayCommand DecreaseSpeedCommand { get; }
     public RelayCommand ResetSpeedCommand { get; }
+    public RelayCommand SetSpeedCommand { get; }
     public RelayCommand ApplyUpdateCommand { get; }
     public RelayCommand CycleSubtitleCommand { get; }
     public RelayCommand ToggleSubtitleVisibilityCommand { get; }
