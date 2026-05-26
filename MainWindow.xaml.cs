@@ -994,7 +994,7 @@ public partial class MainWindow : Window
             ResizeMode = ResizeMode.NoResize;
 
             var mb = GetCurrentMonitorBounds();
-            AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 220);
+            AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 140);
             RestartHideTimer();
         }
         else
@@ -1005,7 +1005,7 @@ public partial class MainWindow : Window
             var ty = _savedTop;
             var tw = _savedWidth  > 0 ? _savedWidth  : 1280;
             var th = _savedHeight > 0 ? _savedHeight : 760;
-            AnimateBounds(tx, ty, tw, th, durationMs: 220, onCompleted: () =>
+            AnimateBounds(tx, ty, tw, th, durationMs: 140, onCompleted: () =>
             {
                 WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
                 ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
