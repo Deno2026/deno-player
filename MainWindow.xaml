@@ -197,17 +197,18 @@
                             Content="&#xE722;"
                             ToolTip="스크린샷 (Ctrl+S)"
                             Command="{Binding ScreenshotCommand}"/>
-                    <!-- 가위 버튼 (E8C6) — 편집 모드 토글. 첫 클릭=진입, 두 번째=실행/exit.
-                         편집 모드면 accent green. -->
-                    <Button Content="&#xE8C6;"
-                            Command="{Binding ToggleTrimModeCommand}">
+                    <!-- 가위 버튼 — 평소엔 ✂ (편집 모드 진입), 편집 모드일 땐 ✓ (저장 실행).
+                         아이콘 자체가 동작 의미를 알려줌. -->
+                    <Button Command="{Binding ToggleTrimModeCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                <Setter Property="ToolTip" Value="자르기 편집 모드 진입 — 양쪽 핸들 드래그로 IN/OUT 조정"/>
+                                <Setter Property="Content" Value="&#xE8C6;"/>
+                                <Setter Property="ToolTip" Value="자르기 편집 — 핸들 드래그로 IN/OUT 조정"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                                        <Setter Property="Content" Value="&#xE73E;"/>
                                         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
-                                        <Setter Property="ToolTip" Value="저장 — 선택 구간 자르기 실행"/>
+                                        <Setter Property="ToolTip" Value="✓ 저장 — 선택 구간 자르기 실행 (Ctrl+E)"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -216,7 +217,7 @@
                     <!-- 편집 모드 취소 X — 편집 모드일 때만 visible -->
                     <Button Style="{StaticResource IconButton}"
                             Content="&#xE711;"
-                            ToolTip="편집 모드 취소 (Esc)"
+                            ToolTip="✕ 취소 — 편집 모드 종료 (Esc)"
                             Command="{Binding CancelTrimModeCommand}"
                             Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}"/>
                     <Button Style="{StaticResource IconButton}"
@@ -477,8 +478,9 @@
                 BorderThickness="0,1,0,0">
             <Grid Margin="14,6,14,8">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>  <!-- 0: SeekBar -->
+                    <RowDefinition Height="Auto"/>  <!-- 1: 컨트롤 -->
+                    <RowDefinition Height="Auto"/>  <!-- 2: 편집 모드 hint (편집 모드일 때만 행 차지) -->
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0" Margin="0,0,0,4">
@@ -648,6 +650,26 @@
                                 Command="{Binding FullscreenCommand}"/>
                     </StackPanel>
                 </Grid>
+
+                <!-- 편집 모드 hint — 사용자가 다음 동작 명확히 알게. 편집 모드일 때만 행 차지. -->
+                <Border Grid.Row="2" Margin="0,6,0,0"
+                        Background="#1A57E389"
+                        BorderBrush="{StaticResource BrushAccent}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusSm}"
+                        Padding="10,4"
+                        Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontFamily="{StaticResource FontMono}"
+                               FontSize="{StaticResource FontSizeSm}"
+                               Foreground="{StaticResource BrushAccent}">
+                        <Run Text="✂ 편집 중 — "/>
+                        <Run Text="{Binding TrimRangeDisplay, Mode=OneWay}"/>
+                        <Run Text="  ·  양쪽 핸들 드래그로 IN/OUT 조정 → 우측 상단 "/>
+                        <Run Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                        <Run Text=" 저장"/>
+                    </TextBlock>
+                </Border>
             </Grid>
         </Border>
     </Grid>
