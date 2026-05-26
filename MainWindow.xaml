@@ -208,7 +208,7 @@
                                     <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
                                         <Setter Property="Content" Value="&#xE73E;"/>
                                         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
-                                        <Setter Property="ToolTip" Value="✓ 저장 — 선택 구간 자르기 실행 (Ctrl+E)"/>
+                                        <Setter Property="ToolTip" Value="✓ 저장 — 위치/이름 지정 창 열기"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -217,7 +217,7 @@
                     <!-- 편집 모드 취소 X — 편집 모드일 때만 visible -->
                     <Button Style="{StaticResource IconButton}"
                             Content="&#xE711;"
-                            ToolTip="✕ 취소 — 편집 모드 종료 (Esc)"
+                            ToolTip="✕ 취소 — 편집 모드 종료"
                             Command="{Binding CancelTrimModeCommand}"
                             Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}"/>
                     <Button Style="{StaticResource IconButton}"
@@ -508,15 +508,15 @@
                                 Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">
                             <!-- IN-OUT 사이 강조 (accent 반투명) -->
                             <Rectangle x:Name="TrimRangeFill"
-                                       Height="8" Fill="#5557E389"
-                                       Canvas.Top="0" IsHitTestVisible="False"/>
+                                       Height="10" Fill="#5557E389"
+                                       Canvas.Top="-1" IsHitTestVisible="False"/>
                             <!-- IN 핸들 -->
-                            <Thumb x:Name="TrimInThumb" Width="12" Height="22"
+                            <Thumb x:Name="TrimInThumb" Width="18" Height="34"
                                    Background="{StaticResource BrushAccent}"
-                                   BorderBrush="#FF000000" BorderThickness="1"
-                                   Cursor="SizeWE" Canvas.Top="-6"
+                                   BorderBrush="#FF000000" BorderThickness="2"
+                                   Cursor="SizeWE" Canvas.Top="-12"
                                    DragDelta="OnTrimInDrag"
-                                   ToolTip="IN 지점 — 드래그로 조정">
+                                   ToolTip="IN 지점">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
                                         <Border Background="{TemplateBinding Background}"
@@ -527,12 +527,12 @@
                                 </Thumb.Template>
                             </Thumb>
                             <!-- OUT 핸들 -->
-                            <Thumb x:Name="TrimOutThumb" Width="12" Height="22"
+                            <Thumb x:Name="TrimOutThumb" Width="18" Height="34"
                                    Background="{StaticResource BrushAccent}"
-                                   BorderBrush="#FF000000" BorderThickness="1"
-                                   Cursor="SizeWE" Canvas.Top="-6"
+                                   BorderBrush="#FF000000" BorderThickness="2"
+                                   Cursor="SizeWE" Canvas.Top="-12"
                                    DragDelta="OnTrimOutDrag"
-                                   ToolTip="OUT 지점 — 드래그로 조정">
+                                   ToolTip="OUT 지점">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
                                         <Border Background="{TemplateBinding Background}"
@@ -665,7 +665,7 @@
                                Foreground="{StaticResource BrushAccent}">
                         <Run Text="✂ 편집 중 — "/>
                         <Run Text="{Binding TrimRangeDisplay, Mode=OneWay}"/>
-                        <Run Text="  ·  양쪽 핸들 드래그로 IN/OUT 조정 → 우측 상단 "/>
+                        <Run Text="  ·  핸들 드래그로 IN/OUT 조정 후 우측 상단 "/>
                         <Run Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
                         <Run Text=" 저장"/>
                     </TextBlock>

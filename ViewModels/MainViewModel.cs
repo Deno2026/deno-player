@@ -138,7 +138,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             TrimInSec = null; TrimOutSec = null;
             Toast?.Invoke("자르기 지점 초기화");
         });
-        ExecuteTrimCommand = new RelayCommand(async _ => await ExecuteTrimAsync(),
+        ExecuteTrimCommand = new RelayCommand(async _ => { _ = await ExecuteTrimAsync(); },
             _ => CanExecuteTrim());
 
         // 가위 버튼 = 편집 모드 토글. !IsTrimMode면 진입 (IN=0, OUT=Duration 기본),
@@ -159,11 +159,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
             else
             {
-                // 실행 또는 cancel
                 if (HasTrimRange)
                 {
-                    await ExecuteTrimAsync();
-                    IsTrimMode = false;  // 자르기 완료 후 자동 exit
+                    var saved = await ExecuteTrimAsync();
+                    if (saved) IsTrimMode = false;  // 저장 성공 시에만 exit. 사용자가 SaveDialog 취소하면 편집 유지.
                 }
                 else
                 {
@@ -616,33 +615,59 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         && CurrentMedia is not null
         && CurrentMedia.Kind != MediaKind.Image;
 
-    private async Task ExecuteTrimAsync()
+    private async Task<bool> ExecuteTrimAsync()
     {
-        if (_trimBusy) return;
+        if (_trimBusy) return false;
         if (CurrentMedia is null)
-        { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
+        { Toast?.Invoke("재생 중인 미디어가 없습니다"); return false; }
         if (CurrentMedia.Kind == MediaKind.Image)
-        { Toast?.Invoke("이미지는 자르기 불가"); return; }
+        { Toast?.Invoke("이미지는 자르기 불가"); return false; }
         if (!HasTrimRange)
-        { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요 (I / O 단축키)"); return; }
+        { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요"); return false; }
+
+        var src = CurrentMedia!.FullPath;
+        var inS = _trimInSec!.Value;
+        var outS = _trimOutSec!.Value;
+        var srcDir  = System.IO.Path.GetDirectoryName(src) ?? Environment.CurrentDirectory;
+        var srcName = System.IO.Path.GetFileNameWithoutExtension(src);
+        var ext = System.IO.Path.GetExtension(src);
+        var defaultName = $"{srcName}_clip{ext}";
+
+        // 사용자가 직접 저장 위치 + 이름 지정
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "자르기 — 저장 위치/이름 지정",
+            FileName = defaultName,
+            InitialDirectory = srcDir,
+            Filter = $"같은 형식 (*{ext})|*{ext}|모든 파일|*.*",
+            AddExtension = true,
+            DefaultExt = ext,
+            OverwritePrompt = true,
+        };
+        if (dlg.ShowDialog() != true)
+        {
+            // 사용자 취소 — 편집 모드 유지, 아무것도 변경 안 함
+            return false;
+        }
+        var outputPath = dlg.FileName;
+
         _trimBusy = true;
         ExecuteTrimCommand.RaiseCanExecuteChanged();
         try
         {
-            var src = CurrentMedia!.FullPath;
-            var inS = _trimInSec!.Value;
-            var outS = _trimOutSec!.Value;
             Toast?.Invoke("자르기 진행 중...");
-            var res = await Services.TrimService.TrimAsync(src, inS, outS).ConfigureAwait(true);
+            var res = await Services.TrimService.TrimAsync(src, inS, outS, outputPath).ConfigureAwait(true);
             if (res.Success && res.OutputPath is not null)
             {
                 var name = System.IO.Path.GetFileName(res.OutputPath);
                 Toast?.Invoke($"저장됨: {name}");
                 Services.AppLog.Info($"Trim saved: {res.OutputPath}");
+                return true;
             }
             else
             {
                 Toast?.Invoke($"자르기 실패: {res.Error}");
+                return false;
             }
         }
         finally
