@@ -951,22 +951,26 @@ public partial class MainWindow : Window
     // ============================================================
     // Fullscreen
     // ============================================================
+    // 풀스크린 진입/탈출 — 깜빡임 최소화 패턴.
+    // 핵심: WindowChrome / WindowState / WindowStyle / Bounds를 모두 건드리면 각각
+    // re-render → 깜빡임. 그래서:
+    //   1) WindowChrome SetWindowChrome 호출 안 함 (XAML 한 번 set으로 끝)
+    //   2) WindowState 토글 안 함 (Max↔Normal hack 제거)
+    //   3) WindowStyle을 None으로 (chrome border 안 보이게)
+    //   4) Bounds 직접 set (현재 모니터 전체) — 1 step 변화로 부드러움
+    // 탈출 시: 저장한 좌표로 복원, WindowStyle만 SingleBorderWindow로.
     private void ApplyFullscreen(bool fs)
     {
-        // 풀스크린 전환 중엔 두 panel 모두 숨김
         _playlistWin?.HideSlide();
         _recentWin?.HideSlide();
 
         if (fs)
         {
-            // 풀스크린 진입 시 mpv hwnd가 keyboard focus를 가지고 있으면 ESC/F 같은 키가
-            // WPF로 안 와서 풀스크린 못 풀림 — Root grid로 focus 강제.
             try { Root.Focus(); Keyboard.Focus(Root); } catch { }
             _savedStyle = WindowStyle;
             _savedResize = ResizeMode;
-            // 풀스크린 해제는 항상 "창 모드"로 갈 것이므로 normal-mode 좌표를 보존.
-            // 현재 Maximized면 RestoreBounds, 아니면 현재 값.
-            if (WindowState == WindowState.Maximized)
+            _savedWasMaximized = WindowState == WindowState.Maximized;
+            if (_savedWasMaximized)
             {
                 var rb = RestoreBounds;
                 _savedLeft   = double.IsNaN(rb.Left)   ? 100  : rb.Left;
@@ -979,36 +983,84 @@ public partial class MainWindow : Window
                 _savedLeft = Left; _savedTop = Top;
                 _savedWidth = Width; _savedHeight = Height;
             }
-            System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
+
+            // 현재 모니터 전체 bounds 가져오기
+            var mb = GetCurrentMonitorBounds();
+
+            // Maximized 상태면 먼저 Normal로 (bounds 직접 set이 통하려면)
+            if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
-            if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-            WindowState = WindowState.Maximized;
+            Left = mb.X;
+            Top = mb.Y;
+            Width = mb.Width;
+            Height = mb.Height;
             RestartHideTimer();
         }
         else
         {
-            // 사용자 의도가 "풀스크린 ↔ 창 모드 스왑"이므로 Maximized로 자동 복원 안 함.
-            // 작은 창으로 명확히 되돌려야 사용자 시각에서 풀스크린과 구분됨.
             Mouse.OverrideCursor = null;
-            System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
-            {
-                CaptionHeight = 0,  // XAML과 일치 — 우리 OnRootDoubleClick이 단독 처리
-                ResizeBorderThickness = new Thickness(6),
-                GlassFrameThickness = new Thickness(0),
-                UseAeroCaptionButtons = false
-            });
             WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
             ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
-            WindowState = WindowState.Normal;
-            if (_savedWidth > 0 && _savedHeight > 0)
+            if (_savedWasMaximized)
             {
-                Left = _savedLeft; Top = _savedTop;
-                Width = _savedWidth; Height = _savedHeight;
+                // Maximized 상태였으면 그 상태로 복원 (Bounds set X)
+                WindowState = WindowState.Maximized;
+            }
+            else
+            {
+                if (_savedWidth > 0 && _savedHeight > 0)
+                {
+                    Left = _savedLeft; Top = _savedTop;
+                    Width = _savedWidth; Height = _savedHeight;
+                }
             }
             ShowControls();
         }
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
     }
+
+    private bool _savedWasMaximized;
+
+    // 현재 윈도우가 있는 모니터의 전체 bounds (DPI scale 적용된 DIP 단위).
+    private Rect GetCurrentMonitorBounds()
+    {
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            var mh = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            var mi = new MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
+            if (GetMonitorInfo(mh, ref mi))
+            {
+                var src = System.Windows.PresentationSource.FromVisual(this);
+                var dpiX = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                var dpiY = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+                var r = mi.rcMonitor;
+                return new Rect(r.left / dpiX, r.top / dpiY,
+                    (r.right - r.left) / dpiX, (r.bottom - r.top) / dpiY);
+            }
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Warn($"GetCurrentMonitorBounds failed: {ex.Message}");
+        }
+        return new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight);
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct WIN32RECT { public int left, top, right, bottom; }
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public WIN32RECT rcMonitor;
+        public WIN32RECT rcWork;
+        public uint dwFlags;
+    }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
 }
