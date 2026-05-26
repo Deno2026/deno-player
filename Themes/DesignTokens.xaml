@@ -136,10 +136,9 @@
         <Setter Property="Foreground" Value="{StaticResource BrushFgSecondary}"/>
     </Style>
 
-    <!-- 아이콘 버튼 (transport / window). IsHitTestVisibleInChrome=True:
-         WindowChrome CaptionHeight=36 영역 안에 있어도 click 받음. -->
+    <!-- 아이콘 버튼 (transport / window). WindowChrome CaptionHeight=0이라
+         IsHitTestVisibleInChrome 불필요. -->
     <Style x:Key="IconButton" TargetType="Button">
-        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         <Setter Property="Background" Value="{StaticResource BrushTransparent}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BrushTransparent}"/>
         <Setter Property="BorderThickness" Value="0"/>

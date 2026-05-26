@@ -91,13 +91,10 @@
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
-        <!-- CaptionHeight=36: TopBar 영역을 OS-native 캡션으로. 드래그/더블클릭/
-             Aero Snap 모두 OS 처리 = race condition 없음.
-             TopBar 안의 버튼들은 IconButton 스타일이 IsHitTestVisibleInChrome=True
-             박아서 정상 click 받음. OnRootDoubleClick에 안전망 있음 (OS NC 처리
-             실패 환경 대비). -->
+        <!-- CaptionHeight=0: OS NC 처리 없음. 더블클릭이 어디서든 WPF 핸들러로 옴.
+             가장자리 ResizeBorderThickness만 OS native. -->
         <shell:WindowChrome
-            CaptionHeight="36"
+            CaptionHeight="0"
             ResizeBorderThickness="6"
             GlassFrameThickness="0"
             CornerRadius="0"
@@ -168,7 +165,10 @@
                 Height="36"
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderSubtle}"
-                BorderThickness="0,0,0,1">
+                BorderThickness="0,0,0,1"
+                MouseLeftButtonDown="OnTopBarMouseDown"
+                MouseMove="OnTopBarMouseMove"
+                MouseLeftButtonUp="OnTopBarMouseUp">
             <DockPanel LastChildFill="True">
                 <!-- 우: 기능 + 창 컨트롤 (Dock=Right가 우선 측정되어 자기 크기 확보) -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"

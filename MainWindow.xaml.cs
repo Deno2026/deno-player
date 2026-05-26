@@ -270,9 +270,35 @@ public partial class MainWindow : Window
     // ============================================================
     // TopBar 빈 영역 드래그 + 더블클릭 max/restore
     // ============================================================
-    // 타이틀바 드래그/더블클릭은 WindowChrome CaptionHeight=36이 OS-native 처리.
-    // 우리 핸들러 일체 없음. OS NC 처리 실패하는 환경 대비 안전망은
-    // OnRootDoubleClick의 TopBar 분기에 있음.
+    // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 토글 안 함 — 그건
+    // OnRootDoubleClick이 단독 처리 (위치 무관 fullscreen 토글).
+    // deferred-drag 패턴: MouseDown에서 arm만, MouseMove threshold 넘으면 DragMove.
+    // 빠른 더블클릭은 mouse 안 움직여서 DragMove modal loop 발생 X → 두 번째 click 정상 fire.
+    private bool _topBarDragArmed;
+    private Point _topBarDownPos;
+
+    private void OnTopBarMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        // 버튼 click은 우리 처리 X
+        if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
+        // ClickCount==2면 OnRootDoubleClick으로 위임 — 우리는 drag arm 해제만
+        if (e.ClickCount >= 2) { _topBarDragArmed = false; return; }
+        _topBarDragArmed = true;
+        _topBarDownPos = e.GetPosition(this);
+    }
+
+    private void OnTopBarMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_topBarDragArmed || e.LeftButton != MouseButtonState.Pressed) return;
+        var pos = e.GetPosition(this);
+        if (Math.Abs(pos.X - _topBarDownPos.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(pos.Y - _topBarDownPos.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _topBarDragArmed = false;
+        try { DragMove(); } catch { /* race 무시 */ }
+    }
+
+    private void OnTopBarMouseUp(object sender, MouseButtonEventArgs e) => _topBarDragArmed = false;
 
     // ============================================================
     // 마우스 자동 숨김 — 풀스크린에서만 동작
@@ -733,32 +759,22 @@ public partial class MainWindow : Window
 
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        // 단순 규칙: 어디서 더블클릭하든 Fullscreen 토글. 컨트롤 요소(슬라이더/버튼/
+        // 리스트박스/BottomBar)만 제외. 사용자가 짚어준 정확한 의도 — 위치 무관, 현재
+        // 상태(전체/아님) 기준으로만.
         if (e.OriginalSource is DependencyObject d)
         {
             if (FindAncestor<Slider>(d) is not null) return;
             if (FindAncestor<Button>(d) is not null) return;
             if (FindAncestor<ListBox>(d) is not null) return;
-            // TopBar 위 더블클릭이면 Maximize 토글 (OnTopBarMouseDown 안전망).
-            // MouseDoubleClick은 OS가 ClickCount=2를 보장하므로 어떤 경로로든 이건 fire됨.
-            var parent = d;
-            while (parent is not null)
+            var p = d;
+            while (p is not null)
             {
-                if (parent == TopBar)
-                {
-                    Services.AppLog.Info($"OnRootDoubleClick(TopBar): toggle from {WindowState}");
-                    WindowState = WindowState == WindowState.Maximized
-                        ? WindowState.Normal
-                        : WindowState.Maximized;
-                    e.Handled = true;
-                    return;
-                }
-                if (parent == BottomBar) return;
-                parent = VisualTreeHelper.GetParent(parent);
+                if (p == BottomBar) return;
+                p = VisualTreeHelper.GetParent(p);
             }
         }
-        // 우/좌 가장자리 hint 영역 (3px)에서의 더블클릭은 무시 (사용자가 hover 의도로 본 영역)
-        var pos = e.GetPosition(Root);
-        if (pos.X < 4 || pos.X > Root.ActualWidth - 4) return;
+        Services.AppLog.Info($"DblClick → Fullscreen toggle (fs={_vm.IsFullscreen})");
         _vm.FullscreenCommand.Execute(null);
         e.Handled = true;
     }
@@ -977,8 +993,7 @@ public partial class MainWindow : Window
             Mouse.OverrideCursor = null;
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
-                // CaptionHeight=36: XAML과 일치. TopBar 영역 = OS-native 캡션.
-                CaptionHeight = 36,
+                CaptionHeight = 0,  // XAML과 일치 — 우리 OnRootDoubleClick이 단독 처리
                 ResizeBorderThickness = new Thickness(6),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
