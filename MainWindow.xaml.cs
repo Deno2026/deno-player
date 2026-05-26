@@ -593,19 +593,25 @@ public partial class MainWindow : Window
         // 좌측 패널(최근 재생)은 화면 세로 상반부에서만 활성. 작업 중 무심코 좌측
         // 내리다가 panel이 튀어나오는 것 방지.
         var inUpperHalf = y < h / 2;
+        // 패널 보호 영역: TopBar(상단 버튼들) 위에 마우스가 있을 때는 이미 열린 패널을
+        // 닫지 않음. 안 그러면 패널 열고 우측의 환경설정/스크린샷/창 버튼 만지려고
+        // 위로 갈 때 hot zone 벗어났다고 패널이 닫혀버려서 조작감 안 좋음.
+        var inTopBar = y < (TopBar?.ActualHeight ?? 36);
 
         if (_playlistWin is not null)
         {
             // 좌측과 일관성 — 우측도 세로 상단 절반 + 하단 transport 영역 제외에서만 trigger.
             var inRight = x >= w - HotZoneWidth && !inLowerStrip && inUpperHalf;
             if (inRight) _playlistWin.ShowSlide();
-            else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+            else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver && !inTopBar)
+                _playlistWin.HideSlide();
         }
         if (_recentWin is not null)
         {
             var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip && inUpperHalf;
             if (inLeft) _recentWin.ShowSlide();
-            else if (_recentWin.IsShown && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+            else if (_recentWin.IsShown && !_recentWin.IsMouseOver && !inTopBar)
+                _recentWin.HideSlide();
         }
     }
 
