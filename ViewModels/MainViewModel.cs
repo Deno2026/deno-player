@@ -946,9 +946,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnUi(() => Seeking = false);
     }
 
-    /// <summary>드래그 중 live preview seek — Seeking 유지하며 mpv에만 위치 갱신.</summary>
+    /// <summary>드래그 중 live preview seek. UI(TimePos)를 즉시 갱신하고 mpv에도 명령.
+    /// 일시정지 상태에서는 mpv가 time-pos event를 느리게 보내거나 한 번만 보내서
+    /// UI 반영이 늦음. 즉시 set으로 SeekBar Value/시간 표시가 바로 따라옴.</summary>
     public void LiveSeek(double seconds)
     {
+        TimePos = seconds;
         _ = _ipc.SeekAbsolute(seconds);
     }
 
