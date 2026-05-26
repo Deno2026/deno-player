@@ -135,8 +135,17 @@ public partial class MainWindow : Window
                     if (_vm.IsPlaylistOpen) _playlistWin?.ShowSlide();
                     else _playlistWin?.HideSlide();
                     break;
+                case nameof(MainViewModel.IsTrimMode):
+                case nameof(MainViewModel.TrimInSec):
+                case nameof(MainViewModel.TrimOutSec):
+                case nameof(MainViewModel.Duration):
+                    Dispatcher.BeginInvoke(new Action(UpdateTrimOverlay),
+                        System.Windows.Threading.DispatcherPriority.Render);
+                    break;
             }
         };
+        // SeekBar 크기 바뀌면 (창 resize) 핸들 위치 다시 계산
+        SizeChanged += (_, _) => UpdateTrimOverlay();
     }
 
     // ============================================================
@@ -733,6 +742,51 @@ public partial class MainWindow : Window
         else _vm.Seek5BackwardCommand.Execute(null);
         e.Handled = true;
     }
+    // ============================================================
+    // Trim 편집 모드 — SeekBar 위 IN/OUT 핸들 드래그
+    // ============================================================
+    private void OnTrimInDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (_vm.Duration <= 0 || SeekBar.ActualWidth <= 0) return;
+        var secPerPx = _vm.Duration / SeekBar.ActualWidth;
+        var deltaSec = e.HorizontalChange * secPerPx;
+        var cur = _vm.TrimInSec ?? 0;
+        var max = (_vm.TrimOutSec ?? _vm.Duration) - 0.1;  // OUT보다 0.1초 앞에서 멈춤
+        _vm.TrimInSec = Math.Clamp(cur + deltaSec, 0, max);
+        UpdateTrimOverlay();
+    }
+    private void OnTrimOutDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (_vm.Duration <= 0 || SeekBar.ActualWidth <= 0) return;
+        var secPerPx = _vm.Duration / SeekBar.ActualWidth;
+        var deltaSec = e.HorizontalChange * secPerPx;
+        var cur = _vm.TrimOutSec ?? _vm.Duration;
+        var min = (_vm.TrimInSec ?? 0) + 0.1;
+        _vm.TrimOutSec = Math.Clamp(cur + deltaSec, min, _vm.Duration);
+        UpdateTrimOverlay();
+    }
+
+    /// <summary>SeekBar 위 IN/OUT 핸들 좌표 + range 강조 위치/크기 갱신.</summary>
+    private void UpdateTrimOverlay()
+    {
+        if (TrimOverlay is null || SeekBar is null) return;
+        if (!_vm.IsTrimMode || _vm.Duration <= 0)
+        {
+            return;
+        }
+        var w = SeekBar.ActualWidth;
+        if (w <= 0) return;
+        var pxPerSec = w / _vm.Duration;
+        var inX  = (_vm.TrimInSec  ?? 0)            * pxPerSec;
+        var outX = (_vm.TrimOutSec ?? _vm.Duration) * pxPerSec;
+        // 핸들 중앙이 좌표에 맞도록 -6 (handle width 12 / 2)
+        System.Windows.Controls.Canvas.SetLeft(TrimInThumb,  inX  - 6);
+        System.Windows.Controls.Canvas.SetLeft(TrimOutThumb, outX - 6);
+        // Range fill
+        System.Windows.Controls.Canvas.SetLeft(TrimRangeFill, inX);
+        TrimRangeFill.Width = Math.Max(0, outX - inX);
+    }
+
     private void OnSpeedWheel(object sender, MouseWheelEventArgs e)
     {
         if (e.Delta > 0) _vm.IncreaseSpeedCommand.Execute(null);

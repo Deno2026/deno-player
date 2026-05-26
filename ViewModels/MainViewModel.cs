@@ -54,7 +54,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OpenFolderCommand = new RelayCommand(OpenFolderDialog);
         MuteCommand      = new RelayCommand(() => IsMuted = !IsMuted);
         FullscreenCommand= new RelayCommand(() => IsFullscreen = !IsFullscreen);
-        ExitFullscreenCommand = new RelayCommand(() => { if (IsFullscreen) IsFullscreen = false; });
+        ExitFullscreenCommand = new RelayCommand(() =>
+        {
+            // ESC 우선순위: 편집 모드 > 풀스크린. 둘 다 활성이면 편집 모드만 빠짐.
+            if (IsTrimMode) { CancelTrimModeCommand?.Execute(null); return; }
+            if (IsFullscreen) IsFullscreen = false;
+        });
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
         TogglePlaylistCommand = new RelayCommand(() => IsPlaylistOpen = !IsPlaylistOpen);
@@ -135,6 +140,45 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         });
         ExecuteTrimCommand = new RelayCommand(async _ => await ExecuteTrimAsync(),
             _ => CanExecuteTrim());
+
+        // 가위 버튼 = 편집 모드 토글. !IsTrimMode면 진입 (IN=0, OUT=Duration 기본),
+        // IsTrimMode && HasTrimRange면 실행 후 exit, IsTrimMode && !HasTrimRange면 cancel.
+        ToggleTrimModeCommand = new RelayCommand(async _ =>
+        {
+            if (CurrentMedia is null) { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
+            if (CurrentMedia.Kind == MediaKind.Image) { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            if (_trimBusy) return;
+
+            if (!IsTrimMode)
+            {
+                // 진입: 기본 IN=0, OUT=Duration (사용자가 양쪽 핸들 드래그로 조정)
+                TrimInSec = 0;
+                TrimOutSec = Duration > 0 ? Duration : null;
+                IsTrimMode = true;
+                Toast?.Invoke("편집 모드 — 양쪽 핸들 드래그로 IN/OUT 조정 → 가위 다시 누르면 저장");
+            }
+            else
+            {
+                // 실행 또는 cancel
+                if (HasTrimRange)
+                {
+                    await ExecuteTrimAsync();
+                    IsTrimMode = false;  // 자르기 완료 후 자동 exit
+                }
+                else
+                {
+                    IsTrimMode = false;
+                    Toast?.Invoke("편집 모드 종료");
+                }
+            }
+        });
+        CancelTrimModeCommand = new RelayCommand(() =>
+        {
+            if (!IsTrimMode) return;
+            IsTrimMode = false;
+            TrimInSec = null; TrimOutSec = null;
+            Toast?.Invoke("편집 모드 취소");
+        });
 
         _ipc.PropertyChanged += OnMpvPropertyChanged;
         _ipc.EndFile        += OnEndFile;
@@ -532,7 +576,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand SetTrimOutCommand { get; }
     public RelayCommand ClearTrimCommand { get; }
     public RelayCommand ExecuteTrimCommand { get; }
+    public RelayCommand ToggleTrimModeCommand { get; }
+    public RelayCommand CancelTrimModeCommand { get; }
     public RelayCommand OpenFolderCommand { get; }
+
+    // 편집 모드 — 가위 버튼 두 번 누르기 사이의 상태. SeekBar 위 IN/OUT 핸들 드래그.
+    private bool _isTrimMode;
+    public bool IsTrimMode
+    {
+        get => _isTrimMode;
+        set => Set(ref _isTrimMode, value);
+    }
 
     // ─── Trim state ────────────────────────────────────────────────────
     // IN/OUT 지점(초). null = 미설정. 둘 다 설정되고 OUT>IN이면 Execute 가능.

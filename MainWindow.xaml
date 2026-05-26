@@ -197,21 +197,28 @@
                             Content="&#xE722;"
                             ToolTip="스크린샷 (Ctrl+S)"
                             Command="{Binding ScreenshotCommand}"/>
-                    <!-- 잘라내기 트리거 — IN/OUT(I/O) 둘 다 잡혀야 enabled.
-                         가위 아이콘 (E8C6 = Cut). DataTrigger로 HasTrimRange면 accent green. -->
+                    <!-- 가위 버튼 (E8C6) — 편집 모드 토글. 첫 클릭=진입, 두 번째=실행/exit.
+                         편집 모드면 accent green. -->
                     <Button Content="&#xE8C6;"
-                            ToolTip="잘라내기 실행 (Ctrl+E) — IN(I) / OUT(O) 지점 먼저 잡기"
-                            Command="{Binding ExecuteTrimCommand}">
+                            Command="{Binding ToggleTrimModeCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                <Setter Property="ToolTip" Value="자르기 편집 모드 진입 — 양쪽 핸들 드래그로 IN/OUT 조정"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasTrimRange}" Value="True">
+                                    <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                                        <Setter Property="ToolTip" Value="저장 — 선택 구간 자르기 실행"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
+                    <!-- 편집 모드 취소 X — 편집 모드일 때만 visible -->
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE711;"
+                            ToolTip="편집 모드 취소 (Esc)"
+                            Command="{Binding CancelTrimModeCommand}"
+                            Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}"/>
                     <Button Style="{StaticResource IconButton}"
                             Content="&#xE838;"
                             ToolTip="폴더 열기"
@@ -483,18 +490,58 @@
                     <TextBlock Grid.Column="0" Text="{Binding TimePosDisplay}"
                                Style="{StaticResource TextMono}"
                                VerticalAlignment="Center" MinWidth="56"/>
-                    <Slider Grid.Column="1"
-                            x:Name="SeekBar"
-                            Style="{StaticResource SeekSlider}"
-                            Minimum="0"
-                            Maximum="{Binding Duration}"
-                            Value="{Binding TimePos, Mode=OneWay}"
-                            IsEnabled="{Binding HasMedia}"
-                            Margin="10,0"
-                            PreviewMouseLeftButtonDown="OnSeekDown"
-                            PreviewMouseMove="OnSeekMove"
-                            PreviewMouseLeftButtonUp="OnSeekUp"
-                            MouseWheel="OnSeekWheel"/>
+                    <Grid Grid.Column="1" Margin="10,0">
+                        <Slider x:Name="SeekBar"
+                                Style="{StaticResource SeekSlider}"
+                                Minimum="0"
+                                Maximum="{Binding Duration}"
+                                Value="{Binding TimePos, Mode=OneWay}"
+                                IsEnabled="{Binding HasMedia}"
+                                PreviewMouseLeftButtonDown="OnSeekDown"
+                                PreviewMouseMove="OnSeekMove"
+                                PreviewMouseLeftButtonUp="OnSeekUp"
+                                MouseWheel="OnSeekWheel"/>
+                        <!-- 편집 모드 overlay: IN/OUT 핸들 + 강조 -->
+                        <Canvas x:Name="TrimOverlay" IsHitTestVisible="True"
+                                Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">
+                            <!-- IN-OUT 사이 강조 (accent 반투명) -->
+                            <Rectangle x:Name="TrimRangeFill"
+                                       Height="8" Fill="#5557E389"
+                                       Canvas.Top="0" IsHitTestVisible="False"/>
+                            <!-- IN 핸들 -->
+                            <Thumb x:Name="TrimInThumb" Width="12" Height="22"
+                                   Background="{StaticResource BrushAccent}"
+                                   BorderBrush="#FF000000" BorderThickness="1"
+                                   Cursor="SizeWE" Canvas.Top="-6"
+                                   DragDelta="OnTrimInDrag"
+                                   ToolTip="IN 지점 — 드래그로 조정">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="2"/>
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                            <!-- OUT 핸들 -->
+                            <Thumb x:Name="TrimOutThumb" Width="12" Height="22"
+                                   Background="{StaticResource BrushAccent}"
+                                   BorderBrush="#FF000000" BorderThickness="1"
+                                   Cursor="SizeWE" Canvas.Top="-6"
+                                   DragDelta="OnTrimOutDrag"
+                                   ToolTip="OUT 지점 — 드래그로 조정">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="2"/>
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                        </Canvas>
+                    </Grid>
                     <TextBlock Grid.Column="2" Text="{Binding DurationDisplay}"
                                Style="{StaticResource TextMono}"
                                VerticalAlignment="Center" MinWidth="56" TextAlignment="Right"/>
