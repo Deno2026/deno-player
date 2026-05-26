@@ -606,7 +606,8 @@ public partial class MainWindow : Window
 
         if (_playlistWin is not null)
         {
-            var inRight = x >= w - HotZoneWidth && !inLowerStrip;
+            // 좌측과 일관성 — 우측도 세로 상단 절반 + 하단 transport 영역 제외에서만 trigger.
+            var inRight = x >= w - HotZoneWidth && !inLowerStrip && inUpperHalf;
             if (inRight) _playlistWin.ShowSlide();
             else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
         }
