@@ -76,9 +76,12 @@ public partial class PlaylistWindow : Window
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
     }
 
-    // 패널 안에 마우스가 있으면 hide 안 함 (panel 안 클릭/스크롤 중에 사라지면 짜증)
+    // 패널 닫힘은 MainWindow의 통합 hot zone polling(GetCursorPos 80ms)에서만 처리.
+    // 여기서 즉시 HideSlide 호출하면 패널→TopBar로 마우스 이동 중 self-close 발생해서
+    // 위쪽 TopBar 버튼 조작이 불가. main window가 inTopBar / IsMouseOver 모두 보고
+    // 일관 판정.
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
-    private void OnPanelLeave(object sender, MouseEventArgs e) => HideSlide();
+    private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 
     private void OnItemClicked(object sender, MouseButtonEventArgs e)
     {

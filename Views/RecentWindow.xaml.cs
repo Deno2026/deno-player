@@ -52,8 +52,10 @@ public partial class RecentWindow : Window
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
     }
 
+    // PlaylistWindow와 동일: 닫힘 판정은 MainWindow.UpdateHotZones에서 일원화.
+    // self-close 하면 패널→TopBar로 마우스 올릴 때 닫혀서 위 버튼 조작 불가.
     private void OnPanelEnter(object sender, MouseEventArgs e) { }
-    private void OnPanelLeave(object sender, MouseEventArgs e) => HideSlide();
+    private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 
     private void OnItemClicked(object sender, MouseButtonEventArgs e)
     {
