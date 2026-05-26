@@ -294,9 +294,11 @@ public partial class MainWindow : Window
         if (e.ChangedButton != MouseButton.Left) return;
         // 버튼 click이면 우리가 처리 안 함
         if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
+        Services.AppLog.Info($"TopBar MouseDown clickCount={e.ClickCount} src={e.OriginalSource?.GetType().Name}");
         if (e.ClickCount == 2)
         {
             _topBarDragArmed = false;
+            Services.AppLog.Info($"TopBar dbl-click → toggle from {WindowState}");
             WindowState = WindowState == WindowState.Maximized
                 ? WindowState.Normal
                 : WindowState.Maximized;
@@ -786,10 +788,21 @@ public partial class MainWindow : Window
             if (FindAncestor<Slider>(d) is not null) return;
             if (FindAncestor<Button>(d) is not null) return;
             if (FindAncestor<ListBox>(d) is not null) return;
+            // TopBar 위 더블클릭이면 Maximize 토글 (OnTopBarMouseDown 안전망).
+            // MouseDoubleClick은 OS가 ClickCount=2를 보장하므로 어떤 경로로든 이건 fire됨.
             var parent = d;
             while (parent is not null)
             {
-                if (parent == TopBar || parent == BottomBar) return;
+                if (parent == TopBar)
+                {
+                    Services.AppLog.Info($"OnRootDoubleClick(TopBar): toggle from {WindowState}");
+                    WindowState = WindowState == WindowState.Maximized
+                        ? WindowState.Normal
+                        : WindowState.Maximized;
+                    e.Handled = true;
+                    return;
+                }
+                if (parent == BottomBar) return;
                 parent = VisualTreeHelper.GetParent(parent);
             }
         }
