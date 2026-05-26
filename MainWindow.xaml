@@ -138,6 +138,11 @@
         <KeyBinding Key="V"        Command="{Binding CycleSubtitleCommand}"/>
         <KeyBinding Key="V"        Modifiers="Shift" Command="{Binding ToggleSubtitleVisibilityCommand}"/>
         <KeyBinding Key="J"        Modifiers="Control" Command="{Binding CycleAudioCommand}"/>
+        <!-- 자르기 (ffmpeg stream copy, 무손실) -->
+        <KeyBinding Key="I"        Command="{Binding SetTrimInCommand}"/>
+        <KeyBinding Key="O"        Command="{Binding SetTrimOutCommand}"/>
+        <KeyBinding Key="X"        Command="{Binding ClearTrimCommand}"/>
+        <KeyBinding Key="E"        Modifiers="Control" Command="{Binding ExecuteTrimCommand}"/>
     </Window.InputBindings>
 
     <Grid x:Name="Root" Focusable="True" FocusVisualStyle="{x:Null}"

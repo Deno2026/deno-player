@@ -8,7 +8,7 @@ echo  ┌───────────────────────�
 echo  │   Deno Player 설치를 시작합니다                       │
 echo  └──────────────────────────────────────────────────────┘
 echo.
-echo  [1/2] mpv 미디어 엔진 받는 중... (한 번만, 약 30 MB)
+echo  [1/3] mpv 미디어 엔진 받는 중... (한 번만, 약 30 MB)
 echo.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\fetch-mpv.ps1" -SkipIfExists
@@ -21,7 +21,18 @@ if errorlevel 1 (
 )
 
 echo.
-echo  [2/2] 바탕화면 바로가기 + 탐색기 우클릭 메뉴 등록 중...
+echo  [2/3] ffmpeg 받는 중 (자르기 기능용, 한 번만, 약 30 MB)...
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\fetch-ffmpeg.ps1" -SkipIfExists
+if errorlevel 1 (
+    echo.
+    echo  ! ffmpeg 다운로드 실패 - 자르기 기능만 비활성. 재생은 정상.
+    echo.
+)
+
+echo.
+echo  [3/3] 바탕화면 바로가기 + 탐색기 우클릭 메뉴 등록 중...
 echo.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\install.ps1"

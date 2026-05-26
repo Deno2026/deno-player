@@ -112,6 +112,29 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _ = _ipc.CycleAudio();              Toast?.Invoke("오디오 트랙 ▶");
         });
 
+        // ─── 잘라내기 (ffmpeg stream copy, 무손실, 키프레임 단위) ───
+        SetTrimInCommand = new RelayCommand(() =>
+        {
+            if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
+            { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            TrimInSec = TimePos;
+            Toast?.Invoke($"IN  {Helpers.TimeFormat.Seconds(TimePos)}");
+        });
+        SetTrimOutCommand = new RelayCommand(() =>
+        {
+            if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
+            { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            TrimOutSec = TimePos;
+            Toast?.Invoke($"OUT {Helpers.TimeFormat.Seconds(TimePos)}");
+        });
+        ClearTrimCommand = new RelayCommand(() =>
+        {
+            TrimInSec = null; TrimOutSec = null;
+            Toast?.Invoke("자르기 지점 초기화");
+        });
+        ExecuteTrimCommand = new RelayCommand(async _ => await ExecuteTrimAsync(),
+            _ => CanExecuteTrim());
+
         _ipc.PropertyChanged += OnMpvPropertyChanged;
         _ipc.EndFile        += OnEndFile;
         _ipc.FileLoaded     += OnFileLoaded;
@@ -504,6 +527,67 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand DecreaseSpeedCommand { get; }
     public RelayCommand ResetSpeedCommand { get; }
     public RelayCommand SetSpeedCommand { get; }
+    public RelayCommand SetTrimInCommand { get; }
+    public RelayCommand SetTrimOutCommand { get; }
+    public RelayCommand ClearTrimCommand { get; }
+    public RelayCommand ExecuteTrimCommand { get; }
+
+    // ─── Trim state ────────────────────────────────────────────────────
+    // IN/OUT 지점(초). null = 미설정. 둘 다 설정되고 OUT>IN이면 Execute 가능.
+    private double? _trimInSec;
+    public double? TrimInSec
+    {
+        get => _trimInSec;
+        set { if (Set(ref _trimInSec, value)) { Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange)); } }
+    }
+    private double? _trimOutSec;
+    public double? TrimOutSec
+    {
+        get => _trimOutSec;
+        set { if (Set(ref _trimOutSec, value)) { Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange)); } }
+    }
+    public bool HasTrimRange =>
+        _trimInSec is double i && _trimOutSec is double o && o > i;
+    public string TrimRangeDisplay => HasTrimRange
+        ? $"{Helpers.TimeFormat.Seconds(_trimInSec!.Value)} → {Helpers.TimeFormat.Seconds(_trimOutSec!.Value)}"
+        : "";
+
+    private bool _trimBusy;
+    private bool CanExecuteTrim() =>
+        !_trimBusy
+        && CurrentMedia is not null
+        && CurrentMedia.Kind != MediaKind.Image
+        && HasTrimRange;
+
+    private async Task ExecuteTrimAsync()
+    {
+        if (!CanExecuteTrim()) { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요 (I / O)"); return; }
+        _trimBusy = true;
+        ExecuteTrimCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var src = CurrentMedia!.FullPath;
+            var inS = _trimInSec!.Value;
+            var outS = _trimOutSec!.Value;
+            Toast?.Invoke("자르기 진행 중...");
+            var res = await Services.TrimService.TrimAsync(src, inS, outS).ConfigureAwait(true);
+            if (res.Success && res.OutputPath is not null)
+            {
+                var name = System.IO.Path.GetFileName(res.OutputPath);
+                Toast?.Invoke($"저장됨: {name}");
+                Services.AppLog.Info($"Trim saved: {res.OutputPath}");
+            }
+            else
+            {
+                Toast?.Invoke($"자르기 실패: {res.Error}");
+            }
+        }
+        finally
+        {
+            _trimBusy = false;
+            ExecuteTrimCommand.RaiseCanExecuteChanged();
+        }
+    }
     public RelayCommand ApplyUpdateCommand { get; }
     public RelayCommand CycleSubtitleCommand { get; }
     public RelayCommand ToggleSubtitleVisibilityCommand { get; }
