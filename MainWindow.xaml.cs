@@ -951,14 +951,13 @@ public partial class MainWindow : Window
     // ============================================================
     // Fullscreen
     // ============================================================
-    // 풀스크린 진입/탈출 — 깜빡임 최소화 패턴.
-    // 핵심: WindowChrome / WindowState / WindowStyle / Bounds를 모두 건드리면 각각
-    // re-render → 깜빡임. 그래서:
-    //   1) WindowChrome SetWindowChrome 호출 안 함 (XAML 한 번 set으로 끝)
-    //   2) WindowState 토글 안 함 (Max↔Normal hack 제거)
-    //   3) WindowStyle을 None으로 (chrome border 안 보이게)
-    //   4) Bounds 직접 set (현재 모니터 전체) — 1 step 변화로 부드러움
-    // 탈출 시: 저장한 좌표로 복원, WindowStyle만 SingleBorderWindow로.
+    // 풀스크린 진입/탈출 — 200ms cubic ease 애니메이션으로 부드럽게 grow/shrink.
+    // 핵심:
+    //   - WindowChrome SetWindowChrome 호출 안 함 (XAML 한 번 set으로 유지)
+    //   - WindowStyle 변경은 진입 시 한 번 (chrome 사라짐), 탈출 시 animate 종료 후 복원
+    //   - Bounds 4개 (Left/Top/Width/Height)를 DoubleAnimation으로 동시에 interpolate
+    //     → WPF가 매 frame layout, mpv child hwnd가 자연스럽게 따라옴
+    //   - WindowState 토글 안 함 (Maximized hack 제거)
     private void ApplyFullscreen(bool fs)
     {
         _playlistWin?.HideSlide();
@@ -977,6 +976,12 @@ public partial class MainWindow : Window
                 _savedTop    = double.IsNaN(rb.Top)    ? 60   : rb.Top;
                 _savedWidth  = rb.Width  > 480 ? rb.Width  : 1280;
                 _savedHeight = rb.Height > 320 ? rb.Height : 760;
+                // Maximized면 RestoreBounds로 visual 위치를 먼저 잡고 거기서 시작.
+                // 안 그러면 Maximized의 가상 bounds(-8,-8,fullW+16,fullH+16)에서
+                // 모니터로 점프 → 어색.
+                WindowState = WindowState.Normal;
+                Left = _savedLeft; Top = _savedTop;
+                Width = _savedWidth; Height = _savedHeight;
             }
             else
             {
@@ -984,41 +989,73 @@ public partial class MainWindow : Window
                 _savedWidth = Width; _savedHeight = Height;
             }
 
-            // 현재 모니터 전체 bounds 가져오기
-            var mb = GetCurrentMonitorBounds();
-
-            // Maximized 상태면 먼저 Normal로 (bounds 직접 set이 통하려면)
-            if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+            // chrome 제거 (한 번의 reflow). 그 후 bounds animate.
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
-            Left = mb.X;
-            Top = mb.Y;
-            Width = mb.Width;
-            Height = mb.Height;
+
+            var mb = GetCurrentMonitorBounds();
+            AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 220);
             RestartHideTimer();
         }
         else
         {
             Mouse.OverrideCursor = null;
-            WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
-            ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
-            if (_savedWasMaximized)
+            // 먼저 bounds를 saved로 animate, 끝난 후 WindowStyle 복원
+            var tx = _savedLeft;
+            var ty = _savedTop;
+            var tw = _savedWidth  > 0 ? _savedWidth  : 1280;
+            var th = _savedHeight > 0 ? _savedHeight : 760;
+            AnimateBounds(tx, ty, tw, th, durationMs: 220, onCompleted: () =>
             {
-                // Maximized 상태였으면 그 상태로 복원 (Bounds set X)
-                WindowState = WindowState.Maximized;
-            }
-            else
-            {
-                if (_savedWidth > 0 && _savedHeight > 0)
-                {
-                    Left = _savedLeft; Top = _savedTop;
-                    Width = _savedWidth; Height = _savedHeight;
-                }
-            }
+                WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
+                ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
+                if (_savedWasMaximized) WindowState = WindowState.Maximized;
+            });
             ShowControls();
         }
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
+    }
+
+    /// <summary>
+    /// 윈도우 Bounds (Left/Top/Width/Height)를 부드럽게 animate. mpv child hwnd가 매
+    /// frame 따라가서 grow/shrink 자연스러움. 이전 animation 진행 중이면 cancel하고
+    /// 현재 값에서 새로 시작.
+    /// </summary>
+    private void AnimateBounds(double targetX, double targetY, double targetW, double targetH,
+        double durationMs, Action? onCompleted = null)
+    {
+        var dur = new Duration(TimeSpan.FromMilliseconds(durationMs));
+        var ease = new System.Windows.Media.Animation.CubicEase
+            { EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut };
+
+        var animL = new System.Windows.Media.Animation.DoubleAnimation(targetX, dur) { EasingFunction = ease };
+        var animT = new System.Windows.Media.Animation.DoubleAnimation(targetY, dur) { EasingFunction = ease };
+        var animW = new System.Windows.Media.Animation.DoubleAnimation(targetW, dur) { EasingFunction = ease };
+        var animH = new System.Windows.Media.Animation.DoubleAnimation(targetH, dur) { EasingFunction = ease };
+
+        // FillBehavior.Stop + 완료 콜백에서 실제 값을 set해야 애니메이션이 끝난 후에도
+        // 좌표가 유지됨 (안 그러면 WPF가 animation snapshot으로 freeze).
+        animL.FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop;
+        animT.FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop;
+        animW.FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop;
+        animH.FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop;
+
+        animH.Completed += (_, _) =>
+        {
+            BeginAnimation(LeftProperty, null);
+            BeginAnimation(TopProperty, null);
+            BeginAnimation(WidthProperty, null);
+            BeginAnimation(HeightProperty, null);
+            Left = targetX; Top = targetY;
+            Width = targetW; Height = targetH;
+            onCompleted?.Invoke();
+        };
+
+        BeginAnimation(LeftProperty, animL);
+        BeginAnimation(TopProperty, animT);
+        BeginAnimation(WidthProperty, animW);
+        BeginAnimation(HeightProperty, animH);
     }
 
     private bool _savedWasMaximized;
