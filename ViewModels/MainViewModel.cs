@@ -648,9 +648,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         try
         {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                "DenoPlayer");
+            // 사용자 지정 폴더 우선, 없으면 기본 Pictures\DenoPlayer\
+            var dir = !string.IsNullOrWhiteSpace(Settings.ScreenshotFolder)
+                ? Settings.ScreenshotFolder
+                : Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                    "DenoPlayer");
             Directory.CreateDirectory(dir);
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var raw  = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);

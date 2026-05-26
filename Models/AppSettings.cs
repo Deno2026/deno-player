@@ -33,5 +33,8 @@ public sealed class AppSettings
     // 최근 재생 기록 (최신 → 오래된 순). 최대 30개 유지.
     public List<string>? RecentFiles { get; set; }
 
+    // 스크린샷 저장 폴더. null/빈이면 기본 Pictures\DenoPlayer\.
+    public string? ScreenshotFolder { get; set; }
+
     public static AppSettings Defaults() => new();
 }

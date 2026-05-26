@@ -22,14 +22,45 @@ public partial class SettingsWindow : Window
 
     private void OnCancel(object? sender, RoutedEventArgs e) => Close();
 
+    private void OnPickScreenshotFolder(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // .NET 8 WPF의 OpenFolderDialog 사용
+            var dlg = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "스크린샷 저장 폴더 선택",
+                InitialDirectory = !string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
+                    ? _vm.ScreenshotFolder
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
+            };
+            if (dlg.ShowDialog(this) == true)
+                _vm.ScreenshotFolder = dlg.FolderName;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("PickScreenshotFolder", ex);
+            MessageBox.Show(this, "폴더 선택 실패: " + ex.Message, "Deno Player",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OnResetScreenshotFolder(object? sender, RoutedEventArgs e)
+    {
+        _vm.ScreenshotFolder = ""; // 빈 = 기본값 (Pictures\DenoPlayer)
+    }
+
     private void OnConfirm(object? sender, RoutedEventArgs e)
     {
         try
         {
             var selected = _vm.SelectedExtensions.ToList();
 
-            // 1) AppSettings 저장
+            // 1) AppSettings 저장 (확장자 + 스크린샷 폴더)
             _settings.RegisteredExtensions = selected;
+            _settings.ScreenshotFolder = string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
+                ? null
+                : _vm.ScreenshotFolder;
             _svc.Save(_settings);
 
             // 2) HKCU 레지스트리 갱신

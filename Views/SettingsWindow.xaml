@@ -64,8 +64,58 @@
                    Background="{StaticResource BrushBorderSubtle}"
                    Margin="0,8,0,12"/>
 
-        <!-- 카테고리 리스트 -->
+        <!-- 카테고리 리스트 + 스크린샷 저장 폴더 -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- 스크린샷 저장 폴더 -->
+                <Border Background="{StaticResource BrushBgRaised}"
+                        BorderBrush="{StaticResource BrushBorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusMd}"
+                        Padding="16,14"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="스크린샷 저장 폴더"
+                                   Style="{StaticResource GroupAllCheckBox.HeaderText}"
+                                   FontFamily="{StaticResource FontUi}"
+                                   FontSize="{StaticResource FontSizeMd}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushAccent}"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Style="{StaticResource TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8"
+                                   Text="Ctrl+S 또는 카메라 버튼으로 저장한 PNG가 들어갈 폴더. 비워두면 기본값 (사용자\사진\DenoPlayer\) 사용."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     x:Name="ScreenshotFolderBox"
+                                     Text="{Binding ScreenshotFolder, UpdateSourceTrigger=PropertyChanged}"
+                                     FontFamily="{StaticResource FontMono}"
+                                     FontSize="{StaticResource FontSizeSm}"
+                                     Padding="8,6"
+                                     Background="{StaticResource BrushBgBase}"
+                                     Foreground="{StaticResource BrushFgPrimary}"
+                                     BorderBrush="{StaticResource BrushBorderStrong}"
+                                     BorderThickness="1"/>
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource ActionButton}"
+                                    Content="찾아보기..."
+                                    Click="OnPickScreenshotFolder"
+                                    Margin="6,0,0,0"/>
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource ActionButton}"
+                                    Content="기본값"
+                                    Click="OnResetScreenshotFolder"
+                                    Margin="6,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
             <ItemsControl ItemsSource="{Binding Groups}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -99,6 +149,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- 액션 버튼 -->

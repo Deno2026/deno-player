@@ -42,9 +42,24 @@ public sealed class ExtGroup
     }
 }
 
-public sealed class SettingsViewModel
+public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     public ObservableCollection<ExtGroup> Groups { get; }
+
+    private string _screenshotFolder = "";
+    /// <summary>스크린샷 PNG 저장 폴더. 빈 문자열이면 기본값(Pictures\DenoPlayer\).</summary>
+    public string ScreenshotFolder
+    {
+        get => _screenshotFolder;
+        set
+        {
+            if (_screenshotFolder == value) return;
+            _screenshotFolder = value ?? "";
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ScreenshotFolder)));
+        }
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
     private static readonly string[] VideoExts =
         { ".mp4", ".mkv", ".mov", ".webm", ".avi", ".m4v", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp" };
@@ -72,6 +87,8 @@ public sealed class SettingsViewModel
             new("오디오", AudioExts.Select(Make)),
             new("이미지", ImageExts.Select(Make)),
         };
+
+        _screenshotFolder = settings.ScreenshotFolder ?? "";
     }
 
     public IEnumerable<string> SelectedExtensions =>
