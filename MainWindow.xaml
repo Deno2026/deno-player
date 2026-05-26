@@ -91,8 +91,11 @@
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
+        <!-- CaptionHeight=36: TopBar 높이만큼 OS-native 캡션. OS가 드래그/더블클릭/
+             right-click system menu 처리. 그 영역의 버튼은 IconButton 스타일 (BasedOn
+             포함)이 IsHitTestVisibleInChrome=True를 박아서 정상 click 가능. -->
         <shell:WindowChrome
-            CaptionHeight="0"
+            CaptionHeight="36"
             ResizeBorderThickness="6"
             GlassFrameThickness="0"
             CornerRadius="0"
@@ -199,13 +202,10 @@
                     <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" ToolTip="닫기" Click="OnClose"/>
                 </StackPanel>
 
-                <!-- 좌: 파일명 (남은 영역 fill, 드래그 핸들).
-                     MouseMove/Up도 핸들 — MouseDown에서 즉시 DragMove하면 double-click의
-                     두 번째 click이 modal loop에 먹혀서 Maximize 토글 실패. -->
-                <Border Background="Transparent"
-                        MouseLeftButtonDown="OnDragArea_MouseDown"
-                        MouseMove="OnDragArea_MouseMove"
-                        MouseLeftButtonUp="OnDragArea_MouseUp">
+                <!-- 좌: 파일명 (남은 영역 fill).
+                     드래그/더블클릭은 WindowChrome CaptionHeight=36이 OS-native로 처리.
+                     이 Border 자체는 hit-test invisible해서 OS 캡션 처리에 안 끼어듦. -->
+                <Border Background="Transparent">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="14,0">
                         <Ellipse Width="6" Height="6"

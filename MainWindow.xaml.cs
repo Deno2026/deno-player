@@ -270,48 +270,9 @@ public partial class MainWindow : Window
     // ============================================================
     // TopBar 빈 영역 드래그 + 더블클릭 max/restore
     // ============================================================
-    // 더블클릭/드래그 race fix —
-    //   기존: MouseDown에서 ClickCount<2면 즉시 DragMove() 호출 → DragMove는 modal
-    //   loop여서 두 번째 click이 system에 도달 못 함 → ClickCount=2 이벤트 자체가 안 옴
-    //   → Normal → Maximized 토글 실패. (Maximized → Normal은 DragMove가
-    //   maximized에서 다르게 작동해서 우연히 동작했음.)
-    //   수정: MouseDown에서는 drag arm만, 실제 DragMove는 MouseMove(드래그 의도가
-    //   명확한 시점)로 미룸. 더블클릭은 OS double-click time 안에 두 MouseDown 이벤트가
-    //   ClickCount=1, 2 순서로 정상 raise됨.
-    private bool _titleBarDragArmed;
-    private Point _titleBarDownPos;
-
-    private void OnDragArea_MouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ChangedButton != MouseButton.Left) return;
-        if (e.ClickCount == 2)
-        {
-            _titleBarDragArmed = false;
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-            e.Handled = true;
-            return;
-        }
-        _titleBarDragArmed = true;
-        _titleBarDownPos = e.GetPosition(this);
-    }
-
-    private void OnDragArea_MouseMove(object sender, MouseEventArgs e)
-    {
-        if (!_titleBarDragArmed || e.LeftButton != MouseButtonState.Pressed) return;
-        var pos = e.GetPosition(this);
-        // 시스템 드래그 임계값(보통 4px) 넘어야 진짜 drag로 판단
-        var dx = Math.Abs(pos.X - _titleBarDownPos.X);
-        var dy = Math.Abs(pos.Y - _titleBarDownPos.Y);
-        if (dx < SystemParameters.MinimumHorizontalDragDistance
-            && dy < SystemParameters.MinimumVerticalDragDistance) return;
-        _titleBarDragArmed = false;
-        try { DragMove(); } catch { /* drag race 무시 */ }
-    }
-
-    private void OnDragArea_MouseUp(object sender, MouseButtonEventArgs e)
-        => _titleBarDragArmed = false;
+    // 캡션 드래그/더블클릭/우클릭 시스템 메뉴는 WindowChrome CaptionHeight=36이
+    // OS-native로 처리. WPF DragMove modal loop이 더블클릭의 두 번째 click을
+    // 흡수하던 race condition 자체가 사라짐. 수동 핸들러 제거됨.
 
     // ============================================================
     // 마우스 자동 숨김 — 풀스크린에서만 동작
@@ -999,7 +960,8 @@ public partial class MainWindow : Window
             Mouse.OverrideCursor = null;
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
-                CaptionHeight = 0,
+                // TopBar 높이 = 36. OS-native 캡션 드래그/더블클릭. XAML과 일치.
+                CaptionHeight = 36,
                 ResizeBorderThickness = new Thickness(6),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false

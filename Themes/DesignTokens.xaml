@@ -1,7 +1,8 @@
 ﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
 
     <!-- ============================================================
          DENO Design Tokens
@@ -135,8 +136,11 @@
         <Setter Property="Foreground" Value="{StaticResource BrushFgSecondary}"/>
     </Style>
 
-    <!-- 아이콘 버튼 (transport / window) -->
+    <!-- 아이콘 버튼 (transport / window).
+         IsHitTestVisibleInChrome=True: WindowChrome CaptionHeight 영역 안에 있어도
+         이 버튼은 click을 받음 (OS native caption 드래그/더블클릭에 먹히지 않음). -->
     <Style x:Key="IconButton" TargetType="Button">
+        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         <Setter Property="Background" Value="{StaticResource BrushTransparent}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BrushTransparent}"/>
         <Setter Property="BorderThickness" Value="0"/>
