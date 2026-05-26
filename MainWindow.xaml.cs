@@ -752,8 +752,16 @@ public partial class MainWindow : Window
         var deltaSec = e.HorizontalChange * secPerPx;
         var cur = _vm.TrimInSec ?? 0;
         var max = (_vm.TrimOutSec ?? _vm.Duration) - 0.1;  // OUT보다 0.1초 앞에서 멈춤
-        _vm.TrimInSec = Math.Clamp(cur + deltaSec, 0, max);
+        var newIn = Math.Clamp(cur + deltaSec, 0, max);
+        _vm.TrimInSec = newIn;
         UpdateTrimOverlay();
+        // IN 위치로 재생 점프 — 들으면서 정확한 시작점 잡기 (80ms throttle, mpv 부담 완화)
+        var now = DateTime.UtcNow;
+        if (now - _lastLiveSeek >= TimeSpan.FromMilliseconds(80))
+        {
+            _lastLiveSeek = now;
+            _vm.LiveSeek(newIn);
+        }
     }
     private void OnTrimOutDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
     {
