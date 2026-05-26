@@ -142,6 +142,11 @@ public partial class MainWindow : Window
                     Dispatcher.BeginInvoke(new Action(UpdateTrimOverlay),
                         System.Windows.Threading.DispatcherPriority.Render);
                     break;
+                case nameof(MainViewModel.TimePos):
+                    if (_vm.IsTrimMode)
+                        Dispatcher.BeginInvoke(new Action(UpdatePlaybackCursor),
+                            System.Windows.Threading.DispatcherPriority.Render);
+                    break;
             }
         };
         // SeekBar 크기 바뀌면 (창 resize) 핸들 위치 다시 계산
@@ -808,8 +813,7 @@ public partial class MainWindow : Window
         UpdateTrimOverlay();
     }
 
-    /// <summary>SeekBar 위 IN/OUT 핸들 좌표 + range 강조 위치/크기 갱신.
-    /// Slider thumb track 영역 보정 → IN=0이면 핸들 중앙이 SeekBar 시작 thumb 위치와 일치.</summary>
+    /// <summary>SeekBar 위 IN/OUT 핸들 좌표 + range 강조 위치/크기 + 재생 cursor 갱신.</summary>
     private void UpdateTrimOverlay()
     {
         if (TrimOverlay is null || SeekBar is null) return;
@@ -819,12 +823,20 @@ public partial class MainWindow : Window
         var inCenterX  = SecToX(_vm.TrimInSec  ?? 0);
         var outCenterX = SecToX(_vm.TrimOutSec ?? _vm.Duration);
 
-        // 핸들 중앙이 SeekBar thumb 중앙과 정확히 일치하도록 좌측 좌표 보정
         System.Windows.Controls.Canvas.SetLeft(TrimInThumb,  inCenterX  - TrimHandleHalf);
         System.Windows.Controls.Canvas.SetLeft(TrimOutThumb, outCenterX - TrimHandleHalf);
-        // Range fill — 두 핸들 중앙 사이
         System.Windows.Controls.Canvas.SetLeft(TrimRangeFill, inCenterX);
         TrimRangeFill.Width = Math.Max(0, outCenterX - inCenterX);
+        UpdatePlaybackCursor();
+    }
+
+    /// <summary>편집 모드 재생 cursor 위치만 가볍게 갱신 (TimePos 매 frame 호출 가능하게).</summary>
+    private void UpdatePlaybackCursor()
+    {
+        if (PlaybackCursor is null || !_vm.IsTrimMode || _vm.Duration <= 0) return;
+        if (SeekBar.ActualWidth <= 0) return;
+        var x = SecToX(_vm.TimePos);
+        System.Windows.Controls.Canvas.SetLeft(PlaybackCursor, x - 1);  // width 2 / 2
     }
 
     private void OnSpeedWheel(object sender, MouseWheelEventArgs e)

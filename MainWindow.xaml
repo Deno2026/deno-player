@@ -519,6 +519,12 @@
                             <Rectangle x:Name="TrimRangeFill"
                                        Height="10" Fill="#5557E389"
                                        Canvas.Top="-1" IsHitTestVisible="False"/>
+                            <!-- 현재 재생 위치 마커 — 편집 모드 미리듣기 중 진행 위치 -->
+                            <Rectangle x:Name="PlaybackCursor"
+                                       Width="2" Height="28"
+                                       Fill="White"
+                                       Canvas.Top="-9"
+                                       IsHitTestVisible="False"/>
                             <!-- IN 핸들 -->
                             <Thumb x:Name="TrimInThumb" Width="18" Height="34"
                                    Background="{StaticResource BrushAccent}"
@@ -530,10 +536,18 @@
                                    ToolTip="IN 지점">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="2"/>
+                                        <!-- 외곽 Transparent Grid = 18x34 hit-test 영역 그대로.
+                                             안에 얇은 6x28 막대만 시각 표시 → 보이는 건 가늘게,
+                                             클릭/드래그 잡기는 넉넉하게. -->
+                                        <Grid Background="Transparent">
+                                            <Border Width="6" Height="28"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                                        </Grid>
                                     </ControlTemplate>
                                 </Thumb.Template>
                             </Thumb>
@@ -546,10 +560,18 @@
                                    ToolTip="OUT 지점">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="2"/>
+                                        <!-- 외곽 Transparent Grid = 18x34 hit-test 영역 그대로.
+                                             안에 얇은 6x28 막대만 시각 표시 → 보이는 건 가늘게,
+                                             클릭/드래그 잡기는 넉넉하게. -->
+                                        <Grid Background="Transparent">
+                                            <Border Width="6" Height="28"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="2"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                                        </Grid>
                                     </ControlTemplate>
                                 </Thumb.Template>
                             </Thumb>
