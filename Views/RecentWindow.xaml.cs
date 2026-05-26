@@ -18,10 +18,19 @@ public partial class RecentWindow : Window
         set => base.DataContext = value;
     }
 
+    // ContextMenu open count — PlaylistWindow와 동일 패턴. 우클릭 메뉴 떴을 때
+    // 메인 polling이 IsMouseOver=false라 닫지 않게.
+    private int _ctxMenuOpenCount;
+
     public RecentWindow()
     {
         InitializeComponent();
         Width = 340;
+        AddHandler(FrameworkElement.ContextMenuOpeningEvent,
+            new ContextMenuEventHandler((_, _) => _ctxMenuOpenCount++), true);
+        AddHandler(FrameworkElement.ContextMenuClosingEvent,
+            new ContextMenuEventHandler((_, _) => { if (_ctxMenuOpenCount > 0) _ctxMenuOpenCount--; }),
+            true);
     }
 
     public void ShowSlide()
@@ -41,6 +50,7 @@ public partial class RecentWindow : Window
     public void HideSlide()
     {
         if (!IsShown) return;
+        if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
         IsShown = false;
         ShownChanged?.Invoke(false);
         var slide = new DoubleAnimation

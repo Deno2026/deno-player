@@ -38,10 +38,21 @@ public partial class PlaylistWindow : Window
         set => base.DataContext = value;
     }
 
+    // ContextMenu open count — 메뉴 열린 동안 HideSlide 무시. ContextMenu는 별도
+    // popup window라 IsMouseOver=false 됨 → 메인 polling이 닫으려고 함. 그 사이에
+    // 사용자가 메뉴 항목 클릭하려는데 패널이 사라져버림.
+    private int _ctxMenuOpenCount;
+
     public PlaylistWindow()
     {
         InitializeComponent();
         Width = 320;
+        // ContextMenuOpening/Closing은 bubble 라우티드 이벤트라 Window 레벨에서 catch 가능.
+        AddHandler(FrameworkElement.ContextMenuOpeningEvent,
+            new ContextMenuEventHandler((_, _) => _ctxMenuOpenCount++), true);
+        AddHandler(FrameworkElement.ContextMenuClosingEvent,
+            new ContextMenuEventHandler((_, _) => { if (_ctxMenuOpenCount > 0) _ctxMenuOpenCount--; }),
+            true);
     }
 
     public void ShowSlide()
@@ -65,6 +76,7 @@ public partial class PlaylistWindow : Window
     public void HideSlide()
     {
         if (!IsShown) return;
+        if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
         IsShown = false;
         ShownChanged?.Invoke(false);
         var slide = new DoubleAnimation
