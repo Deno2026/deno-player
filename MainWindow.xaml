@@ -197,18 +197,17 @@
                             Content="&#xE722;"
                             ToolTip="스크린샷 (Ctrl+S)"
                             Command="{Binding ScreenshotCommand}"/>
-                    <!-- 가위 버튼 — 평소엔 ✂ (편집 모드 진입), 편집 모드일 땐 ✓ (저장 실행).
-                         아이콘 자체가 동작 의미를 알려줌. -->
-                    <Button Command="{Binding ToggleTrimModeCommand}">
+                    <!-- 가위 버튼 — 항상 ✂. 클릭 = 편집 모드 토글 (진입 vs 취소).
+                         저장은 별도 하단 Save 버튼이 담당. -->
+                    <Button Content="&#xE8C6;"
+                            Command="{Binding ToggleTrimModeCommand}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                <Setter Property="Content" Value="&#xE8C6;"/>
-                                <Setter Property="ToolTip" Value="자르기 편집 — 핸들 드래그로 IN/OUT 조정"/>
+                                <Setter Property="ToolTip" Value="자르기 편집 시작"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
-                                        <Setter Property="Content" Value="&#xE73E;"/>
                                         <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
-                                        <Setter Property="ToolTip" Value="✓ 저장 — 위치/이름 지정 창 열기"/>
+                                        <Setter Property="ToolTip" Value="자르기 편집 종료 (저장 안 함)"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -651,7 +650,7 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 편집 모드 hint — 사용자가 다음 동작 명확히 알게. 편집 모드일 때만 행 차지. -->
+                <!-- 편집 모드 hint + Save 버튼 — 편집 모드일 때만 행 차지. -->
                 <Border Grid.Row="2" Margin="0,6,0,0"
                         Background="#1A57E389"
                         BorderBrush="{StaticResource BrushAccent}"
@@ -659,16 +658,35 @@
                         CornerRadius="{StaticResource RadiusSm}"
                         Padding="10,4"
                         Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">
-                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                               FontFamily="{StaticResource FontMono}"
-                               FontSize="{StaticResource FontSizeSm}"
-                               Foreground="{StaticResource BrushAccent}">
-                        <Run Text="✂ 편집 중 — "/>
-                        <Run Text="{Binding TrimRangeDisplay, Mode=OneWay}"/>
-                        <Run Text="  ·  핸들 드래그로 IN/OUT 조정 후 우측 상단 "/>
-                        <Run Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-                        <Run Text=" 저장"/>
-                    </TextBlock>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="{StaticResource FontSizeSm}"
+                                   Foreground="{StaticResource BrushAccent}">
+                            <Run Text="✂ 편집 중 — "/>
+                            <Run Text="{Binding TrimRangeDisplay, Mode=OneWay}"/>
+                            <Run Text="  ·  양쪽 핸들 드래그로 IN/OUT 조정"/>
+                        </TextBlock>
+                        <!-- 명시적 Save 버튼 — 클릭하면 SaveFileDialog 열고 저장 -->
+                        <Button Grid.Column="1"
+                                Content="💾  Save"
+                                Command="{Binding ExecuteTrimCommand}"
+                                FontFamily="{StaticResource FontUi}"
+                                FontSize="{StaticResource FontSizeMd}"
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource BrushAccent}"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource BrushAccent}"
+                                BorderThickness="1"
+                                Padding="14,4"
+                                Cursor="Hand"
+                                ToolTip="자른 구간을 파일로 저장 (탐색기 위치/이름 지정)"/>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>

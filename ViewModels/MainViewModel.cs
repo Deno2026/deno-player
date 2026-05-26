@@ -138,8 +138,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             TrimInSec = null; TrimOutSec = null;
             Toast?.Invoke("자르기 지점 초기화");
         });
-        ExecuteTrimCommand = new RelayCommand(async _ => { _ = await ExecuteTrimAsync(); },
-            _ => CanExecuteTrim());
+        ExecuteTrimCommand = new RelayCommand(async _ =>
+        {
+            var saved = await ExecuteTrimAsync();
+            if (saved) IsTrimMode = false;  // 저장 성공 시 편집 모드 자동 종료
+        }, _ => CanExecuteTrim());
 
         // 가위 버튼 = 편집 모드 토글. !IsTrimMode면 진입 (IN=0, OUT=Duration 기본),
         // IsTrimMode && HasTrimRange면 실행 후 exit, IsTrimMode && !HasTrimRange면 cancel.
@@ -159,16 +162,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
             else
             {
-                if (HasTrimRange)
-                {
-                    var saved = await ExecuteTrimAsync();
-                    if (saved) IsTrimMode = false;  // 저장 성공 시에만 exit. 사용자가 SaveDialog 취소하면 편집 유지.
-                }
-                else
-                {
-                    IsTrimMode = false;
-                    Toast?.Invoke("편집 모드 종료");
-                }
+                // 가위 두 번째 클릭 = 편집 모드 취소 (저장 안 함).
+                // 저장은 별도 Save 버튼이 ExecuteTrimCommand 호출.
+                IsTrimMode = false;
+                TrimInSec = null; TrimOutSec = null;
+                Toast?.Invoke("편집 모드 종료");
+                await Task.CompletedTask;
             }
         });
         CancelTrimModeCommand = new RelayCommand(() =>
