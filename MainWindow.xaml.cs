@@ -270,24 +270,57 @@ public partial class MainWindow : Window
     // ============================================================
     // TopBar 빈 영역 드래그 + 더블클릭 max/restore
     // ============================================================
-    // WindowChrome CaptionHeight=36으로 OS-native 캡션 위임 시도하되, 일부 환경에서
-    // OS NC 처리가 안 되는 경우(특히 maximized → normal 토글)가 있어 ClickCount==2는
-    // WPF 핸들러로도 직접 처리. ClickCount==1은 안 건드림 → 드래그는 OS WindowChrome이
-    // 그대로 처리 (DragMove modal loop 호출 X → 더블클릭의 두 번째 click 흡수 안 됨).
+    // 타이틀바 더블클릭 / 드래그 — WindowChrome CaptionHeight=0 환경에서 WPF가
+    // 모든 input 받음. 단순화한 알고리즘:
+    //   MouseDown ClickCount=2 → 즉시 WindowState 토글 (Normal↔Maximized)
+    //   MouseDown ClickCount=1 → drag arm 만 (DragMove/native drag 호출 X)
+    //   MouseMove → arm 상태에서 drag threshold 넘으면 native drag 시작 (P/Invoke)
+    //   MouseUp  → disarm
+    // 이렇게 deferred-drag로 가면 더블클릭의 두 번째 click이 modal loop에
+    // 흡수되지 않고 정상 ClickCount=2로 raise됨.
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+    private const int WM_NCLBUTTONDOWN = 0xA1;
+    private const int HTCAPTION = 2;
+
+    private bool _topBarDragArmed;
+    private Point _topBarDownPos;
+
     private void OnTopBarMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
-        // 버튼 클릭은 우리가 처리 안 함 (버튼이 자기 click 받음)
+        // 버튼 click이면 우리가 처리 안 함
         if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
         if (e.ClickCount == 2)
         {
+            _topBarDragArmed = false;
             WindowState = WindowState == WindowState.Maximized
                 ? WindowState.Normal
                 : WindowState.Maximized;
             e.Handled = true;
+            return;
         }
-        // ClickCount==1은 OS WindowChrome 캡션 처리에 위임 — DragMove 호출 X
+        _topBarDragArmed = true;
+        _topBarDownPos = e.GetPosition(this);
     }
+
+    private void OnTopBarMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_topBarDragArmed || e.LeftButton != MouseButtonState.Pressed) return;
+        var pos = e.GetPosition(this);
+        if (Math.Abs(pos.X - _topBarDownPos.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(pos.Y - _topBarDownPos.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _topBarDragArmed = false;
+        // OS native drag — DragMove와 달리 snap-to-edge / Aero Snap 자동 지원.
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        ReleaseCapture();
+        SendMessage(hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+    }
+
+    private void OnTopBarMouseUp(object sender, MouseButtonEventArgs e) => _topBarDragArmed = false;
 
     // ============================================================
     // 마우스 자동 숨김 — 풀스크린에서만 동작
@@ -981,8 +1014,8 @@ public partial class MainWindow : Window
             Mouse.OverrideCursor = null;
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
-                // TopBar 높이 = 36. OS-native 캡션 드래그/더블클릭. XAML과 일치.
-                CaptionHeight = 36,
+                // CaptionHeight=0: XAML과 일치. 캡션 처리는 WPF OnTopBarMouseDown.
+                CaptionHeight = 0,
                 ResizeBorderThickness = new Thickness(6),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false

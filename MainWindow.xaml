@@ -91,11 +91,12 @@
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
-        <!-- CaptionHeight=36: TopBar 높이만큼 OS-native 캡션. OS가 드래그/더블클릭/
-             right-click system menu 처리. 그 영역의 버튼은 IconButton 스타일 (BasedOn
-             포함)이 IsHitTestVisibleInChrome=True를 박아서 정상 click 가능. -->
+        <!-- CaptionHeight=0: OS NC 처리 의존 안 함. 캡션 hit-test/드래그/더블클릭
+             모두 WPF 핸들러에서 처리. 일부 환경에서 OS가 CaptionHeight 영역의
+             NC hit-test를 일관성 없이 처리하던 문제 우회. ResizeBorderThickness만
+             유지해서 가장자리 리사이즈는 OS native. -->
         <shell:WindowChrome
-            CaptionHeight="36"
+            CaptionHeight="0"
             ResizeBorderThickness="6"
             GlassFrameThickness="0"
             CornerRadius="0"
@@ -167,7 +168,9 @@
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderSubtle}"
                 BorderThickness="0,0,0,1"
-                MouseLeftButtonDown="OnTopBarMouseDown">
+                MouseLeftButtonDown="OnTopBarMouseDown"
+                MouseMove="OnTopBarMouseMove"
+                MouseLeftButtonUp="OnTopBarMouseUp">
             <DockPanel LastChildFill="True">
                 <!-- 우: 기능 + 창 컨트롤 (Dock=Right가 우선 측정되어 자기 크기 확보) -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
