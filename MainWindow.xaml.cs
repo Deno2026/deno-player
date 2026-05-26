@@ -270,9 +270,24 @@ public partial class MainWindow : Window
     // ============================================================
     // TopBar 빈 영역 드래그 + 더블클릭 max/restore
     // ============================================================
-    // 캡션 드래그/더블클릭/우클릭 시스템 메뉴는 WindowChrome CaptionHeight=36이
-    // OS-native로 처리. WPF DragMove modal loop이 더블클릭의 두 번째 click을
-    // 흡수하던 race condition 자체가 사라짐. 수동 핸들러 제거됨.
+    // WindowChrome CaptionHeight=36으로 OS-native 캡션 위임 시도하되, 일부 환경에서
+    // OS NC 처리가 안 되는 경우(특히 maximized → normal 토글)가 있어 ClickCount==2는
+    // WPF 핸들러로도 직접 처리. ClickCount==1은 안 건드림 → 드래그는 OS WindowChrome이
+    // 그대로 처리 (DragMove modal loop 호출 X → 더블클릭의 두 번째 click 흡수 안 됨).
+    private void OnTopBarMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        // 버튼 클릭은 우리가 처리 안 함 (버튼이 자기 click 받음)
+        if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            e.Handled = true;
+        }
+        // ClickCount==1은 OS WindowChrome 캡션 처리에 위임 — DragMove 호출 X
+    }
 
     // ============================================================
     // 마우스 자동 숨김 — 풀스크린에서만 동작

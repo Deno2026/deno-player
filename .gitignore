@@ -26,6 +26,9 @@ runtime/mpv/mpv.exe
 runtime/mpv/*.dll
 runtime/mpv/*.7z
 runtime/mpv/*.zip
+# ffmpeg.exe도 동일 (LGPL, 165MB) — fetch-ffmpeg.ps1로 자동 다운로드
+runtime/ffmpeg/
+runtime/ffmpeg/*
 
 # Local
 *.local.json

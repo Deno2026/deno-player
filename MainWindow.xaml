@@ -166,7 +166,8 @@
                 Height="36"
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderSubtle}"
-                BorderThickness="0,0,0,1">
+                BorderThickness="0,0,0,1"
+                MouseLeftButtonDown="OnTopBarMouseDown">
             <DockPanel LastChildFill="True">
                 <!-- 우: 기능 + 창 컨트롤 (Dock=Right가 우선 측정되어 자기 크기 확보) -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
