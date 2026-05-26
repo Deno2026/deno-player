@@ -212,6 +212,20 @@ public sealed class MpvIpcClient : IDisposable
     public Task SetSpeed(double speed)     => SendAsync("set_property", "speed", speed);
     public Task SeekAbsolute(double sec)   => SendAsync("seek", sec, "absolute", "exact");
     public Task SeekRelative(double sec)   => SendAsync("seek", sec, "relative");
+    // ab-loop: mpv가 a~b 구간 자동 루프. 편집 모드 IN/OUT 미리듣기.
+    public Task SetAbLoop(double aSec, double bSec)
+    {
+        var t1 = SendAsync("set_property", "ab-loop-a", aSec);
+        var t2 = SendAsync("set_property", "ab-loop-b", bSec);
+        return Task.WhenAll(t1, t2);
+    }
+    public Task ClearAbLoop()
+    {
+        // "no" 문자열로 해제
+        var t1 = SendAsync("set_property", "ab-loop-a", "no");
+        var t2 = SendAsync("set_property", "ab-loop-b", "no");
+        return Task.WhenAll(t1, t2);
+    }
     public Task Stop()                     => SendAsync("stop");
     public Task FrameStep()                => SendAsync("frame-step");
     public Task FrameBackStep()            => SendAsync("frame-back-step");

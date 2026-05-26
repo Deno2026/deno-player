@@ -141,7 +141,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ExecuteTrimCommand = new RelayCommand(async _ =>
         {
             var saved = await ExecuteTrimAsync();
-            if (saved) IsTrimMode = false;  // 저장 성공 시 편집 모드 자동 종료
+            if (saved)
+            {
+                IsTrimMode = false;
+                _ = _ipc.ClearAbLoop();
+            }
         }, _ => CanExecuteTrim());
 
         // 가위 버튼 = 편집 모드 토글. !IsTrimMode면 진입 (IN=0, OUT=Duration 기본),
@@ -158,6 +162,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 TrimInSec = 0;
                 TrimOutSec = Duration > 0 ? Duration : null;
                 IsTrimMode = true;
+                ApplyTrimLoop();  // mpv ab-loop set → IN~OUT 자동 루프
                 Toast?.Invoke("편집 모드 — 양쪽 핸들 드래그로 IN/OUT 조정 → 가위 다시 누르면 저장");
             }
             else
@@ -166,6 +171,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 // 저장은 별도 Save 버튼이 ExecuteTrimCommand 호출.
                 IsTrimMode = false;
                 TrimInSec = null; TrimOutSec = null;
+                _ = _ipc.ClearAbLoop();  // mpv 구간 루프 해제
                 Toast?.Invoke("편집 모드 종료");
                 await Task.CompletedTask;
             }
@@ -175,6 +181,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (!IsTrimMode) return;
             IsTrimMode = false;
             TrimInSec = null; TrimOutSec = null;
+            _ = _ipc.ClearAbLoop();
             Toast?.Invoke("편집 모드 취소");
         });
 
@@ -592,13 +599,31 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public double? TrimInSec
     {
         get => _trimInSec;
-        set { if (Set(ref _trimInSec, value)) { Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange)); } }
+        set
+        {
+            if (!Set(ref _trimInSec, value)) return;
+            Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange));
+            if (IsTrimMode) ApplyTrimLoop();
+        }
     }
     private double? _trimOutSec;
     public double? TrimOutSec
     {
         get => _trimOutSec;
-        set { if (Set(ref _trimOutSec, value)) { Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange)); } }
+        set
+        {
+            if (!Set(ref _trimOutSec, value)) return;
+            Raise(nameof(TrimRangeDisplay)); Raise(nameof(HasTrimRange));
+            if (IsTrimMode) ApplyTrimLoop();
+        }
+    }
+
+    /// <summary>편집 모드 진입 / IN-OUT 변경 시 mpv에 ab-loop 적용.
+    /// mpv가 자동으로 a~b 구간 재생 후 a로 점프 → 사용자가 그 구간만 미리듣기.</summary>
+    private void ApplyTrimLoop()
+    {
+        if (!HasTrimRange) return;
+        _ = _ipc.SetAbLoop(_trimInSec!.Value, _trimOutSec!.Value);
     }
     public bool HasTrimRange =>
         _trimInSec is double i && _trimOutSec is double o && o > i;
