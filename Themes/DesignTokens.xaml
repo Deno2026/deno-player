@@ -279,7 +279,10 @@
 
     <Style x:Key="SeekSlider" TargetType="Slider">
         <Setter Property="Focusable" Value="False"/>
-        <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <!-- IsMoveToPointEnabled=False — Slider 자체가 click 처리 안 함. 우리 OnSeekDown/Move/Up이
+             mouse capture로 직접 1:1 mapping. (True면 Slider 내부 RepeatButton/Thumb가 mouse
+             capture를 먼저 가져가 우리 PreviewMouseMove가 fire 안 됨.) -->
+        <Setter Property="IsMoveToPointEnabled" Value="False"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="Minimum" Value="0"/>
         <Setter Property="MinHeight" Value="22"/>
