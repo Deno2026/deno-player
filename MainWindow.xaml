@@ -197,6 +197,25 @@
                             Content="&#xE722;"
                             ToolTip="스크린샷 (Ctrl+S)"
                             Command="{Binding ScreenshotCommand}"/>
+                    <!-- 잘라내기 트리거 — IN/OUT(I/O) 둘 다 잡혀야 enabled.
+                         가위 아이콘 (E8C6 = Cut). DataTrigger로 HasTrimRange면 accent green. -->
+                    <Button Content="&#xE8C6;"
+                            ToolTip="잘라내기 실행 (Ctrl+E) — IN(I) / OUT(O) 지점 먼저 잡기"
+                            Command="{Binding ExecuteTrimCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasTrimRange}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Style="{StaticResource IconButton}"
+                            Content="&#xE838;"
+                            ToolTip="폴더 열기"
+                            Command="{Binding OpenFolderCommand}"/>
                     <Button Style="{StaticResource IconButton}"
                             Content="&#xE8E5;"
                             ToolTip="파일 열기 (Ctrl+O)"
@@ -352,10 +371,16 @@
                                            Style="{StaticResource TextMuted}"
                                            HorizontalAlignment="Center"
                                            Margin="0,0,0,18"/>
-                                <Button Content="파일 열기"
-                                        Style="{StaticResource GhostButton}"
-                                        Command="{Binding OpenCommand}"
-                                        HorizontalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Button Content="파일 열기"
+                                            Style="{StaticResource GhostButton}"
+                                            Command="{Binding OpenCommand}"
+                                            Margin="0,0,8,0"/>
+                                    <Button Content="폴더 열기"
+                                            Style="{StaticResource GhostButton}"
+                                            Command="{Binding OpenFolderCommand}"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                         <TextBlock HorizontalAlignment="Center" Margin="0,16,0,0"

@@ -51,6 +51,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         NextCommand      = new RelayCommand(Next, () => HasNext);
         PrevCommand      = new RelayCommand(Prev, () => HasPrev);
         OpenCommand      = new RelayCommand(OpenDialog);
+        OpenFolderCommand = new RelayCommand(OpenFolderDialog);
         MuteCommand      = new RelayCommand(() => IsMuted = !IsMuted);
         FullscreenCommand= new RelayCommand(() => IsFullscreen = !IsFullscreen);
         ExitFullscreenCommand = new RelayCommand(() => { if (IsFullscreen) IsFullscreen = false; });
@@ -531,6 +532,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand SetTrimOutCommand { get; }
     public RelayCommand ClearTrimCommand { get; }
     public RelayCommand ExecuteTrimCommand { get; }
+    public RelayCommand OpenFolderCommand { get; }
 
     // ─── Trim state ────────────────────────────────────────────────────
     // IN/OUT 지점(초). null = 미설정. 둘 다 설정되고 OUT>IN이면 Execute 가능.
@@ -629,6 +631,35 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         };
         if (dlg.ShowDialog() == true)
             OpenPath(dlg.FileName);
+    }
+
+    private void OpenFolderDialog()
+    {
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "미디어 폴더 열기 (첫 파일부터 재생)",
+                InitialDirectory = Settings.LastOpenedFolder ?? ""
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            // 자연 정렬로 폴더 안 첫 지원 미디어 파일 찾기
+            var first = System.IO.Directory.EnumerateFiles(dlg.FolderName)
+                .Where(MediaKindExtensions.IsSupported)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            if (first is null)
+                Toast?.Invoke("이 폴더에 재생 가능한 미디어가 없습니다");
+            else
+                OpenPath(first);
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Error("OpenFolderDialog", ex);
+            Toast?.Invoke("폴더 열기 실패: " + ex.Message);
+        }
     }
 
     private static string BuildFileFilter()
