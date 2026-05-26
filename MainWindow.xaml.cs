@@ -110,9 +110,11 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
         SizeChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
 
-        // main window가 deactivate(focus 다른 곳)되면 Space hold가 stuck될 수 있어 강제 복귀
+        // main window가 deactivate(focus 다른 곳)되면 Space hold timer가 계속 동작해
+        // 사용자 의도와 무관하게 2배속 trigger 가능 → timer 중단 + 이미 hold면 복원.
         Deactivated += (_, _) =>
         {
+            _spaceHoldTimer?.Stop();
             if (_spaceHeld) { _vm.Speed = _speedBeforeHold; _spaceHeld = false; }
         };
 
@@ -809,42 +811,48 @@ public partial class MainWindow : Window
 
 
     // ============================================================
-    // Space: 짧게 누름 = Play/Pause, 꾹 누르면 = 2x 재생 (놓으면 원래 속도)
+    // Space: 짧게 누름 = Play/Pause, 1초 이상 hold = 2x 재생 (놓으면 원래 속도)
+    // 사용자 요구: IsRepeat(OS 키 auto-repeat ~500ms 가변) 대신 정확히 1초 timer.
     // ============================================================
     private bool _spaceHeld;
     private double _speedBeforeHold = 1.0;
+    private DispatcherTimer? _spaceHoldTimer;
 
     private void OnSpaceDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
-        // hold 동작 중에도 OSD 살아 있게
         ShowControls(); RestartHideTimer();
-        if (e.IsRepeat)
-        {
-            if (!_spaceHeld)
-            {
-                _spaceHeld = true;
-                _speedBeforeHold = _vm.Speed;
-                _vm.Speed = 2.0;
-            }
-            e.Handled = true;
-        }
-        else
-        {
-            e.Handled = true;
-        }
+        e.Handled = true;
+        if (e.IsRepeat) return; // OS auto-repeat — 첫 keydown만 timer 시작
+
+        // 1초 후 hold = true + 2x. 그 전에 KeyUp 들어오면 단발 play/pause.
+        _spaceHoldTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _spaceHoldTimer.Tick -= OnSpaceHoldTick;
+        _spaceHoldTimer.Tick += OnSpaceHoldTick;
+        _spaceHoldTimer.Start();
+    }
+
+    private void OnSpaceHoldTick(object? sender, EventArgs e)
+    {
+        _spaceHoldTimer?.Stop();
+        if (_spaceHeld) return;
+        _spaceHeld = true;
+        _speedBeforeHold = _vm.Speed;
+        _vm.Speed = 2.0;
+        ShowControls(); RestartHideTimer();
     }
 
     private void OnSpaceUp(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
-        EndSpaceHoldOrToggle();
         e.Handled = true;
+        EndSpaceHoldOrToggle();
     }
 
-    /// <summary>main window가 비활성화돼도 hold 상태가 stuck되지 않게 안전 복귀.</summary>
+    /// <summary>1초 안에 release → play/pause 단발. 1초 후 release → speed 복원.</summary>
     private void EndSpaceHoldOrToggle()
     {
+        _spaceHoldTimer?.Stop();
         if (_spaceHeld)
         {
             _vm.Speed = _speedBeforeHold;

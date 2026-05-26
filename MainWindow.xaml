@@ -58,6 +58,29 @@
             </Style.Triggers>
         </Style>
 
+        <!-- 각 모드 mutex 버튼 — 현재 mode면 accent green, 아니면 mute color -->
+        <Style x:Key="RepeatNoneButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRepeatNone}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RepeatAllButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRepeatAll}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RepeatOneButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRepeatOne}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="ShuffleToggleButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Shuffle}" Value="True">
@@ -463,19 +486,19 @@
                                 Command="{Binding NextCommand}"/>
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
-                        <Button Style="{StaticResource RepeatToggleButton}"
-                                Content="{Binding RepeatGlyph}"
-                                Command="{Binding CycleRepeatCommand}"
-                                Click="OnTooltipRefreshClick"
-                                MouseLeave="OnTooltipMouseLeave"
-                                ToolTipService.InitialShowDelay="0"
-                                ToolTipService.BetweenShowDelay="0"
-                                ToolTipService.ShowDuration="2500"
-                                ToolTipService.Placement="Top">
-                            <Button.ToolTip>
-                                <ToolTip Content="{Binding RepeatTooltip}"/>
-                            </Button.ToolTip>
-                        </Button>
+                        <!-- 3개 mutex 버튼 — 한 번 click이면 그 mode로 즉시 set, cycle 안 함 -->
+                        <Button Style="{StaticResource RepeatNoneButton}"
+                                Content="&#xE71A;"
+                                ToolTip="반복 안 함 (전체 한 번 끝나면 멈춤)"
+                                Command="{Binding SetRepeatNoneCommand}"/>
+                        <Button Style="{StaticResource RepeatAllButton}"
+                                Content="&#xE8EE;"
+                                ToolTip="전체 반복 (마지막 곡 끝나면 처음으로)"
+                                Command="{Binding SetRepeatAllCommand}"/>
+                        <Button Style="{StaticResource RepeatOneButton}"
+                                Content="&#xE8ED;"
+                                ToolTip="한 곡 반복 (현재 곡만 계속)"
+                                Command="{Binding SetRepeatOneCommand}"/>
                         <Button Style="{StaticResource ShuffleToggleButton}"
                                 Content="&#xE8B1;"
                                 Command="{Binding ToggleShuffleCommand}"

@@ -63,6 +63,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             RepeatMode.RepeatAll => RepeatMode.RepeatOne,
             _                    => RepeatMode.None
         });
+        SetRepeatNoneCommand = new RelayCommand(() => Repeat = RepeatMode.None);
+        SetRepeatAllCommand  = new RelayCommand(() => Repeat = RepeatMode.RepeatAll);
+        SetRepeatOneCommand  = new RelayCommand(() => Repeat = RepeatMode.RepeatOne);
         ToggleShuffleCommand = new RelayCommand(() => Shuffle = !Shuffle);
         Seek5ForwardCommand   = new RelayCommand(() => SeekBy(5));
         Seek5BackwardCommand  = new RelayCommand(() => SeekBy(-5));
@@ -360,6 +363,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(RepeatGlyph));
             Raise(nameof(RepeatTooltip));
             Raise(nameof(IsRepeatActive));
+            Raise(nameof(IsRepeatNone));
             Raise(nameof(IsRepeatOne));
             Raise(nameof(IsRepeatAll));
             // RepeatAll 켜면 마지막 곡에서도 ⏭ 활성. 끄면 비활성. HasNext/HasPrev 다시 평가.
@@ -409,6 +413,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
     public bool IsRepeatActive => _repeat != RepeatMode.None;
+    public bool IsRepeatNone   => _repeat == RepeatMode.None;
     public bool IsRepeatOne    => _repeat == RepeatMode.RepeatOne;
     public bool IsRepeatAll    => _repeat == RepeatMode.RepeatAll;
     /// <summary>
@@ -461,6 +466,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand AlwaysOnTopCommand { get; }
     public RelayCommand TogglePlaylistCommand { get; }
     public RelayCommand CycleRepeatCommand { get; }
+    public RelayCommand SetRepeatNoneCommand { get; }
+    public RelayCommand SetRepeatAllCommand  { get; }
+    public RelayCommand SetRepeatOneCommand  { get; }
     public RelayCommand ToggleShuffleCommand { get; }
     public RelayCommand Seek5ForwardCommand { get; }
     public RelayCommand Seek5BackwardCommand { get; }
