@@ -622,8 +622,49 @@ public partial class MainWindow : Window
     private void OnSeekDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is Slider sl)
+        {
             Services.AppLog.Info($"OnSeekDown: cur={sl.Value:F2} max={sl.Maximum:F2}");
+            // track 아무 위치 click + 그대로 drag — thumb를 안 잡아도 drag 시작.
+            ForwardClickToThumb(sl, e);
+        }
         _vm.BeginSeek();
+    }
+
+    /// <summary>
+    /// IsMoveToPointEnabled로 thumb 점프는 되지만 mouse 누른 상태로 drag는 thumb 안 잡혀
+    /// 시작 안 됨. PreviewMouseLeftButtonDown에서 thumb로 click 이벤트 forward해서 drag 시작.
+    /// SeekBar / VolumeSlider 둘 다 호출.
+    /// </summary>
+    private static void ForwardClickToThumb(Slider sl, MouseButtonEventArgs e)
+    {
+        var thumb = FindVisualChild<System.Windows.Controls.Primitives.Thumb>(sl);
+        if (thumb is null) return;
+        var args = new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left)
+        {
+            RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+            Source = thumb
+        };
+        thumb.RaiseEvent(args);
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject
+    {
+        if (parent is null) return null;
+        var count = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < count; i++)
+        {
+            var c = VisualTreeHelper.GetChild(parent, i);
+            if (c is T t) return t;
+            var nested = FindVisualChild<T>(c);
+            if (nested is not null) return nested;
+        }
+        return null;
+    }
+
+    /// <summary>Volume slider도 같은 효과 — track 아무 위치 click+drag로 즉시 조절.</summary>
+    private void OnVolumeSliderDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Slider sl) ForwardClickToThumb(sl, e);
     }
     private void OnSeekUp(object sender, MouseButtonEventArgs e)
     {
