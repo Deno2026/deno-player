@@ -199,9 +199,13 @@
                     <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" ToolTip="닫기" Click="OnClose"/>
                 </StackPanel>
 
-                <!-- 좌: 파일명 (남은 영역 fill, 드래그 핸들) -->
+                <!-- 좌: 파일명 (남은 영역 fill, 드래그 핸들).
+                     MouseMove/Up도 핸들 — MouseDown에서 즉시 DragMove하면 double-click의
+                     두 번째 click이 modal loop에 먹혀서 Maximize 토글 실패. -->
                 <Border Background="Transparent"
-                        MouseLeftButtonDown="OnDragArea_MouseDown">
+                        MouseLeftButtonDown="OnDragArea_MouseDown"
+                        MouseMove="OnDragArea_MouseMove"
+                        MouseLeftButtonUp="OnDragArea_MouseUp">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="14,0">
                         <Ellipse Width="6" Height="6"
