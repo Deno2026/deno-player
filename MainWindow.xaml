@@ -58,11 +58,16 @@
             </Style.Triggers>
         </Style>
 
-        <!-- 각 모드 mutex 버튼 — 현재 mode면 accent green, 아니면 mute color -->
+        <!-- 각 모드 mutex 버튼 — 현재 mode면 accent green, 아니면 mute color.
+             편집 모드에선 ab-loop가 IN~OUT만 무한 반복하므로 의미 없음 → disabled + dim. -->
         <Style x:Key="RepeatNoneButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsRepeatNone}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Opacity" Value="0.25"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -71,12 +76,23 @@
                 <DataTrigger Binding="{Binding IsRepeatAll}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Opacity" Value="0.25"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- RepeatOne만 편집 모드에서도 enabled 유지 (개념상 가장 가까움). 단 ab-loop가 우선
+             동작하므로 클릭해도 시각 토글만 일어남 — 사용자 헷갈림 없게 그냥 disabled로도 OK. -->
         <Style x:Key="RepeatOneButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsRepeatOne}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                    <!-- 편집 모드 = 사실상 RepeatOne 의미라 시각적으로 활성 표시 -->
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                    <Setter Property="IsEnabled" Value="False"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -85,6 +101,10 @@
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Shuffle}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Opacity" Value="0.25"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -590,19 +610,39 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <Button Style="{StaticResource IconButton}"
-                                Content="&#xE892;"
+                        <Button Content="&#xE892;"
                                 ToolTip="이전 파일 (PageUp / Ctrl+←)"
-                                Command="{Binding PrevCommand}"/>
+                                Command="{Binding PrevCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="Opacity" Value="0.25"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <Button Style="{StaticResource PrimaryIconButton}"
                                 Content="{Binding IsPaused, Converter={StaticResource PlayIcon}}"
                                 ToolTip="재생/일시정지 (Space)"
                                 Command="{Binding PlayPauseCommand}"
                                 Margin="2,0"/>
-                        <Button Style="{StaticResource IconButton}"
-                                Content="&#xE893;"
+                        <Button Content="&#xE893;"
                                 ToolTip="다음 파일 (PageDown / Ctrl+→)"
-                                Command="{Binding NextCommand}"/>
+                                Command="{Binding NextCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTrimMode}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="Opacity" Value="0.25"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
                         <!-- 3개 mutex 버튼 — 한 번 click이면 그 mode로 즉시 set, cycle 안 함 -->
