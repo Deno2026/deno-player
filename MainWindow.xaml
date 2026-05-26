@@ -122,6 +122,9 @@
         <KeyBinding Key="Down"     Command="{Binding VolumeDownCommand}"/>
         <KeyBinding Key="PageUp"   Command="{Binding PrevCommand}"/>
         <KeyBinding Key="PageDown" Command="{Binding NextCommand}"/>
+        <!-- Ctrl+←/→ — 동영상 일반적 관습 (이전/다음 파일) -->
+        <KeyBinding Key="Left"     Modifiers="Control" Command="{Binding PrevCommand}"/>
+        <KeyBinding Key="Right"    Modifiers="Control" Command="{Binding NextCommand}"/>
         <KeyBinding Key="OemPeriod" Modifiers="Shift" Command="{Binding IncreaseSpeedCommand}"/>
         <KeyBinding Key="OemComma"  Modifiers="Shift" Command="{Binding DecreaseSpeedCommand}"/>
         <KeyBinding Key="OemPeriod" Command="{Binding FrameStepCommand}"/>
@@ -475,7 +478,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
                         <Button Style="{StaticResource IconButton}"
                                 Content="&#xE892;"
-                                ToolTip="이전 파일 (PageUp)"
+                                ToolTip="이전 파일 (PageUp / Ctrl+←)"
                                 Command="{Binding PrevCommand}"/>
                         <Button Style="{StaticResource PrimaryIconButton}"
                                 Content="{Binding IsPaused, Converter={StaticResource PlayIcon}}"
@@ -484,7 +487,7 @@
                                 Margin="2,0"/>
                         <Button Style="{StaticResource IconButton}"
                                 Content="&#xE893;"
-                                ToolTip="다음 파일 (PageDown)"
+                                ToolTip="다음 파일 (PageDown / Ctrl+→)"
                                 Command="{Binding NextCommand}"/>
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="6,0"/>
