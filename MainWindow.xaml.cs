@@ -619,97 +619,90 @@ public partial class MainWindow : Window
     }
 
     // ============================================================
-    // Seek bar / speed wheel
+    // Seek bar / volume slider — mouse capture + 직접 1:1 mapping.
+    //
+    // 사용자 요구: "클릭한 지점으로 바로 강제 이동 + 그 기준 anchor 따라가게".
+    // WPF Thumb 기본 drag는 click offset 유지 (mouse가 thumb 잡은 그 지점이 anchor).
+    // 사용자 시각에선 어색 → mouse position 자체를 직접 Slider.Value로 mapping.
+    // Slider style의 IsMoveToPointEnabled / Thumb DragDelta는 더 이상 사용 안 함.
     // ============================================================
+    private bool _seekDragging;
+    private bool _volDragging;
+    private DateTime _lastLiveSeek;
+
     private void OnSeekDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is Slider sl)
-        {
-            Services.AppLog.Info($"OnSeekDown: cur={sl.Value:F2} max={sl.Maximum:F2}");
-            // track 아무 위치 click + 그대로 drag — thumb를 안 잡아도 drag 시작.
-            ForwardClickToThumb(sl, e);
-        }
-        _vm.BeginSeek();
-    }
-
-    /// <summary>
-    /// IsMoveToPointEnabled로 thumb 점프는 되지만 mouse 누른 상태로 drag는 thumb 안 잡혀
-    /// 시작 안 됨. PreviewMouseLeftButtonDown에서 thumb로 click 이벤트 forward해서 drag 시작.
-    /// SeekBar / VolumeSlider 둘 다 호출.
-    /// </summary>
-    private static void ForwardClickToThumb(Slider sl, MouseButtonEventArgs e)
-    {
-        var thumb = FindVisualChild<System.Windows.Controls.Primitives.Thumb>(sl);
-        if (thumb is null) return;
-        var args = new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left)
-        {
-            RoutedEvent = UIElement.MouseLeftButtonDownEvent,
-            Source = thumb
-        };
-        thumb.RaiseEvent(args);
-    }
-
-    private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject
-    {
-        if (parent is null) return null;
-        var count = VisualTreeHelper.GetChildrenCount(parent);
-        for (var i = 0; i < count; i++)
-        {
-            var c = VisualTreeHelper.GetChild(parent, i);
-            if (c is T t) return t;
-            var nested = FindVisualChild<T>(c);
-            if (nested is not null) return nested;
-        }
-        return null;
-    }
-
-    /// <summary>Volume slider도 같은 효과 — track 아무 위치 click+drag로 즉시 조절.</summary>
-    private void OnVolumeSliderDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is Slider sl) ForwardClickToThumb(sl, e);
-    }
-    private void OnSeekUp(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is Slider sl)
-        {
-            // 마우스 마지막 위치 X 기준으로 target time 계산. click이든 drag-end든 동일하게.
-            // Slider.Value(IsMoveToPointEnabled가 잘 옮긴 값)는 신뢰하되, 다르면 mouse-X 우선.
-            var pos = e.GetPosition(sl);
-            var ratio = sl.ActualWidth > 0 ? Math.Clamp(pos.X / sl.ActualWidth, 0, 1) : 0;
-            var clickValue = sl.Minimum + (sl.Maximum - sl.Minimum) * ratio;
-            var target = Math.Abs(sl.Value - clickValue) > 0.5 ? clickValue : sl.Value;
-            Services.AppLog.Info($"OnSeekUp: slider.Value={sl.Value:F2} click={clickValue:F2} -> seek {target:F2}");
-
-            // Slider Value를 target으로 임시 동기 — mpv가 응답하기 전 thumb이 옛 위치로
-            // 잠깐 끌려가 보이는 깜빡임 방지. SetCurrentValue를 써서 OneWay binding을
-            // disconnect하지 않는다. (sl.Value = ... 는 local value로 마크돼 이후 mpv가
-            // 보내는 time-pos가 thumb에 못 반영됨 = thumb stuck 버그)
-            try { sl.SetCurrentValue(Slider.ValueProperty, target); } catch { }
-
-            _vm.EndSeek(target);
-        }
-    }
-    private void OnSeekDragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
-    {
-        Services.AppLog.Info("OnSeekDragStarted");
-        _vm.BeginSeek();
-    }
-    private DateTime _lastLiveSeek;
-    private void OnSeekDragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-    {
         if (sender is not Slider sl) return;
+        sl.CaptureMouse();
+        _seekDragging = true;
+        _vm.BeginSeek();
+        ApplyMousePosToSlider(sl, e.GetPosition(sl)); // 즉시 클릭 지점으로 점프
+        _vm.LiveSeek(sl.Value);
+        e.Handled = true;
+    }
+
+    private void OnSeekMove(object sender, MouseEventArgs e)
+    {
+        if (!_seekDragging || sender is not Slider sl) return;
+        ApplyMousePosToSlider(sl, e.GetPosition(sl));
         var now = DateTime.UtcNow;
         if (now - _lastLiveSeek < TimeSpan.FromMilliseconds(80)) return;
         _lastLiveSeek = now;
         _vm.LiveSeek(sl.Value);
     }
-    private void OnSeekDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+
+    private void OnSeekUp(object sender, MouseButtonEventArgs e)
     {
-        // 의도적 no-op. mouse up 직후 OnSeekUp이 단일 EndSeek 호출함.
-        // 여기서도 EndSeek 호출하면 click 케이스(IsMoveToPointEnabled가 simulate한 drag)에서
-        // 두 EndSeek가 서로 다른 위치(slider.Value vs mouse-x click)로 보내져 mpv가 두 번
-        // seek → thumb이 옛↔새 사이 깜빡임. OnSeekUp 한 군데로 일원화.
-        Services.AppLog.Info("OnSeekDragCompleted (no-op, OnSeekUp will handle)");
+        if (!_seekDragging || sender is not Slider sl) return;
+        sl.ReleaseMouseCapture();
+        _seekDragging = false;
+        ApplyMousePosToSlider(sl, e.GetPosition(sl));
+        Services.AppLog.Info($"OnSeekUp: final value={sl.Value:F2}");
+        _vm.EndSeek(sl.Value);
+        e.Handled = true;
+    }
+
+    private void OnVolumeSliderDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Slider sl) return;
+        sl.CaptureMouse();
+        _volDragging = true;
+        ApplyMousePosToSlider(sl, e.GetPosition(sl));
+        e.Handled = true;
+    }
+
+    private void OnVolumeSliderMove(object sender, MouseEventArgs e)
+    {
+        if (!_volDragging || sender is not Slider sl) return;
+        ApplyMousePosToSlider(sl, e.GetPosition(sl));
+    }
+
+    private void OnVolumeSliderUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_volDragging || sender is not Slider sl) return;
+        sl.ReleaseMouseCapture();
+        _volDragging = false;
+        ApplyMousePosToSlider(sl, e.GetPosition(sl));
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// mouse X 좌표를 Slider 가로 비율로 변환해 Value로 직접 설정. anchor offset 없이 1:1.
+    /// VolumeSlider는 TwoWay binding이라 sl.Value = ...로 set해야 ViewModel.Volume까지 전파.
+    /// SeekBar는 OneWay binding이라 SetCurrentValue로 시각만 변경 (mpv time-pos 흐름 유지).
+    /// </summary>
+    private static void ApplyMousePosToSlider(Slider sl, Point pos)
+    {
+        if (sl.ActualWidth <= 0) return;
+        var ratio = Math.Clamp(pos.X / sl.ActualWidth, 0, 1);
+        var value = sl.Minimum + ratio * (sl.Maximum - sl.Minimum);
+        // SeekBar는 OneWay (Mode=OneWay) — local set이 binding 끊으니 SetCurrentValue 사용.
+        // VolumeSlider는 TwoWay (default) — sl.Value = value로 ViewModel.Volume까지 push.
+        var bindExpr = sl.GetBindingExpression(Slider.ValueProperty);
+        if (bindExpr is { ParentBinding.Mode: System.Windows.Data.BindingMode.OneWay })
+            sl.SetCurrentValue(Slider.ValueProperty, value);
+        else
+            sl.Value = value;
     }
     private void OnSeekWheel(object sender, MouseWheelEventArgs e)
     {
@@ -826,7 +819,8 @@ public partial class MainWindow : Window
         if (e.IsRepeat) return; // OS auto-repeat — 첫 keydown만 timer 시작
 
         // 1초 후 hold = true + 2x. 그 전에 KeyUp 들어오면 단발 play/pause.
-        _spaceHoldTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // YouTube와 같이 0.5초 후 2배속 시작 (그 전 release면 단순 play/pause toggle).
+        _spaceHoldTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _spaceHoldTimer.Tick -= OnSpaceHoldTick;
         _spaceHoldTimer.Tick += OnSpaceHoldTick;
         _spaceHoldTimer.Start();

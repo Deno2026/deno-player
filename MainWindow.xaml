@@ -452,10 +452,8 @@
                             Value="{Binding TimePos, Mode=OneWay}"
                             IsEnabled="{Binding HasMedia}"
                             Margin="10,0"
-                            Thumb.DragStarted="OnSeekDragStarted"
-                            Thumb.DragDelta="OnSeekDragDelta"
-                            Thumb.DragCompleted="OnSeekDragCompleted"
                             PreviewMouseLeftButtonDown="OnSeekDown"
+                            PreviewMouseMove="OnSeekMove"
                             PreviewMouseLeftButtonUp="OnSeekUp"
                             MouseWheel="OnSeekWheel"/>
                     <TextBlock Grid.Column="2" Text="{Binding DurationDisplay}"
@@ -523,7 +521,9 @@
                                 Value="{Binding Volume}"
                                 VerticalAlignment="Center"
                                 Margin="4,0,8,0"
-                                PreviewMouseLeftButtonDown="OnVolumeSliderDown"/>
+                                PreviewMouseLeftButtonDown="OnVolumeSliderDown"
+                                PreviewMouseMove="OnVolumeSliderMove"
+                                PreviewMouseLeftButtonUp="OnVolumeSliderUp"/>
 
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="4,0"/>
