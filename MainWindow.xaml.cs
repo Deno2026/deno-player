@@ -745,17 +745,40 @@ public partial class MainWindow : Window
     // ============================================================
     // Trim 편집 모드 — SeekBar 위 IN/OUT 핸들 드래그
     // ============================================================
+    // SeekBar Slider 내부 thumb 크기 (SeekThumb style) — Track 사용 영역 보정용.
+    // Slider Value=Min일 때 thumb 중앙이 thumbHalf(=8)에서 시작, Value=Max일 때
+    // ActualWidth-thumbHalf에 도달. 그 사이 거리(usableWidth)가 실제 sec 매핑 영역.
+    private const double SeekThumbWidth = 16.0;
+    private const double SeekThumbHalf  = SeekThumbWidth / 2.0;
+    // 우리 trim 핸들 크기 — XAML과 일치 (18px)
+    private const double TrimHandleWidth = 18.0;
+    private const double TrimHandleHalf  = TrimHandleWidth / 2.0;
+
+    /// <summary>sec → SeekBar 좌표(핸들 중앙 X) 변환.</summary>
+    private double SecToX(double sec)
+    {
+        var usable = Math.Max(0, SeekBar.ActualWidth - SeekThumbWidth);
+        if (_vm.Duration <= 0 || usable <= 0) return SeekThumbHalf;
+        return SeekThumbHalf + (sec / _vm.Duration) * usable;
+    }
+
+    /// <summary>px 변화(드래그 delta) → sec 변화. usableWidth 기준.</summary>
+    private double PxDeltaToSec(double dxPx)
+    {
+        var usable = Math.Max(1, SeekBar.ActualWidth - SeekThumbWidth);
+        return dxPx * (_vm.Duration / usable);
+    }
+
     private void OnTrimInDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
     {
         if (_vm.Duration <= 0 || SeekBar.ActualWidth <= 0) return;
-        var secPerPx = _vm.Duration / SeekBar.ActualWidth;
-        var deltaSec = e.HorizontalChange * secPerPx;
+        var deltaSec = PxDeltaToSec(e.HorizontalChange);
         var cur = _vm.TrimInSec ?? 0;
-        var max = (_vm.TrimOutSec ?? _vm.Duration) - 0.1;  // OUT보다 0.1초 앞에서 멈춤
+        var max = (_vm.TrimOutSec ?? _vm.Duration) - 0.1;
         var newIn = Math.Clamp(cur + deltaSec, 0, max);
         _vm.TrimInSec = newIn;
         UpdateTrimOverlay();
-        // IN 위치로 재생 점프 — 들으면서 정확한 시작점 잡기 (80ms throttle, mpv 부담 완화)
+        // IN 위치로 재생 live seek (80ms throttle)
         var now = DateTime.UtcNow;
         if (now - _lastLiveSeek >= TimeSpan.FromMilliseconds(80))
         {
@@ -766,33 +789,30 @@ public partial class MainWindow : Window
     private void OnTrimOutDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
     {
         if (_vm.Duration <= 0 || SeekBar.ActualWidth <= 0) return;
-        var secPerPx = _vm.Duration / SeekBar.ActualWidth;
-        var deltaSec = e.HorizontalChange * secPerPx;
+        var deltaSec = PxDeltaToSec(e.HorizontalChange);
         var cur = _vm.TrimOutSec ?? _vm.Duration;
         var min = (_vm.TrimInSec ?? 0) + 0.1;
         _vm.TrimOutSec = Math.Clamp(cur + deltaSec, min, _vm.Duration);
         UpdateTrimOverlay();
     }
 
-    /// <summary>SeekBar 위 IN/OUT 핸들 좌표 + range 강조 위치/크기 갱신.</summary>
+    /// <summary>SeekBar 위 IN/OUT 핸들 좌표 + range 강조 위치/크기 갱신.
+    /// Slider thumb track 영역 보정 → IN=0이면 핸들 중앙이 SeekBar 시작 thumb 위치와 일치.</summary>
     private void UpdateTrimOverlay()
     {
         if (TrimOverlay is null || SeekBar is null) return;
-        if (!_vm.IsTrimMode || _vm.Duration <= 0)
-        {
-            return;
-        }
-        var w = SeekBar.ActualWidth;
-        if (w <= 0) return;
-        var pxPerSec = w / _vm.Duration;
-        var inX  = (_vm.TrimInSec  ?? 0)            * pxPerSec;
-        var outX = (_vm.TrimOutSec ?? _vm.Duration) * pxPerSec;
-        // 핸들 중앙이 좌표에 맞도록 -6 (handle width 12 / 2)
-        System.Windows.Controls.Canvas.SetLeft(TrimInThumb,  inX  - 6);
-        System.Windows.Controls.Canvas.SetLeft(TrimOutThumb, outX - 6);
-        // Range fill
-        System.Windows.Controls.Canvas.SetLeft(TrimRangeFill, inX);
-        TrimRangeFill.Width = Math.Max(0, outX - inX);
+        if (!_vm.IsTrimMode || _vm.Duration <= 0) return;
+        if (SeekBar.ActualWidth <= 0) return;
+
+        var inCenterX  = SecToX(_vm.TrimInSec  ?? 0);
+        var outCenterX = SecToX(_vm.TrimOutSec ?? _vm.Duration);
+
+        // 핸들 중앙이 SeekBar thumb 중앙과 정확히 일치하도록 좌측 좌표 보정
+        System.Windows.Controls.Canvas.SetLeft(TrimInThumb,  inCenterX  - TrimHandleHalf);
+        System.Windows.Controls.Canvas.SetLeft(TrimOutThumb, outCenterX - TrimHandleHalf);
+        // Range fill — 두 핸들 중앙 사이
+        System.Windows.Controls.Canvas.SetLeft(TrimRangeFill, inCenterX);
+        TrimRangeFill.Width = Math.Max(0, outCenterX - inCenterX);
     }
 
     private void OnSpeedWheel(object sender, MouseWheelEventArgs e)
