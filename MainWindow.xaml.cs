@@ -830,13 +830,13 @@ public partial class MainWindow : Window
         UpdatePlaybackCursor();
     }
 
-    /// <summary>편집 모드 재생 cursor 위치만 가볍게 갱신 (TimePos 매 frame 호출 가능하게).</summary>
+    /// <summary>편집 모드 재생 cursor 위치 갱신 (Ellipse 10×10 중앙 정렬).</summary>
     private void UpdatePlaybackCursor()
     {
         if (PlaybackCursor is null || !_vm.IsTrimMode || _vm.Duration <= 0) return;
         if (SeekBar.ActualWidth <= 0) return;
         var x = SecToX(_vm.TimePos);
-        System.Windows.Controls.Canvas.SetLeft(PlaybackCursor, x - 1);  // width 2 / 2
+        System.Windows.Controls.Canvas.SetLeft(PlaybackCursor, x - 5);  // width 10 / 2
     }
 
     private void OnSpeedWheel(object sender, MouseWheelEventArgs e)

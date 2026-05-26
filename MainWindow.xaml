@@ -529,22 +529,27 @@
                         <Grid Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}"
                               IsHitTestVisible="False">
                             <Rectangle Fill="{StaticResource BrushBgRaised}"/>
-                            <Rectangle Height="4" Fill="#FF222822" VerticalAlignment="Center"
-                                       RadiusX="2" RadiusY="2"/>
+                            <Rectangle Height="6" Fill="#FF1F2520" VerticalAlignment="Center"
+                                       RadiusX="3" RadiusY="3"/>
                         </Grid>
                         <!-- 편집 모드 overlay: IN/OUT 핸들 + 강조 -->
                         <Canvas x:Name="TrimOverlay" IsHitTestVisible="True"
                                 Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">
-                            <!-- IN-OUT 사이 강조 (accent 반투명) -->
+                            <!-- IN-OUT 사이 강조 — 둥근 끝 (pill처럼) -->
                             <Rectangle x:Name="TrimRangeFill"
                                        Height="10" Fill="#5557E389"
+                                       RadiusX="5" RadiusY="5"
                                        Canvas.Top="-1" IsHitTestVisible="False"/>
-                            <!-- 현재 재생 위치 마커 — 편집 모드 미리듣기 중 진행 위치 -->
-                            <Rectangle x:Name="PlaybackCursor"
-                                       Width="2" Height="28"
-                                       Fill="White"
-                                       Canvas.Top="-9"
-                                       IsHitTestVisible="False"/>
+                            <!-- 현재 재생 위치 마커 — 작은 흰 동그라미 + glow (소프트) -->
+                            <Ellipse x:Name="PlaybackCursor"
+                                     Width="10" Height="10"
+                                     Fill="White"
+                                     Canvas.Top="-1"
+                                     IsHitTestVisible="False">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect Color="White" BlurRadius="10" ShadowDepth="0" Opacity="0.7"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
                             <!-- IN 핸들 -->
                             <Thumb x:Name="TrimInThumb" Width="18" Height="34"
                                    Background="{StaticResource BrushAccent}"
@@ -557,16 +562,18 @@
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
                                         <!-- 외곽 Transparent Grid = 18x34 hit-test 영역 그대로.
-                                             안에 얇은 6x28 막대만 시각 표시 → 보이는 건 가늘게,
-                                             클릭/드래그 잡기는 넉넉하게. -->
+                                             안에 부드러운 pill 모양 8x26 (CornerRadius=4) + soft glow. -->
                                         <Grid Background="Transparent">
-                                            <Border Width="6" Height="28"
+                                            <Border Width="8" Height="26"
                                                     Background="{TemplateBinding Background}"
-                                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="2"
+                                                    BorderThickness="0"
+                                                    CornerRadius="4"
                                                     HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"/>
+                                                    VerticalAlignment="Center">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="#57E389" BlurRadius="8" ShadowDepth="0" Opacity="0.55"/>
+                                                </Border.Effect>
+                                            </Border>
                                         </Grid>
                                     </ControlTemplate>
                                 </Thumb.Template>
@@ -581,16 +588,18 @@
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
                                         <!-- 외곽 Transparent Grid = 18x34 hit-test 영역 그대로.
-                                             안에 얇은 6x28 막대만 시각 표시 → 보이는 건 가늘게,
-                                             클릭/드래그 잡기는 넉넉하게. -->
+                                             안에 부드러운 pill 모양 8x26 (CornerRadius=4) + soft glow. -->
                                         <Grid Background="Transparent">
-                                            <Border Width="6" Height="28"
+                                            <Border Width="8" Height="26"
                                                     Background="{TemplateBinding Background}"
-                                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="2"
+                                                    BorderThickness="0"
+                                                    CornerRadius="4"
                                                     HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"/>
+                                                    VerticalAlignment="Center">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="#57E389" BlurRadius="8" ShadowDepth="0" Opacity="0.55"/>
+                                                </Border.Effect>
+                                            </Border>
                                         </Grid>
                                     </ControlTemplate>
                                 </Thumb.Template>
