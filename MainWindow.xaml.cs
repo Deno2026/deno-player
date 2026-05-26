@@ -769,6 +769,11 @@ public partial class MainWindow : Window
         return dxPx * (_vm.Duration / usable);
     }
 
+    private void OnTrimInDragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+    {
+        // BeginSeek → Seeking=true → mpv가 time-pos 옛 값으로 덮어쓰지 못하게 차단
+        _vm.BeginSeek();
+    }
     private void OnTrimInDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
     {
         if (_vm.Duration <= 0 || SeekBar.ActualWidth <= 0) return;
@@ -778,13 +783,18 @@ public partial class MainWindow : Window
         var newIn = Math.Clamp(cur + deltaSec, 0, max);
         _vm.TrimInSec = newIn;
         UpdateTrimOverlay();
-        // IN 위치로 재생 live seek (80ms throttle)
+        // IN 위치로 재생 live seek (80ms throttle, mpv 부담 완화)
         var now = DateTime.UtcNow;
         if (now - _lastLiveSeek >= TimeSpan.FromMilliseconds(80))
         {
             _lastLiveSeek = now;
             _vm.LiveSeek(newIn);
         }
+    }
+    private void OnTrimInDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        // 마지막 위치로 한 번 더 seek 보장 (throttle에 막혔을 수 있음) + Seeking=false
+        _vm.EndSeek(_vm.TrimInSec ?? 0);
     }
     private void OnTrimOutDrag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
     {

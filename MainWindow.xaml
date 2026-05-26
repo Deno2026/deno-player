@@ -514,7 +514,9 @@
                                    Background="{StaticResource BrushAccent}"
                                    BorderBrush="#FF000000" BorderThickness="2"
                                    Cursor="SizeWE" Canvas.Top="-12"
+                                   DragStarted="OnTrimInDragStarted"
                                    DragDelta="OnTrimInDrag"
+                                   DragCompleted="OnTrimInDragCompleted"
                                    ToolTip="IN 지점">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
