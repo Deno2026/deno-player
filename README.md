@@ -61,7 +61,7 @@ repo. 다른 host를 쓰려면 환경변수 `DENO_PLAYER_UPDATE_URL`을 설정�
 | `F` / `F11` / `Enter` / `Alt+Enter` | 전체화면 토글 |
 | `Esc` | 전체화면 해제 |
 | `PageUp` / `PageDown` | 이전/다음 파일 |
-| `Shift + . / ,` | 배속 +0.25 / -0.25 |
+| `Shift + . / ,` | 배속 +0.25 / -0.25 (하단 1.0x 버튼 클릭=프리셋 메뉴, 휠=±0.25) |
 | `.` / `,` | 프레임 step / back step |
 | `Ctrl + O` | 파일 열기 |
 | `Ctrl + S` | 스크린샷 (기본: `Pictures\DenoPlayer\`, 환경설정에서 변경 가능) |
