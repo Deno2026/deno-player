@@ -294,15 +294,11 @@ public partial class MainWindow : Window
         if (e.ChangedButton != MouseButton.Left) return;
         // 버튼 click이면 우리가 처리 안 함
         if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
-        Services.AppLog.Info($"TopBar MouseDown clickCount={e.ClickCount} src={e.OriginalSource?.GetType().Name}");
         if (e.ClickCount == 2)
         {
+            // 토글은 OnRootDoubleClick (MouseDoubleClick 합성 이벤트)이 단독 처리.
+            // 여기서 토글하면 그 후 fire되는 OnRootDoubleClick과 중복 → 두 번 토글 → 원위치.
             _topBarDragArmed = false;
-            Services.AppLog.Info($"TopBar dbl-click → toggle from {WindowState}");
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-            e.Handled = true;
             return;
         }
         _topBarDragArmed = true;
