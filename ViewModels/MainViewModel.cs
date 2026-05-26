@@ -555,15 +555,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : "";
 
     private bool _trimBusy;
+    // 버튼 IsEnabled — HasTrimRange는 검사 안 함 (disabled되면 클릭 시 toast 안내 못 함).
+    // 사용자가 가위 버튼 그냥 누르면 ExecuteTrimAsync 안에서 "IN/OUT 먼저" 안내 toast.
     private bool CanExecuteTrim() =>
         !_trimBusy
         && CurrentMedia is not null
-        && CurrentMedia.Kind != MediaKind.Image
-        && HasTrimRange;
+        && CurrentMedia.Kind != MediaKind.Image;
 
     private async Task ExecuteTrimAsync()
     {
-        if (!CanExecuteTrim()) { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요 (I / O)"); return; }
+        if (_trimBusy) return;
+        if (CurrentMedia is null)
+        { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
+        if (CurrentMedia.Kind == MediaKind.Image)
+        { Toast?.Invoke("이미지는 자르기 불가"); return; }
+        if (!HasTrimRange)
+        { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요 (I / O 단축키)"); return; }
         _trimBusy = true;
         ExecuteTrimCommand.RaiseCanExecuteChanged();
         try
