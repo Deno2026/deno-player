@@ -502,6 +502,16 @@
                                 PreviewMouseMove="OnSeekMove"
                                 PreviewMouseLeftButtonUp="OnSeekUp"
                                 MouseWheel="OnSeekWheel"/>
+                        <!-- 편집 모드일 때 SeekBar의 진행 표시(played/remaining/thumb)를 가림.
+                             그 위에 IN/OUT 영역만 표시 → 핸들과 progress 충돌로 인한 시각 혼란 제거.
+                             IsHitTestVisible=False라 그 아래 SeekBar는 살아있지만, OnSeekDown에서
+                             IsTrimMode면 early return으로 막아서 사용자 click이 재생 위치 안 바꿈. -->
+                        <Grid Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}"
+                              IsHitTestVisible="False">
+                            <Rectangle Fill="{StaticResource BrushBgRaised}"/>
+                            <Rectangle Height="4" Fill="#FF222822" VerticalAlignment="Center"
+                                       RadiusX="2" RadiusY="2"/>
+                        </Grid>
                         <!-- 편집 모드 overlay: IN/OUT 핸들 + 강조 -->
                         <Canvas x:Name="TrimOverlay" IsHitTestVisible="True"
                                 Visibility="{Binding IsTrimMode, Converter={StaticResource BoolVis}}">

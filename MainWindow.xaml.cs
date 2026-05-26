@@ -665,6 +665,8 @@ public partial class MainWindow : Window
     private void OnSeekDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Slider sl) return;
+        // 편집 모드일 땐 SeekBar drag/click 막음 — IN/OUT 핸들만 사용
+        if (_vm.IsTrimMode) { e.Handled = true; return; }
         sl.CaptureMouse();
         _seekDragging = true;
         _vm.BeginSeek();
