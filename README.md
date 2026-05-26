@@ -6,16 +6,16 @@
 
 ```
  ┌──────────────────────────────────────────────────────────┐
- │● clip.mp4                            📌 📷 🗀 — □ ✕     │
+ │● clip.mp4                       ☁⤓ 📌 ⚙ 📷 🗀 — □ ✕     │
  │                                                          │
  │                                                          │
  │                    [ 영상 영역 ]                          │
  │                                                          │
  │                                                          │
  │ 00:12 ━━━━━●─────────────────────────────────────── 04:58│
- │   ⏮  ▶  ⏭             🔇━●━━━━  1.0x   ⛶                │
+ │   ⏮  ▶  ⏭   ↻ ↻ ↻ 🔀   🔇━●━━━━  1.0x   ⛶              │
  └──────────────────────────────────────────────────────────┘
-                                       │  hover →  재생목록 │
+   재생 ←─→ 반복없음/전체반복/한곡반복/랜덤    hover →  재생목록 │
 ```
 
 ---
@@ -64,7 +64,7 @@ repo. 다른 host를 쓰려면 환경변수 `DENO_PLAYER_UPDATE_URL`을 설정�
 | `Shift + . / ,` | 배속 +0.25 / -0.25 |
 | `.` / `,` | 프레임 step / back step |
 | `Ctrl + O` | 파일 열기 |
-| `Ctrl + S` | 스크린샷 (Pictures\DenoPlayer\) |
+| `Ctrl + S` | 스크린샷 (기본: `Pictures\DenoPlayer\`, 환경설정에서 변경 가능) |
 | `Ctrl + T` | 항상 위 토글 |
 | `P` / `Ctrl + L` | 재생목록 패널 토글 |
 | `V` | 자막 트랙 사이클 (다중 자막 영상) |
@@ -108,13 +108,19 @@ dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoPla
 
 ## ⚙️ 고급: 설정 파일
 
-`%APPDATA%\DenoPlayer\settings.json` — 단일 파일, UI 없음. 저장 값:
+`%APPDATA%\DenoPlayer\settings.json` — 단일 파일. 일부 값은 도구 막대 **⚙ 환경설정**
+에서 GUI로도 조절 가능 (스크린샷 폴더, 연결 프로그램 등록 확장자).
+
+저장 값:
 - `windowWidth/Height`, `windowLeft/Top`, `windowMaximized`
 - `volume`, `muted`, `playbackRate`
 - `lastOpenedFolder`, `autoPlayNext`
 - `controlAutoHideMs` (기본 2500)
 - `playlistPanelEnabled`, `alwaysOnTop`
 - `recentFiles` (최근 30개)
+- `repeatMode` (`None` / `All` / `One`), `shuffle`
+- `screenshotFolder` (비우면 기본 `Pictures\DenoPlayer\`)
+- `enabledExtensions` (연결 프로그램 후보로 등록할 확장자 목록)
 
 마지막 재생 위치는 저장하지 않는다 (재생목록 자동 진행만 유지).
 
@@ -130,9 +136,12 @@ DenoPlayer.exe "C:\path\video.mp4"   # 파일 즉시 열기 + 같은 폴더 재�
 ## 의도적으로 없는 것
 
 광고 · 계정 · 로그인 · 클라우드 · 텔레메트리 · 분석 · 추천 · 뉴스 · 스토어 ·
-스킨 마켓 · 플러그인 시스템 · 코덱팩 권유 · 자동 업데이트 · 영상 변환 · 영상 편집 ·
-캡처/녹화(스크린샷 외) · AI 기능 · 자막 싱크 편집기 · 미디어 라이브러리 색인 ·
+스킨 마켓 · 플러그인 시스템 · 코덱팩 권유 · 영상 변환 · 영상 편집 ·
+녹화(스크린샷 외) · AI 기능 · 자막 싱크 편집기 · 미디어 라이브러리 색인 ·
 폴더 전체 DB 스캔.
+
+자동 업데이트는 **있지만 pull 방식** — 새 버전이 있으면 도구 막대에 녹색 아이콘이
+뜨고 사용자가 클릭해야 적용된다 (강제 안 함).
 
 ## 라이선스
 
