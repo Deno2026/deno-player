@@ -4,6 +4,8 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.1] - 2026-05-28
+
 ### Player UX
 - First launch now shows a dedicated playback-engine preparation screen instead
   of exposing a blank native video surface while mpv is being downloaded.

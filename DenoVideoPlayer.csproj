@@ -16,9 +16,9 @@
     <AssemblyTitle>Deno Video Player</AssemblyTitle>
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
-    <Version>0.4.0</Version>
-    <FileVersion>0.4.0.0</FileVersion>
-    <InformationalVersion>0.4.0</InformationalVersion>
+    <Version>0.4.1</Version>
+    <FileVersion>0.4.1.0</FileVersion>
+    <InformationalVersion>0.4.1</InformationalVersion>
     <NeutralLanguage>ko-KR</NeutralLanguage>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
