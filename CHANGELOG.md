@@ -1,4 +1,4 @@
-# Deno Player — Changelog
+# Deno Video Player — Changelog
 
 날짜는 KST (UTC+9). 버전 태그는 Velopack release 시점에 부여한다.
 

@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 
 echo.
-echo  Deno Player 등록 해제 (바로가기 + 탐색기 메뉴 제거)
+echo  Deno Video Player 등록 해제 (바로가기 + 탐색기 메뉴 제거)
 echo.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\install.ps1" -Uninstall

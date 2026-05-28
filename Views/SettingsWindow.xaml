@@ -57,7 +57,7 @@
             <TextBlock Margin="0,4,0,0"
                        Style="{StaticResource TextSecondary}"
                        TextWrapping="Wrap"
-                       Text="체크한 확장자를 Deno Player의 '연결 프로그램' 후보로 등록합니다. 기본 앱 자동 지정은 Windows 정책상 불가하므로, 확인 후 '기본 앱 설정 열기'를 눌러 Windows 설정에서 한 번에 지정하세요."/>
+                       Text="체크한 확장자를 Deno Video Player의 '연결 프로그램' 후보로 등록합니다. 기본 앱 자동 지정은 Windows 정책상 불가하므로, 확인 후 '기본 앱 설정 열기'를 눌러 Windows 설정에서 한 번에 지정하세요."/>
         </StackPanel>
 
         <Separator Grid.Row="1"

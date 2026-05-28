@@ -15,14 +15,15 @@ namespace DenoPlayer.Services;
 ///                              FriendlyAppName + SupportedTypes (Open With 후보)
 ///   3) Capabilities          ─ HKCU\Software\DenoPlayer\Capabilities
 ///                              ApplicationName / Description / FileAssociations
-///      + RegisteredApplications "Deno Player" = "Software\DenoPlayer\Capabilities"
+///      + RegisteredApplications "Deno Video Player" = "Software\DenoPlayer\Capabilities"
 ///
-/// 위 셋이 다 있어야 Windows 설정 → 기본 앱 화면에 "Deno Player" 항목이 보이고,
+/// 위 셋이 다 있어야 Windows 설정 → 기본 앱 화면에 "Deno Video Player" 항목이 보이고,
 /// 사용자가 선택했을 때 UserChoice 해시 검증을 통과한다.
 /// </summary>
 public static class FileAssociationService
 {
-    public const string AppName        = "Deno Player";
+    public const string AppName        = "Deno Video Player";
+    private const string LegacyAppName = "Deno Player";
     public const string AppKey         = @"Software\Classes\Applications\DenoPlayer.exe";
     public const string ProgId         = "DenoPlayer.Media";          // 실제 ProgID
     public const string OpenWithProgId = "Applications\\DenoPlayer.exe"; // Open With 호환용
@@ -45,8 +46,8 @@ public static class FileAssociationService
         // 2) ProgID — 실제 default 앱 지정용
         using (var prog = hkcu.CreateSubKey($@"Software\Classes\{ProgId}", writable: true))
         {
-            prog!.SetValue("", "Deno Player Media File", RegistryValueKind.String);
-            prog.SetValue("FriendlyTypeName", "Deno Player 미디어", RegistryValueKind.String);
+            prog!.SetValue("", "Deno Video Player Media File", RegistryValueKind.String);
+            prog.SetValue("FriendlyTypeName", "Deno Video Player 미디어", RegistryValueKind.String);
         }
         using (var icon = hkcu.CreateSubKey($@"Software\Classes\{ProgId}\DefaultIcon", writable: true))
         {
@@ -70,7 +71,8 @@ public static class FileAssociationService
         // 4) RegisteredApplications — Capabilities를 시스템에 노출
         using (var regApps = hkcu.CreateSubKey(@"Software\RegisteredApplications", writable: true))
         {
-            regApps!.SetValue(AppName, CapabilitiesKey, RegistryValueKind.String);
+            regApps!.DeleteValue(LegacyAppName, throwOnMissingValue: false);
+            regApps.SetValue(AppName, CapabilitiesKey, RegistryValueKind.String);
         }
     }
 
@@ -117,7 +119,7 @@ public static class FileAssociationService
         }
     }
 
-    /// <summary>Windows 10/11 "기본 앱" 화면을 Deno Player 페이지로 바로 연다.</summary>
+    /// <summary>Windows 10/11 "기본 앱" 화면을 Deno Video Player 페이지로 바로 연다.</summary>
     public static void OpenDefaultAppsSettings()
     {
         try

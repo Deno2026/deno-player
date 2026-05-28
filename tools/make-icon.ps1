@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Generates icon.ico for Deno Player: near-black square with a centred DENO-green
+  Generates icon.ico for Deno Video Player: near-black square with a centred DENO-green
   play triangle. Multi-resolution (16, 24, 32, 48, 64, 128, 256).
 
 .NOTES

@@ -40,7 +40,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             AppLog.Error("PickScreenshotFolder", ex);
-            MessageBox.Show(this, "폴더 선택 실패: " + ex.Message, "Deno Player",
+            MessageBox.Show(this, "폴더 선택 실패: " + ex.Message, "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -73,12 +73,12 @@ public partial class SettingsWindow : Window
             var ans = MessageBox.Show(
                 this,
                 $"등록 완료 ({selected.Count}개 확장자).\n\n" +
-                "탐색기 우클릭 → '연결 프로그램' 메뉴에 Deno Player가 나오고,\n" +
-                "Windows '기본 앱' 화면에도 'Deno Player' 항목이 추가됐습니다.\n\n" +
-                "지금 그 화면을 열까요? — Deno Player 항목 클릭 후 각 확장자를\n" +
-                "Deno Player로 지정하면 더블클릭 시 우리 앱이 열립니다.\n\n" +
+                "탐색기 우클릭 → '연결 프로그램' 메뉴에 Deno Video Player가 나오고,\n" +
+                "Windows '기본 앱' 화면에도 'Deno Video Player' 항목이 추가됐습니다.\n\n" +
+                "지금 그 화면을 열까요? — Deno Video Player 항목 클릭 후 각 확장자를\n" +
+                "Deno Video Player로 지정하면 더블클릭 시 우리 앱이 열립니다.\n\n" +
                 "(Windows 정책상 기본 앱 변경은 사용자가 직접 눌러야 적용됩니다)",
-                "Deno Player",
+                "Deno Video Player",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
 
@@ -90,7 +90,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             AppLog.Error("Settings confirm", ex);
-            MessageBox.Show(this, "등록 중 오류:\n" + ex.Message, "Deno Player",
+            MessageBox.Show(this, "등록 중 오류:\n" + ex.Message, "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Fetches mpv.exe into runtime\mpv\ for Deno Player.
+  Fetches mpv.exe into runtime\mpv\ for Deno Video Player.
 
 .DESCRIPTION
   mpv does not host an "official" Windows static build directly.

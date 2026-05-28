@@ -38,7 +38,7 @@ vpk pack `
     --packVersion $Version `
     --packDir $pubDir `
     --mainExe DenoPlayer.exe `
-    --packTitle "Deno Player" `
+    --packTitle "Deno Video Player" `
     --packAuthors "DENO" `
     --outputDir $outDir
 

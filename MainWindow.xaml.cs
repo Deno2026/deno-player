@@ -1045,7 +1045,7 @@ public partial class MainWindow : Window
         {
             Services.AppLog.Error("Open SettingsWindow", ex);
             MessageBox.Show(this, "환경설정 창을 열 수 없습니다:\n" + ex.Message,
-                "Deno Player", MessageBoxButton.OK, MessageBoxImage.Error);
+                "Deno Video Player", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

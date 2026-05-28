@@ -27,5 +27,5 @@ This project bundles or depends on the following third-party components:
 * mpv (https://mpv.io) — GPLv2+ / LGPLv2.1+
   mpv.exe is NOT redistributed in this repository. Users must obtain mpv
   separately (see README's "mpv 설치" section) and place it in `runtime/mpv/`.
-  Deno Player communicates with mpv as a separate process over a JSON IPC
+  Deno Video Player communicates with mpv as a separate process over a JSON IPC
   pipe; it does not link mpv code into its own binary.

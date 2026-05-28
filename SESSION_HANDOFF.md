@@ -1,9 +1,13 @@
-# Deno Player — Session Handoff
+# Deno Video Player — Session Handoff
 
 **Status (2026-05-26 KST 18시경):** PRIVATE repo. 사용자 피드백 받으면서 핵심 UX
 다듬기 라운드 종료. main HEAD `e1e1961`. 65/65 unit tests pass, build 경고
 0 / 오류 0. publish 폴더 (`publish/DenoPlayer-win-x64/`) 데스크탑 shortcut
 가리키는 최신 binary 적용됨.
+
+**Naming decision (2026-05-28 KST):** 사용자 지시로 표시명은 앞으로
+`Deno Video Player`. 실행 파일/네임스페이스/AppData/ProgID 같은 내부 ID는
+기존 설정과 업데이트 호환을 위해 `DenoPlayer`를 유지한다.
 
 ## Repository
 

@@ -7,7 +7,7 @@ using System.Threading;
 namespace DenoPlayer.Services;
 
 /// <summary>
-/// 한 사용자 세션에 Deno Player 인스턴스를 하나만 유지. 두 번째 실행은
+/// 한 사용자 세션에 Deno Video Player 인스턴스를 하나만 유지. 두 번째 실행은
 /// 첫 인스턴스에 명령줄 인자를 named pipe로 전달하고 자기 자신은 종료한다.
 /// </summary>
 internal sealed class SingleInstance : IDisposable

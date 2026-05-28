@@ -33,13 +33,13 @@ public partial class App : Application
         {
             var msg = ex.ExceptionObject?.ToString() ?? "unknown";
             AppLog.Error("UnhandledException", ex.ExceptionObject as Exception);
-            MessageBox.Show("예기치 못한 오류:\n" + msg, "Deno Player",
+            MessageBox.Show("예기치 못한 오류:\n" + msg, "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         };
         DispatcherUnhandledException += (_, args) =>
         {
             AppLog.Error("DispatcherUnhandledException", args.Exception);
-            MessageBox.Show("UI 예외:\n" + args.Exception.Message, "Deno Player",
+            MessageBox.Show("UI 예외:\n" + args.Exception.Message, "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };

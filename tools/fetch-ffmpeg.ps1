@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Fetches ffmpeg.exe into runtime\ffmpeg\ for Deno Player's trim feature.
+  Fetches ffmpeg.exe into runtime\ffmpeg\ for Deno Video Player's trim feature.
 
 .DESCRIPTION
   Downloads a static Windows x64 ffmpeg build from BtbN/FFmpeg-Builds

@@ -11,8 +11,8 @@
     <AssemblyName>DenoPlayer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>icon.ico</ApplicationIcon>
-    <Product>Deno Player</Product>
-    <AssemblyTitle>Deno Player</AssemblyTitle>
+    <Product>Deno Video Player</Product>
+    <AssemblyTitle>Deno Video Player</AssemblyTitle>
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
     <Version>0.3.3</Version>
