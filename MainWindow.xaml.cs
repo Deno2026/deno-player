@@ -38,9 +38,11 @@ public partial class MainWindow : Window
     private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
     private const int VkLButton = 0x01;
     private const int FullscreenToggleDebounceMs = 320;
+    private const int WindowButtonDebounceMs = 320;
     private bool _pollLeftButtonWasDown;
     private DateTime _lastPollLeftDownUtc = DateTime.MinValue;
     private DateTime _lastDoubleClickToggleUtc = DateTime.MinValue;
+    private DateTime _lastMaxRestoreClickUtc = DateTime.MinValue;
     private Point _lastPollLeftDownPos;
     private DateTime _playlistHoverStartedUtc = DateTime.MinValue;
     private DateTime _playlistLastKeepAliveUtc = DateTime.MinValue;
@@ -84,6 +86,7 @@ public partial class MainWindow : Window
             }
         }
         if (s.WindowMaximized) WindowState = WindowState.Maximized;
+        UpdateMaxRestoreButton();
         Topmost = s.AlwaysOnTop;
         _vm.IsAlwaysOnTop = s.AlwaysOnTop;
 
@@ -148,6 +151,7 @@ public partial class MainWindow : Window
             {
                 case nameof(MainViewModel.IsFullscreen):
                     ApplyFullscreen(_vm.IsFullscreen);
+                    UpdateMaxRestoreButton();
                     break;
                 case nameof(MainViewModel.IsAlwaysOnTop):
                     Topmost = _vm.IsAlwaysOnTop;
@@ -356,15 +360,14 @@ public partial class MainWindow : Window
 
     private void OnStateChanged(object? sender, EventArgs e)
     {
-        if (MaxRestoreBtn != null)
-            MaxRestoreBtn.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+        UpdateMaxRestoreButton();
         SyncPlaylistWindowPosition();
         // 최소화될 때 playlist도 같이 숨김 (Owner가 minimize면 자동이긴 하지만 명시)
         if (WindowState == WindowState.Minimized) _playlistWin?.HideSlide();
     }
 
     // ============================================================
-    // TopBar 빈 영역 드래그 + 더블클릭 max/restore
+    // TopBar 빈 영역 드래그 + 더블클릭 fullscreen
     // ============================================================
     // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 공통 fullscreen
     // 토글 경로로 넘긴다.
@@ -378,8 +381,13 @@ public partial class MainWindow : Window
         if (e.ChangedButton != MouseButton.Left) return;
         // 버튼 click은 우리 처리 X
         if (e.OriginalSource is DependencyObject d && FindAncestor<Button>(d) is not null) return;
-        // ClickCount==2면 OnRootDoubleClick으로 위임 — 우리는 drag arm 해제만
-        if (e.ClickCount >= 2) { _topBarDragArmed = false; return; }
+        if (e.ClickCount >= 2)
+        {
+            _topBarDragArmed = false;
+            ToggleFullscreenFromDoubleClick("topbar");
+            e.Handled = true;
+            return;
+        }
         _topBarDragArmed = true;
         _topBarDownPos = e.GetPosition(this);
     }
@@ -675,46 +683,22 @@ public partial class MainWindow : Window
             return;
         }
         if (!GetCursorPos(out var pt)) return;
-        var src = System.Windows.PresentationSource.FromVisual(this);
-        if (src?.CompositionTarget is null) return;
-
-        // Screen native pixel → WPF DIP (logical) — DPI-aware.
-        var fromDevice = src.CompositionTarget.TransformFromDevice;
-        var ptLogical = fromDevice.Transform(new Point(pt.X, pt.Y));
-
-        // main window-relative.
-        var winLeft = WindowState == WindowState.Maximized
-            ? (Left < -10 ? RestoreBounds.Left : Left) // Maximized면 Left 음수 가능
-            : Left;
-        var winTop = WindowState == WindowState.Maximized
-            ? (Top < -10 ? RestoreBounds.Top : Top)
-            : Top;
-        // 위 단순화: Maximized 시 chrome border만큼 음수일 수 있어 WorkArea로 클램프
-        // 가 더 정확하지만 일단 SystemParameters.WorkArea로:
-        if (WindowState == WindowState.Maximized)
-        {
-            var wa = System.Windows.SystemParameters.WorkArea;
-            winLeft = wa.Left;
-            winTop = wa.Top;
-        }
-        var relX = ptLogical.X - winLeft;
-        var relY = ptLogical.Y - winTop;
-        var w = WindowState == WindowState.Maximized
-            ? System.Windows.SystemParameters.WorkArea.Width
-            : ActualWidth;
-        var h = WindowState == WindowState.Maximized
-            ? System.Windows.SystemParameters.WorkArea.Height
-            : ActualHeight;
+        var screenPoint = new Point(pt.X, pt.Y);
+        var posInRoot = Root.PointFromScreen(screenPoint);
+        var relX = posInRoot.X;
+        var relY = posInRoot.Y;
+        var w = Root.ActualWidth;
+        var h = Root.ActualHeight;
         if (w <= 0 || h <= 0) return;
 
         PollFullscreenDoubleClick(relX, relY, w, h);
 
         // Mouse 움직임 감지 → ShowControls (이전엔 mpv MouseActivity event가 담당).
         // 풀스크린 모드에서 마우스 움직일 때 OSD 다시 보이게 하는 게 핵심.
-        if (Math.Abs(ptLogical.X - _lastPollMouse.X) > 0.5 ||
-            Math.Abs(ptLogical.Y - _lastPollMouse.Y) > 0.5)
+        if (Math.Abs(screenPoint.X - _lastPollMouse.X) > 0.5 ||
+            Math.Abs(screenPoint.Y - _lastPollMouse.Y) > 0.5)
         {
-            _lastPollMouse = ptLogical;
+            _lastPollMouse = screenPoint;
             if (relX >= 0 && relX < w && relY >= 0 && relY < h)
             {
                 ShowControls();
@@ -1261,8 +1245,35 @@ public partial class MainWindow : Window
 
     private void OnMinimize(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void OnMaxRestore(object? sender, RoutedEventArgs e)
-        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastMaxRestoreClickUtc).TotalMilliseconds < WindowButtonDebounceMs)
+        {
+            e.Handled = true;
+            return;
+        }
+        _lastMaxRestoreClickUtc = now;
+
+        if (_vm.IsFullscreen)
+        {
+            _vm.IsFullscreen = false;
+            e.Handled = true;
+            return;
+        }
+
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        UpdateMaxRestoreButton();
+        e.Handled = true;
+    }
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
+
+    private void UpdateMaxRestoreButton()
+    {
+        if (MaxRestoreBtn is null) return;
+        MaxRestoreBtn.Content = (_vm?.IsFullscreen == true || WindowState == WindowState.Maximized)
+            ? "\uE923"
+            : "\uE922";
+    }
 
     // ============================================================
     // Fullscreen

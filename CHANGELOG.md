@@ -4,6 +4,14 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+### Fullscreen
+- Made empty top-bar double-click handle fullscreen directly instead of relying
+  on a later root double-click route that could be preempted by drag handling.
+- The top-right maximize/restore button now shows restore while fullscreen and
+  exits fullscreen before touching normal window maximize state.
+- Cursor-poll double-click fallback now maps through the actual root visual
+  instead of guessing maximized WorkArea coordinates.
+
 ## [0.4.3] - 2026-05-28
 
 ### Player UX
