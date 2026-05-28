@@ -216,11 +216,11 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button Style="{StaticResource ActionButton}"
-                                Content="{DynamicResource RegisterFileTypes}"
+                                Content="{DynamicResource OpenDefaultAppsSettings}"
                                 Foreground="{StaticResource BrushAccent}"
                                 HorizontalAlignment="Left"
-                                MinWidth="170"
-                                Click="OnRegisterFileTypes"/>
+                                MinWidth="190"
+                                Click="OnOpenDefaultAppsSettings"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

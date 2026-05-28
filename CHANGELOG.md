@@ -4,6 +4,12 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+### Settings
+- Fresh settings now select video and audio file associations by default, with
+  image extensions left as an explicit opt-in.
+- Clicking OK in Settings now saves the extension choices and immediately syncs
+  them to the Windows "Open with" / Default apps candidate list.
+
 ## [0.4.1] - 2026-05-28
 
 ### Player UX

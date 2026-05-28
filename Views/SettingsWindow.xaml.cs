@@ -54,38 +54,25 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            SaveSettings();
+            var selected = SaveSettings();
+            SyncFileAssociations(selected);
             Close();
         }
         catch (Exception ex)
         {
             AppLog.Error("Settings confirm", ex);
-            MessageBox.Show(this, LocalizationService.F("SettingsSaveError", ex.Message), "Deno Video Player",
+            MessageBox.Show(this, LocalizationService.F("SettingsApplyError", ex.Message), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private void OnRegisterFileTypes(object? sender, RoutedEventArgs e)
+    private void OnOpenDefaultAppsSettings(object? sender, RoutedEventArgs e)
     {
         try
         {
-            SaveSettings();
-            var selected = _vm.SelectedExtensions.ToList();
-
-            var exePath = System.IO.Path.Combine(
-                AppContext.BaseDirectory, "DenoVideoPlayer.exe");
-            FileAssociationService.RegisterApplication(exePath);
-            FileAssociationService.SyncExtensions(selected, _vm.AllKnownExtensions);
-
-            var ans = MessageBox.Show(
-                this,
-                LocalizationService.F("SettingsRegisterComplete", selected.Count),
-                "Deno Video Player",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (ans == MessageBoxResult.Yes)
-                FileAssociationService.OpenDefaultAppsSettings();
+            var selected = SaveSettings();
+            SyncFileAssociations(selected);
+            FileAssociationService.OpenDefaultAppsSettings();
         }
         catch (Exception ex)
         {
@@ -95,7 +82,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void SaveSettings()
+    private List<string> SaveSettings()
     {
         var selected = _vm.SelectedExtensions.ToList();
         _settings.RegisteredExtensions = selected;
@@ -105,5 +92,14 @@ public partial class SettingsWindow : Window
         _settings.Language = LocalizationService.Normalize(_vm.SelectedLanguage);
         _svc.Save(_settings);
         LocalizationService.Apply(_settings.Language);
+        return selected;
+    }
+
+    private void SyncFileAssociations(IReadOnlyCollection<string> selected)
+    {
+        var exePath = System.IO.Path.Combine(
+            AppContext.BaseDirectory, "DenoVideoPlayer.exe");
+        FileAssociationService.RegisterApplication(exePath);
+        FileAssociationService.SyncExtensions(selected, _vm.AllKnownExtensions);
     }
 }

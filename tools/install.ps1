@@ -12,10 +12,11 @@
   Run once after `dotnet publish` (or after `dotnet build`). The script:
     1. Resolves the path to DenoVideoPlayer.exe (-ExePath optional override)
     2. Registers HKCU\Software\Classes\Applications\DenoVideoPlayer.exe
-       with SupportedTypes for video/audio/image extensions so the EXE
+       with SupportedTypes for video/audio extensions so the EXE
        shows up under Explorer's "Open with" menu
-    3. Adds Deno Video Player to each extension's HKCU\...\OpenWithProgids so
-       Windows offers it in the "Open with" dialog
+    3. Adds Deno Video Player to video/audio HKCU\...\OpenWithProgids so
+       Windows offers it in the "Open with" dialog. Images stay opt-in from
+       the app Settings screen.
     4. Creates a Desktop shortcut
     5. Creates a Start Menu shortcut
 
@@ -57,7 +58,10 @@ $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
 $VideoExt = @('.mp4','.mkv','.mov','.webm','.avi','.m4v','.ts','.mts','.m2ts','.wmv','.flv','.3gp')
 $AudioExt = @('.mp3','.wav','.flac','.aac','.m4a','.ogg','.opus','.wma','.alac')
 $ImageExt = @('.jpg','.jpeg','.png','.webp','.bmp','.gif')
+$DefaultExt = $VideoExt + $AudioExt
 $AllExt   = $VideoExt + $AudioExt + $ImageExt
+$DefaultExtLookup = @{}
+foreach ($e in $DefaultExt) { $DefaultExtLookup[$e.ToLowerInvariant()] = $true }
 
 $AppRegKey  = 'HKCU:\Software\Classes\Applications\DenoVideoPlayer.exe'
 $LegacyAppRegKey = 'HKCU:\Software\Classes\Applications\DenoPlayer.exe'
@@ -120,8 +124,9 @@ function Install-DenoVideoPlayer {
     New-Item -Path "$AppRegKey\shell\open\command" -Force | Out-Null
     Set-ItemProperty -Path "$AppRegKey\shell\open\command" -Name '(Default)' `
         -Value ('"' + $exe + '" "%1"') -Force
+    Remove-Item -Path "$AppRegKey\SupportedTypes" -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -Path "$AppRegKey\SupportedTypes" -Force | Out-Null
-    foreach ($e in $AllExt) {
+    foreach ($e in $DefaultExt) {
         Set-ItemProperty -Path "$AppRegKey\SupportedTypes" -Name $e -Value '' -Force
     }
 
@@ -148,8 +153,9 @@ function Install-DenoVideoPlayer {
     Set-ItemProperty -Path "HKCU:\$capabilities" `
         -Name 'ApplicationIcon' -Value ('"' + $exe + '",0') -Force
 
+    Remove-Item -Path "HKCU:\$capabilities\FileAssociations" -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -Path "HKCU:\$capabilities\FileAssociations" -Force | Out-Null
-    foreach ($e in $AllExt) {
+    foreach ($e in $DefaultExt) {
         Set-ItemProperty -Path "HKCU:\$capabilities\FileAssociations" `
             -Name $e -Value $progId -Force
     }
@@ -166,10 +172,15 @@ function Install-DenoVideoPlayer {
         try {
             $sub.DeleteValue($legacyProgId, $false)
             $sub.DeleteValue($legacyOpenWithProg, $false)
-            $sub.SetValue($progId, [byte[]]@(),
-                          [Microsoft.Win32.RegistryValueKind]::None)
-            $sub.SetValue($openWithProg, [byte[]]@(),
-                          [Microsoft.Win32.RegistryValueKind]::None)
+            if ($DefaultExtLookup.ContainsKey($e.ToLowerInvariant())) {
+                $sub.SetValue($progId, [byte[]]@(),
+                              [Microsoft.Win32.RegistryValueKind]::None)
+                $sub.SetValue($openWithProg, [byte[]]@(),
+                              [Microsoft.Win32.RegistryValueKind]::None)
+            } else {
+                $sub.DeleteValue($progId, $false)
+                $sub.DeleteValue($openWithProg, $false)
+            }
         } finally { $sub.Close() }
     }
 

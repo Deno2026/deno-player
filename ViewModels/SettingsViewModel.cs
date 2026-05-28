@@ -99,13 +99,16 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     public IEnumerable<string> AllKnownExtensions =>
         VideoExts.Concat(AudioExts).Concat(ImageExts);
 
+    public IEnumerable<string> DefaultRegisteredExtensions =>
+        VideoExts.Concat(AudioExts);
+
     public SettingsViewModel(AppSettings settings)
     {
-        // 저장된 목록이 있으면 그것 기반, 없으면 default = 전체 선택
+        // First run defaults to video + audio only. Images remain opt-in.
         var saved = settings.RegisteredExtensions;
-        var preselected = saved is { Count: > 0 }
+        var preselected = saved is not null
             ? new HashSet<string>(saved, StringComparer.OrdinalIgnoreCase)
-            : new HashSet<string>(AllKnownExtensions, StringComparer.OrdinalIgnoreCase);
+            : new HashSet<string>(DefaultRegisteredExtensions, StringComparer.OrdinalIgnoreCase);
 
         ExtItem Make(string e) => new(e, preselected.Contains(e));
 
