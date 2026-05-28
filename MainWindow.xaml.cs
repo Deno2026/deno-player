@@ -32,14 +32,20 @@ public partial class MainWindow : Window
     private PlaylistWindow? _playlistWin;
     private RecentWindow?   _recentWin;
     private ToastWindow?    _toastWin;
-    private const int HotZoneWidth = 180;           // 우측 hover trigger (이전 280 → 2/3 수준)
+    private const int HotZoneWidth = 72;            // 우측 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
     private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
+    private const int PanelHoverShowDelayMs = 140;  // edge를 스쳐 지나갈 때는 열지 않음
+    private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
     private const int VkLButton = 0x01;
     private const int FullscreenToggleDebounceMs = 320;
     private bool _pollLeftButtonWasDown;
     private DateTime _lastPollLeftDownUtc = DateTime.MinValue;
     private DateTime _lastDoubleClickToggleUtc = DateTime.MinValue;
     private Point _lastPollLeftDownPos;
+    private DateTime _playlistHoverStartedUtc = DateTime.MinValue;
+    private DateTime _playlistLastKeepAliveUtc = DateTime.MinValue;
+    private DateTime _recentHoverStartedUtc = DateTime.MinValue;
+    private DateTime _recentLastKeepAliveUtc = DateTime.MinValue;
 
 
     public MainWindow()
@@ -505,13 +511,11 @@ public partial class MainWindow : Window
             _playlistWin = new PlaylistWindow { Owner = this };
             _playlistWin.DataContext = _vm;
             _playlistWin.ShownChanged += OnPlaylistShownChanged;
-            _playlistWin.Show();
         }
         if (_recentWin is null)
         {
             _recentWin = new RecentWindow { Owner = this };
             _recentWin.DataContext = _vm;
-            _recentWin.Show();
         }
         // _toastWin은 lazy create — 첫 ShowToast 시점에 생성. 항상 떠있으면 mouse-pos
         // routing이나 다른 owned window들 layout에 영향 가능.
@@ -666,6 +670,8 @@ public partial class MainWindow : Window
             // 다른 앱이 foreground면 panel은 mouse-over 아닐 때 닫음.
             if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
             if (_recentWin?.IsShown == true && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+            _playlistHoverStartedUtc = DateTime.MinValue;
+            _recentHoverStartedUtc = DateTime.MinValue;
             return;
         }
         if (!GetCursorPos(out var pt)) return;
@@ -782,16 +788,70 @@ public partial class MainWindow : Window
         {
             // 좌측과 일관성 — 우측도 세로 상단 절반 + 하단 transport 영역 제외에서만 trigger.
             var inRight = x >= w - HotZoneWidth && !inLowerStrip && inUpperHalf;
-            if (inRight) _playlistWin.ShowSlide();
-            else if (_playlistWin.IsShown && !_playlistWin.IsMouseOver && !inTopBar)
-                _playlistWin.HideSlide();
+            UpdateSlidePanelHover(
+                inRight,
+                _playlistWin.IsShown,
+                _playlistWin.IsMouseOver,
+                inTopBar,
+                _playlistWin.ShowSlide,
+                _playlistWin.HideSlide,
+                ref _playlistHoverStartedUtc,
+                ref _playlistLastKeepAliveUtc);
         }
         if (_recentWin is not null)
         {
             var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip && inUpperHalf;
-            if (inLeft) _recentWin.ShowSlide();
-            else if (_recentWin.IsShown && !_recentWin.IsMouseOver && !inTopBar)
-                _recentWin.HideSlide();
+            UpdateSlidePanelHover(
+                inLeft,
+                _recentWin.IsShown,
+                _recentWin.IsMouseOver,
+                inTopBar,
+                _recentWin.ShowSlide,
+                _recentWin.HideSlide,
+                ref _recentHoverStartedUtc,
+                ref _recentLastKeepAliveUtc);
+        }
+    }
+
+    private static void UpdateSlidePanelHover(
+        bool inTrigger,
+        bool isShown,
+        bool isMouseOver,
+        bool inTopBar,
+        Action show,
+        Action hide,
+        ref DateTime hoverStartedUtc,
+        ref DateTime lastKeepAliveUtc)
+    {
+        var now = DateTime.UtcNow;
+
+        if (inTrigger)
+        {
+            if (hoverStartedUtc == DateTime.MinValue)
+                hoverStartedUtc = now;
+            lastKeepAliveUtc = now;
+
+            if (!isShown && now - hoverStartedUtc >= TimeSpan.FromMilliseconds(PanelHoverShowDelayMs))
+                show();
+            return;
+        }
+
+        hoverStartedUtc = DateTime.MinValue;
+
+        if (!isShown) return;
+        if (lastKeepAliveUtc == DateTime.MinValue)
+            lastKeepAliveUtc = now;
+
+        if (isMouseOver || inTopBar)
+        {
+            lastKeepAliveUtc = now;
+            return;
+        }
+
+        if (now - lastKeepAliveUtc >= TimeSpan.FromMilliseconds(PanelHoverHideGraceMs))
+        {
+            hide();
+            lastKeepAliveUtc = DateTime.MinValue;
         }
     }
 

@@ -58,6 +58,12 @@ public partial class PlaylistWindow : Window
     public void ShowSlide()
     {
         if (IsShown) return;
+        if (!IsVisible)
+        {
+            SlideTx.BeginAnimation(TranslateTransform.XProperty, null);
+            SlideTx.X = Width;
+            Show();
+        }
         IsShown = true;
         ShownChanged?.Invoke(true);
         var slide = new DoubleAnimation
@@ -84,6 +90,11 @@ public partial class PlaylistWindow : Window
             To = Width,
             Duration = TimeSpan.FromMilliseconds(100),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        slide.Completed += (_, _) =>
+        {
+            if (!IsShown)
+                Hide();
         };
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
     }

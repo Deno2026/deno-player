@@ -4,6 +4,12 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+### Player UX
+- Reduced right-edge playlist hover sensitivity and added open/close hysteresis
+  so the panel does not flap while the mouse moves near the edge.
+- Hidden side panels are now truly hidden instead of leaving transparent owned
+  windows over the video surface.
+
 ## [0.4.2] - 2026-05-28
 
 ### Settings
