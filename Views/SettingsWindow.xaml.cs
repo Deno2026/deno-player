@@ -56,6 +56,8 @@ public partial class SettingsWindow : Window
         {
             var selected = SaveSettings();
             SyncFileAssociations(selected);
+            if (selected.Count > 0)
+                FileAssociationService.OpenDefaultAppsSettings();
             Close();
         }
         catch (Exception ex)

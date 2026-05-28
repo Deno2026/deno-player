@@ -9,6 +9,8 @@ Dates are KST (UTC+9).
   image extensions left as an explicit opt-in.
 - Clicking OK in Settings now saves the extension choices and immediately syncs
   them to the Windows "Open with" / Default apps candidate list.
+- When extensions are selected, clicking OK now opens Windows Default Apps so
+  the user can finish the protected double-click default choice immediately.
 
 ## [0.4.1] - 2026-05-28
 
