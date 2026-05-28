@@ -4,6 +4,8 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.3] - 2026-05-28
+
 ### Player UX
 - Reduced right-edge playlist hover sensitivity and added open/close hysteresis
   so the panel does not flap while the mouse moves near the edge.
