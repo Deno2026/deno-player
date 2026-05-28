@@ -17,6 +17,12 @@ Windows 기본 캡션 버튼이 다시 보이는 버그를 수정했다. `MainWi
 실행 캡처/Fullscreen 버튼 왕복 후 캡처에서 기본 버튼 미재현, Win32 style
 `HasCaption=False`.
 
+**Codex follow-up (2026-05-28 KST):** Fullscreen 진입 직후 마우스가
+TopBar/BottomBar 위에 남아 있으면 컨트롤이 계속 보이는 조작감 문제를 개선했다.
+Fullscreen bounds 애니메이션 완료 후 450ms 뒤 한 번은 hover를 무시하고 컨트롤을
+숨겨 바로 영상만 보이는 상태로 정착시킨다. 이후 마우스 움직임/키 입력 시 기존처럼
+컨트롤이 다시 나타난다.
+
 ## Repository
 
 - **Repo**: https://github.com/Deno2026/deno-player (**PRIVATE**)

@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly Win32VideoHost _videoHost = new();
     private readonly MainViewModel _vm;
     private readonly DispatcherTimer _controlsHideTimer;
+    private readonly DispatcherTimer _fullscreenSettleHideTimer;
     private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _closing;
@@ -74,6 +75,13 @@ public partial class MainWindow : Window
 
         _controlsHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(s.ControlAutoHideMs) };
         _controlsHideTimer.Tick += (_, _) => HideControls();
+
+        _fullscreenSettleHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
+        _fullscreenSettleHideTimer.Tick += (_, _) =>
+        {
+            _fullscreenSettleHideTimer.Stop();
+            HideControls(force: true);
+        };
 
         _mpvProc.Crashed += () => Dispatcher.BeginInvoke(() =>
         {
@@ -354,6 +362,14 @@ public partial class MainWindow : Window
         _controlsHideTimer.Start();
     }
 
+    private void SettleIntoFullscreen()
+    {
+        _controlsHideTimer.Stop();
+        _fullscreenSettleHideTimer.Stop();
+        if (ControlsAlwaysOn) return;
+        _fullscreenSettleHideTimer.Start();
+    }
+
     // 현재 OSD 표시 상태 — animation 재트리거 방지 (mpv mouse-pos가 픽셀당 보고)
     private bool _osdShown = true;
 
@@ -368,11 +384,11 @@ public partial class MainWindow : Window
         Mouse.OverrideCursor = null;
     }
 
-    private void HideControls()
+    private void HideControls(bool force = false)
     {
         if (ControlsAlwaysOn) return;
-        if (TopBar.IsMouseOver || BottomBar.IsMouseOver) { RestartHideTimer(); return; }
-        if (_vm.Seeking) { RestartHideTimer(); return; }
+        if (!force && (TopBar.IsMouseOver || BottomBar.IsMouseOver)) { RestartHideTimer(); return; }
+        if (_vm.Seeking || _seekDragging || _volDragging) { RestartHideTimer(); return; }
         if (!_osdShown) return;
         _osdShown = false;
 
@@ -1098,11 +1114,12 @@ public partial class MainWindow : Window
             ResizeMode = ResizeMode.NoResize;
 
             var mb = GetCurrentMonitorBounds();
-            AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 140);
-            RestartHideTimer();
+            AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 140,
+                onCompleted: SettleIntoFullscreen);
         }
         else
         {
+            _fullscreenSettleHideTimer.Stop();
             Mouse.OverrideCursor = null;
             // 먼저 bounds를 saved로 animate, 끝난 후 resize/maximize 상태만 복원
             var tx = _savedLeft;
