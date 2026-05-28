@@ -4,6 +4,8 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.2] - 2026-05-28
+
 ### Settings
 - Fresh settings now select video and audio file associations by default, with
   image extensions left as an explicit opt-in.
