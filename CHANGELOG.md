@@ -4,6 +4,8 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.4] - 2026-05-28
+
 ### Fullscreen
 - Made empty top-bar double-click handle fullscreen directly instead of relying
   on a later root double-click route that could be preempted by drag handling.
