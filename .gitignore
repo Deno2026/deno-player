@@ -32,6 +32,7 @@ runtime/ffmpeg/
 runtime/ffmpeg/*
 
 # Local
+SESSION_HANDOFF.md
 *.local.json
 *.log
 publish-sc/
