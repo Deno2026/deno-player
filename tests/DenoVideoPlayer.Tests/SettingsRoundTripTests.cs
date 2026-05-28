@@ -82,6 +82,9 @@ public class SettingsRoundTripTests
         Assert.Equal("Open file", LocalizationService.T("OpenFile"));
         Assert.Equal("New version 0.4.1 — click to update",
             LocalizationService.F("UpdateAvailable", "0.4.1"));
+        Assert.Equal("Register extensions", LocalizationService.T("RegisterFileTypes"));
+        Assert.Contains("Could not save settings",
+            LocalizationService.F("SettingsSaveError", "sample"));
 
         LocalizationService.Apply("ko");
     }

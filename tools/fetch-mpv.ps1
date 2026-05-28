@@ -69,7 +69,7 @@ if ($SkipIfExists -and (Test-Path $existingMpv)) {
 
 Write-Host ">>> Resolving latest mpv release from $Owner/$Repo ..." -ForegroundColor Cyan
 $headers = @{ "User-Agent" = "DenoVideoPlayer-mpv-fetch" }
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $rel = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/releases/latest"
 
 $asset = $rel.assets | Where-Object { $_.name -match $Match } | Select-Object -First 1

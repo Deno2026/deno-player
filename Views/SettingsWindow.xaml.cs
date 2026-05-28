@@ -54,24 +54,29 @@ public partial class SettingsWindow : Window
     {
         try
         {
+            SaveSettings();
+            Close();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Settings confirm", ex);
+            MessageBox.Show(this, LocalizationService.F("SettingsSaveError", ex.Message), "Deno Video Player",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OnRegisterFileTypes(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SaveSettings();
             var selected = _vm.SelectedExtensions.ToList();
 
-            // 1) AppSettings 저장 (확장자 + 스크린샷 폴더)
-            _settings.RegisteredExtensions = selected;
-            _settings.ScreenshotFolder = string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
-                ? null
-                : _vm.ScreenshotFolder;
-            _settings.Language = LocalizationService.Normalize(_vm.SelectedLanguage);
-            _svc.Save(_settings);
-            LocalizationService.Apply(_settings.Language);
-
-            // 2) HKCU 레지스트리 갱신
             var exePath = System.IO.Path.Combine(
                 AppContext.BaseDirectory, "DenoVideoPlayer.exe");
             FileAssociationService.RegisterApplication(exePath);
             FileAssociationService.SyncExtensions(selected, _vm.AllKnownExtensions);
 
-            // 3) 사용자에게 안내 + Windows 기본 앱 화면 열기
             var ans = MessageBox.Show(
                 this,
                 LocalizationService.F("SettingsRegisterComplete", selected.Count),
@@ -81,14 +86,24 @@ public partial class SettingsWindow : Window
 
             if (ans == MessageBoxResult.Yes)
                 FileAssociationService.OpenDefaultAppsSettings();
-
-            Close();
         }
         catch (Exception ex)
         {
-            AppLog.Error("Settings confirm", ex);
+            AppLog.Error("Settings register file types", ex);
             MessageBox.Show(this, LocalizationService.F("SettingsRegisterError", ex.Message), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void SaveSettings()
+    {
+        var selected = _vm.SelectedExtensions.ToList();
+        _settings.RegisteredExtensions = selected;
+        _settings.ScreenshotFolder = string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
+            ? null
+            : _vm.ScreenshotFolder;
+        _settings.Language = LocalizationService.Normalize(_vm.SelectedLanguage);
+        _svc.Save(_settings);
+        LocalizationService.Apply(_settings.Language);
     }
 }

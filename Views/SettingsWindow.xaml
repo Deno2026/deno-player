@@ -168,39 +168,61 @@
                     </StackPanel>
                 </Border>
 
-            <ItemsControl ItemsSource="{Binding Groups}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="{StaticResource BrushBgRaised}"
-                                BorderBrush="{StaticResource BrushBorderSubtle}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource RadiusMd}"
-                                Padding="16,14"
-                                Margin="0,0,0,12">
-                            <StackPanel>
-                                <CheckBox Style="{StaticResource GroupAllCheckBox}"
-                                          IsChecked="{Binding AllSelected, Mode=TwoWay}"
-                                          Content="{Binding Title}"/>
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <CheckBox Style="{StaticResource ExtCheckBox}"
-                                                      IsChecked="{Binding Selected, Mode=TwoWay}"
-                                                      Content="{Binding Extension}"
-                                                      MinWidth="70"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                <Border Background="{StaticResource BrushBgRaised}"
+                        BorderBrush="{StaticResource BrushBorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusMd}"
+                        Padding="16,14"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource FileAssociationHeader}"
+                                   FontFamily="{StaticResource FontUi}"
+                                   FontSize="{StaticResource FontSizeMd}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushAccent}"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Style="{StaticResource TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"
+                                   Text="{DynamicResource FileAssociationDescription}"/>
+
+                        <ItemsControl ItemsSource="{Binding Groups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="Transparent"
+                                            Padding="0,0,0,12">
+                                        <StackPanel>
+                                            <CheckBox Style="{StaticResource GroupAllCheckBox}"
+                                                      IsChecked="{Binding AllSelected, Mode=TwoWay}"
+                                                      Content="{Binding Title}"/>
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Style="{StaticResource ExtCheckBox}"
+                                                                  IsChecked="{Binding Selected, Mode=TwoWay}"
+                                                                  Content="{Binding Extension}"
+                                                                  MinWidth="70"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Style="{StaticResource ActionButton}"
+                                Content="{DynamicResource RegisterFileTypes}"
+                                Foreground="{StaticResource BrushAccent}"
+                                HorizontalAlignment="Left"
+                                MinWidth="170"
+                                Click="OnRegisterFileTypes"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
