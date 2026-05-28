@@ -27,6 +27,10 @@ Fullscreen bounds 애니메이션 완료 후 450ms 뒤 한 번은 hover를 무�
 문제를 줄이기 위해 상단바 전용 `BrushChromeOutline` 색상(`#FF3A4D36`)을 추가하고
 TopBar 하단 1px outline에만 적용했다. 전체 톤은 유지하고 상단 경계 시인성만 보강.
 
+**Codex follow-up (2026-05-28 KST):** 좌/우 edge hint 시각을 맞췄다. 우측
+재생목록 hover 경계선이 전체 높이로 보이던 것을 좌측 최근파일 hint와 동일한 상반부
+그라디언트로 변경했다.
+
 ## Repository
 
 - **Repo**: https://github.com/Deno2026/deno-player (**PRIVATE**)

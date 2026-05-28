@@ -295,7 +295,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3"/>   <!-- 좌측 hint (최근 — 상반부) -->
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="3"/>   <!-- 우측 hint (재생목록 — 전체) -->
+                <ColumnDefinition Width="3"/>   <!-- 우측 hint (재생목록 — 상반부) -->
             </Grid.ColumnDefinitions>
 
             <!-- 좌측 hint: 상반부만 보이는 그라디언트 (호버 가능 영역 안내) -->
@@ -310,11 +310,17 @@
                 <Border.Opacity>0.32</Border.Opacity>
             </Border>
 
-            <!-- 우측 hint: 전체 (BottomBar 위까지). 약하게 표시. -->
-            <Border Grid.Column="2"
-                    Background="{StaticResource BrushAccent}"
-                    Opacity="0.22"
-                    IsHitTestVisible="False"/>
+            <!-- 우측 hint: 좌측과 같은 상반부 그라디언트 (재생목록 hover 영역 안내) -->
+            <Border Grid.Column="2" IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0"/>
+                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0.40"/>
+                        <GradientStop Color="#0057E389" Offset="0.55"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Opacity>0.32</Border.Opacity>
+            </Border>
 
             <!-- 영상 호스트 + 오버레이들 -->
             <Grid Grid.Column="1" ClipToBounds="True">
