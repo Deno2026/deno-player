@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 internal static class Win32
 {

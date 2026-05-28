@@ -2,12 +2,13 @@
 
 **Status (2026-05-26 KST 18시경):** PRIVATE repo. 사용자 피드백 받으면서 핵심 UX
 다듬기 라운드 종료. main HEAD `e1e1961`. 65/65 unit tests pass, build 경고
-0 / 오류 0. publish 폴더 (`publish/DenoPlayer-win-x64/`) 데스크탑 shortcut
+0 / 오류 0. publish 폴더 (`publish/DenoVideoPlayer-win-x64/`) 데스크탑 shortcut
 가리키는 최신 binary 적용됨.
 
-**Naming decision (2026-05-28 KST):** 사용자 지시로 표시명은 앞으로
-`Deno Video Player`. 실행 파일/네임스페이스/AppData/ProgID 같은 내부 ID는
-기존 설정과 업데이트 호환을 위해 `DenoPlayer`를 유지한다.
+**Naming decision (2026-05-28 KST):** 사용자 지시로 표시명은
+`Deno Video Player`. 실행 파일/네임스페이스/AppData/ProgID/테스트 폴더/릴리즈
+산출물 같은 공백 없는 내부 ID는 `DenoVideoPlayer`로 동기화한다. 기존
+`DenoPlayer` 설정은 새 설정 경로로 자동 복사하고, 구 Windows 등록은 설치 시 정리한다.
 
 ## Repository
 
@@ -140,7 +141,7 @@ f2b0ad1 가위 버튼: IN/OUT 안 잡혀도 클릭 가능 + toast 안내
 | `START_HERE.bat` | 더블클릭 한 번 설치 (mpv + ffmpeg + install.ps1) |
 | `UNINSTALL.bat` | 더블클릭 제거 |
 
-## settings.json (`%APPDATA%\DenoPlayer\settings.json`)
+## settings.json (`%APPDATA%\DenoVideoPlayer\settings.json`)
 
 ```jsonc
 {
@@ -156,7 +157,7 @@ f2b0ad1 가위 버튼: IN/OUT 안 잡혀도 클릭 가능 + toast 안내
   "recentFiles": [],
   "repeatMode": "None",   // None / All / One
   "shuffle": false,
-  "screenshotFolder": null,  // null = Pictures\DenoPlayer\
+  "screenshotFolder": null,  // null = Pictures\Deno Video Player\
   "enabledExtensions": [".mp4", ".mkv", ...]
 }
 ```
@@ -207,7 +208,7 @@ f2b0ad1 가위 버튼: IN/OUT 안 잡혀도 클릭 가능 + toast 안내
 - private origin/main push는 사용자 명시 승인 받음 — 자유 push OK.
 - Velopack publish (public release repo로) / tag bump / public 노출은 **사용자
   명시 승인 후만**.
-- 사용자가 화면 보고 피드백하는 작업은 매 turn 후 `taskkill /F /IM DenoPlayer.exe`
+- 사용자가 화면 보고 피드백하는 작업은 매 turn 후 `taskkill /F /IM DenoVideoPlayer.exe`
   → `dotnet publish` 권한 받음. publish 폴더 갱신해야 desktop shortcut 다음
   실행 시 새 binary 적용.
 

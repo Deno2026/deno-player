@@ -1,6 +1,6 @@
-using DenoPlayer.Helpers;
+using DenoVideoPlayer.Helpers;
 
-namespace DenoPlayer.Tests;
+namespace DenoVideoPlayer.Tests;
 
 public class TimeFormatTests
 {

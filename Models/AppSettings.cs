@@ -1,8 +1,8 @@
-namespace DenoPlayer.Models;
+namespace DenoVideoPlayer.Models;
 
 /// <summary>
 /// 단일 설정 파일. 사용자 노출 UI 없음(MVP).
-/// 위치: %APPDATA%\DenoPlayer\settings.json
+/// 위치: %APPDATA%\DenoVideoPlayer\settings.json
 /// </summary>
 public sealed class AppSettings
 {
@@ -33,7 +33,7 @@ public sealed class AppSettings
     // 최근 재생 기록 (최신 → 오래된 순). 최대 30개 유지.
     public List<string>? RecentFiles { get; set; }
 
-    // 스크린샷 저장 폴더. null/빈이면 기본 Pictures\DenoPlayer\.
+    // 스크린샷 저장 폴더. null/빈이면 기본 Pictures\Deno Video Player\.
     public string? ScreenshotFolder { get; set; }
 
     public static AppSettings Defaults() => new();

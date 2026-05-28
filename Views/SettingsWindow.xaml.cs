@@ -1,9 +1,9 @@
 using System.Windows;
-using DenoPlayer.Models;
-using DenoPlayer.Services;
-using DenoPlayer.ViewModels;
+using DenoVideoPlayer.Models;
+using DenoVideoPlayer.Services;
+using DenoVideoPlayer.ViewModels;
 
-namespace DenoPlayer.Views;
+namespace DenoVideoPlayer.Views;
 
 public partial class SettingsWindow : Window
 {
@@ -47,7 +47,7 @@ public partial class SettingsWindow : Window
 
     private void OnResetScreenshotFolder(object? sender, RoutedEventArgs e)
     {
-        _vm.ScreenshotFolder = ""; // 빈 = 기본값 (Pictures\DenoPlayer)
+        _vm.ScreenshotFolder = ""; // 빈 = 기본값 (Pictures\Deno Video Player)
     }
 
     private void OnConfirm(object? sender, RoutedEventArgs e)
@@ -65,7 +65,7 @@ public partial class SettingsWindow : Window
 
             // 2) HKCU 레지스트리 갱신
             var exePath = System.IO.Path.Combine(
-                AppContext.BaseDirectory, "DenoPlayer.exe");
+                AppContext.BaseDirectory, "DenoVideoPlayer.exe");
             FileAssociationService.RegisterApplication(exePath);
             FileAssociationService.SyncExtensions(selected, _vm.AllKnownExtensions);
 

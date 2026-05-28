@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\DenoPlayer.csproj" />
+    <ProjectReference Include="..\..\DenoVideoPlayer.csproj" />
   </ItemGroup>
 
 </Project>

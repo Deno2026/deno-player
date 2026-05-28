@@ -6,13 +6,13 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using DenoPlayer.Helpers;
-using DenoPlayer.Models;
-using DenoPlayer.Services;
-using DenoPlayer.ViewModels;
-using DenoPlayer.Views;
+using DenoVideoPlayer.Helpers;
+using DenoVideoPlayer.Models;
+using DenoVideoPlayer.Services;
+using DenoVideoPlayer.ViewModels;
+using DenoVideoPlayer.Views;
 
-namespace DenoPlayer;
+namespace DenoVideoPlayer;
 
 public partial class MainWindow : Window
 {

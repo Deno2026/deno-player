@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
 
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 /// <summary>
 /// WPF 안에 child Win32 window 한 개 만들고 그 HWND를 mpv --wid 로 넘기는 컨테이너.

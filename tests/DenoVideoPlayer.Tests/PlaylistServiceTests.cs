@@ -1,7 +1,7 @@
 using System.IO;
-using DenoPlayer.Services;
+using DenoVideoPlayer.Services;
 
-namespace DenoPlayer.Tests;
+namespace DenoVideoPlayer.Tests;
 
 public class PlaylistServiceTests : IDisposable
 {
@@ -10,7 +10,7 @@ public class PlaylistServiceTests : IDisposable
 
     public PlaylistServiceTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), "DenoPlayerTests_" + Guid.NewGuid().ToString("N"));
+        _dir = Path.Combine(Path.GetTempPath(), "DenoVideoPlayerTests_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
     }
 

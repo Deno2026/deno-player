@@ -52,7 +52,7 @@ if ($SkipIfExists -and (Test-Path $existing)) {
 }
 
 Write-Host ">>> Resolving latest ffmpeg release from $Owner/$Repo ..." -ForegroundColor Cyan
-$headers = @{ "User-Agent" = "DenoPlayer-ffmpeg-fetch" }
+$headers = @{ "User-Agent" = "DenoVideoPlayer-ffmpeg-fetch" }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 $rel = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/releases/latest"
 

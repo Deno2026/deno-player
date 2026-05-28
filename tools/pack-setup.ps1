@@ -1,20 +1,20 @@
-# Pack publish folder into a clean Deno-Player-Setup.zip in user's Downloads.
+# Pack publish folder into a clean DenoVideoPlayer-Setup.zip in user's Downloads.
 # Excludes runtime/mpv/mpv.exe (GPL — let START_HERE.bat fetch fresh on user's PC).
 param(
-    [string]$SrcDir = "publish\DenoPlayer-win-x64",
+    [string]$SrcDir = "publish\DenoVideoPlayer-win-x64",
     [string]$DestZip = ""
 )
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($DestZip)) {
-    $DestZip = Join-Path $env:USERPROFILE "Downloads\Deno-Player-Setup.zip"
+    $DestZip = Join-Path $env:USERPROFILE "Downloads\DenoVideoPlayer-Setup.zip"
 }
 
 if (-not (Test-Path $SrcDir)) {
     throw "Publish folder not found: $SrcDir (run 'dotnet publish' first)"
 }
 
-$tmp = Join-Path $env:TEMP ("denoplayer-pack-" + [Guid]::NewGuid().ToString("N").Substring(0,8))
+$tmp = Join-Path $env:TEMP ("denovideoplayer-pack-" + [Guid]::NewGuid().ToString("N").Substring(0,8))
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
 Copy-Item -Recurse -Path "$SrcDir\*" -Destination $tmp

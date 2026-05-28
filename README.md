@@ -77,7 +77,7 @@ repo. 다른 host를 쓰려면 환경변수 `DENO_PLAYER_UPDATE_URL`을 설정�
 | `Shift + . / ,` | 배속 +0.25 / -0.25 (하단 1.0x 버튼 클릭=프리셋 메뉴, 휠=±0.25) |
 | `.` / `,` | 프레임 step / back step |
 | `Ctrl + O` | 파일 열기 |
-| `Ctrl + S` | 스크린샷 (기본: `Pictures\DenoPlayer\`, 환경설정에서 변경 가능) |
+| `Ctrl + S` | 스크린샷 (기본: `Pictures\Deno Video Player\`, 환경설정에서 변경 가능) |
 | `Ctrl + T` | 항상 위 토글 |
 | `P` / `Ctrl + L` | 재생목록 패널 토글 |
 | `V` | 자막 트랙 사이클 (다중 자막 영상) |
@@ -111,20 +111,20 @@ winget install Microsoft.DotNet.SDK.8
 dotnet build -c Release
 
 # 3) publish (배포 폴더 만들기)
-dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoPlayer-win-x64
+dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoVideoPlayer-win-x64
 
 # 4) 그 폴더의 START_HERE.bat 더블클릭
 ```
 
 ## ⚙️ 고급: 진단
 
-- **로그**: `%APPDATA%\DenoPlayer\log.txt` (1 MB 회전, 최대 2 파일).
+- **로그**: `%APPDATA%\DenoVideoPlayer\log.txt` (1 MB 회전, 최대 2 파일).
   세션 시작·mpv pid·IPC 연결·예외가 시간 스탬프와 함께 들어간다.
-- **단위 테스트**: `dotnet test tests\DenoPlayer.Tests\DenoPlayer.Tests.csproj -c Release`
+- **단위 테스트**: `dotnet test tests\DenoVideoPlayer.Tests\DenoVideoPlayer.Tests.csproj -c Release`
 
 ## ⚙️ 고급: 설정 파일
 
-`%APPDATA%\DenoPlayer\settings.json` — 단일 파일. 일부 값은 도구 막대 **⚙ 환경설정**
+`%APPDATA%\DenoVideoPlayer\settings.json` — 단일 파일. 일부 값은 도구 막대 **⚙ 환경설정**
 에서 GUI로도 조절 가능 (스크린샷 폴더, 연결 프로그램 등록 확장자).
 
 저장 값:
@@ -135,7 +135,7 @@ dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoPla
 - `playlistPanelEnabled`, `alwaysOnTop`
 - `recentFiles` (최근 30개)
 - `repeatMode` (`None` / `All` / `One`), `shuffle`
-- `screenshotFolder` (비우면 기본 `Pictures\DenoPlayer\`)
+- `screenshotFolder` (비우면 기본 `Pictures\Deno Video Player\`)
 - `enabledExtensions` (연결 프로그램 후보로 등록할 확장자 목록)
 
 마지막 재생 위치는 저장하지 않는다 (재생목록 자동 진행만 유지).
@@ -143,8 +143,8 @@ dotnet publish -c Release -r win-x64 --self-contained false -o .\publish\DenoPla
 ## 명령줄
 
 ```
-DenoPlayer.exe                       # 빈 상태로 실행
-DenoPlayer.exe "C:\path\video.mp4"   # 파일 즉시 열기 + 같은 폴더 재생목록
+DenoVideoPlayer.exe                       # 빈 상태로 실행
+DenoVideoPlayer.exe "C:\path\video.mp4"   # 파일 즉시 열기 + 같은 폴더 재생목록
 ```
 
 탐색기에서 "연결 프로그램"으로 등록하면 더블클릭 한 번에 열린다.

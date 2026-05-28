@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 /// <summary>
 /// Windows 탐색기 스타일 자연 정렬. "file2" &lt; "file10".

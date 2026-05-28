@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 public sealed class RelayCommand : ICommand
 {

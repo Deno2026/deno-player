@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace DenoPlayer.Models;
+namespace DenoVideoPlayer.Models;
 
 public sealed class RecentItem
 {

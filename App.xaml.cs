@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Threading;
-using DenoPlayer.Services;
+using DenoVideoPlayer.Services;
 
-namespace DenoPlayer;
+namespace DenoVideoPlayer;
 
 public partial class App : Application
 {

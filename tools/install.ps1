@@ -10,8 +10,8 @@
 
 .DESCRIPTION
   Run once after `dotnet publish` (or after `dotnet build`). The script:
-    1. Resolves the path to DenoPlayer.exe (-ExePath optional override)
-    2. Registers HKCU\Software\Classes\Applications\DenoPlayer.exe
+    1. Resolves the path to DenoVideoPlayer.exe (-ExePath optional override)
+    2. Registers HKCU\Software\Classes\Applications\DenoVideoPlayer.exe
        with SupportedTypes for video/audio/image extensions so the EXE
        shows up under Explorer's "Open with" menu
     3. Adds Deno Video Player to each extension's HKCU\...\OpenWithProgids so
@@ -20,7 +20,7 @@
     5. Creates a Start Menu shortcut
 
 .PARAMETER ExePath
-  Absolute path to DenoPlayer.exe. If omitted, auto-detected.
+  Absolute path to DenoVideoPlayer.exe. If omitted, auto-detected.
 
 .PARAMETER NoDesktop
   Skip Desktop shortcut.
@@ -59,7 +59,8 @@ $AudioExt = @('.mp3','.wav','.flac','.aac','.m4a','.ogg','.opus','.wma','.alac')
 $ImageExt = @('.jpg','.jpeg','.png','.webp','.bmp','.gif')
 $AllExt   = $VideoExt + $AudioExt + $ImageExt
 
-$AppRegKey  = 'HKCU:\Software\Classes\Applications\DenoPlayer.exe'
+$AppRegKey  = 'HKCU:\Software\Classes\Applications\DenoVideoPlayer.exe'
+$LegacyAppRegKey = 'HKCU:\Software\Classes\Applications\DenoPlayer.exe'
 $DesktopLnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Deno Video Player.lnk'
 $StartMenuLnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Deno Video Player.lnk'
 $LegacyDesktopLnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Deno Player.lnk'
@@ -71,18 +72,18 @@ function Find-Exe {
         return (Resolve-Path $ExePath).Path
     }
     $candidates = @(
-        (Join-Path $repoRoot 'publish\DenoPlayer-win-x64\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'publish\DenoPlayer-win-x64-fxdep\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'bin\Release\net8.0-windows\win-x64\publish\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'bin\Release\net8.0-windows\publish\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'bin\Release\net8.0-windows\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'bin\Debug\net8.0-windows\DenoPlayer.exe'),
-        (Join-Path $repoRoot 'DenoPlayer.exe')
+        (Join-Path $repoRoot 'publish\DenoVideoPlayer-win-x64\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'publish\DenoVideoPlayer-win-x64-fxdep\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\Release\net8.0-windows\win-x64\publish\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\Release\net8.0-windows\publish\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\Release\net8.0-windows\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\Debug\net8.0-windows\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'DenoVideoPlayer.exe')
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) { return (Resolve-Path $c).Path }
     }
-    throw "DenoPlayer.exe not found. Build first: `dotnet build -c Release`. Or pass -ExePath."
+    throw "DenoVideoPlayer.exe not found. Build first: `dotnet build -c Release`. Or pass -ExePath."
 }
 
 function New-Shortcut([string]$target, [string]$lnk, [string]$workdir, [string]$desc) {
@@ -95,16 +96,23 @@ function New-Shortcut([string]$target, [string]$lnk, [string]$workdir, [string]$
     $sc.Save()
 }
 
-function Install-DenoPlayer {
+function Install-DenoVideoPlayer {
     $exe = Find-Exe
     $work = Split-Path $exe -Parent
     Write-Host ">>> Registering Deno Video Player" -ForegroundColor Cyan
     Write-Host "    exe: $exe" -ForegroundColor DarkGray
 
     $hkcu = [Microsoft.Win32.Registry]::CurrentUser
-    $progId        = 'DenoPlayer.Media'
-    $openWithProg  = 'Applications\DenoPlayer.exe'
-    $capabilities  = 'Software\DenoPlayer\Capabilities'
+    $progId        = 'DenoVideoPlayer.Media'
+    $openWithProg  = 'Applications\DenoVideoPlayer.exe'
+    $capabilities  = 'Software\DenoVideoPlayer\Capabilities'
+    $legacyProgId = 'DenoPlayer.Media'
+    $legacyOpenWithProg = 'Applications\DenoPlayer.exe'
+    $legacyCapabilities = 'Software\DenoPlayer\Capabilities'
+
+    Remove-Item -Path $LegacyAppRegKey -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "HKCU:\Software\Classes\$legacyProgId" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "HKCU:\$legacyCapabilities" -Recurse -Force -ErrorAction SilentlyContinue
 
     # 1) HKCU Application key — "Open with" menu / SupportedTypes
     New-Item -Path $AppRegKey -Force | Out-Null
@@ -156,6 +164,8 @@ function Install-DenoPlayer {
     foreach ($e in $AllExt) {
         $sub = $hkcu.CreateSubKey("Software\Classes\$e\OpenWithProgids", $true)
         try {
+            $sub.DeleteValue($legacyProgId, $false)
+            $sub.DeleteValue($legacyOpenWithProg, $false)
             $sub.SetValue($progId, [byte[]]@(),
                           [Microsoft.Win32.RegistryValueKind]::None)
             $sub.SetValue($openWithProg, [byte[]]@(),
@@ -185,20 +195,34 @@ function Install-DenoPlayer {
     Write-Host "     'Always use this app'."
 }
 
-function Uninstall-DenoPlayer {
+function Uninstall-DenoVideoPlayer {
     Write-Host ">>> Removing Deno Video Player registrations" -ForegroundColor Cyan
-    $progId = 'DenoPlayer.Media'
+    $progId = 'DenoVideoPlayer.Media'
+    $legacyProgId = 'DenoPlayer.Media'
+    $legacyOpenWithProg = 'Applications\DenoPlayer.exe'
     if (Test-Path $AppRegKey) {
         Remove-Item -Path $AppRegKey -Recurse -Force
         Write-Host "    removed $AppRegKey" -ForegroundColor DarkGray
+    }
+    if (Test-Path $LegacyAppRegKey) {
+        Remove-Item -Path $LegacyAppRegKey -Recurse -Force
+        Write-Host "    removed $LegacyAppRegKey" -ForegroundColor DarkGray
     }
     if (Test-Path "HKCU:\Software\Classes\$progId") {
         Remove-Item -Path "HKCU:\Software\Classes\$progId" -Recurse -Force
         Write-Host "    removed ProgID $progId" -ForegroundColor DarkGray
     }
+    if (Test-Path "HKCU:\Software\Classes\$legacyProgId") {
+        Remove-Item -Path "HKCU:\Software\Classes\$legacyProgId" -Recurse -Force
+        Write-Host "    removed legacy ProgID $legacyProgId" -ForegroundColor DarkGray
+    }
+    if (Test-Path 'HKCU:\Software\DenoVideoPlayer') {
+        Remove-Item -Path 'HKCU:\Software\DenoVideoPlayer' -Recurse -Force
+        Write-Host "    removed Capabilities" -ForegroundColor DarkGray
+    }
     if (Test-Path 'HKCU:\Software\DenoPlayer') {
         Remove-Item -Path 'HKCU:\Software\DenoPlayer' -Recurse -Force
-        Write-Host "    removed Capabilities" -ForegroundColor DarkGray
+        Write-Host "    removed legacy Capabilities" -ForegroundColor DarkGray
     }
     if (Test-Path 'HKCU:\Software\RegisteredApplications') {
         Remove-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' `
@@ -209,8 +233,10 @@ function Uninstall-DenoPlayer {
     foreach ($e in $AllExt) {
         $extKey = "HKCU:\Software\Classes\$e\OpenWithProgids"
         if (Test-Path $extKey) {
-            Remove-ItemProperty -Path $extKey -Name 'Applications\DenoPlayer.exe' -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $extKey -Name 'Applications\DenoVideoPlayer.exe' -ErrorAction SilentlyContinue
             Remove-ItemProperty -Path $extKey -Name $progId -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $extKey -Name $legacyOpenWithProg -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $extKey -Name $legacyProgId -ErrorAction SilentlyContinue
         }
     }
     if (Test-Path $DesktopLnk)   { Remove-Item $DesktopLnk -Force }
@@ -223,4 +249,4 @@ function Uninstall-DenoPlayer {
     Write-Host "      and Windows protects them. Change them via Settings -> Apps -> Default apps."
 }
 
-if ($Uninstall) { Uninstall-DenoPlayer } else { Install-DenoPlayer }
+if ($Uninstall) { Uninstall-DenoVideoPlayer } else { Install-DenoVideoPlayer }

@@ -1,4 +1,4 @@
-namespace DenoPlayer.ViewModels;
+namespace DenoVideoPlayer.ViewModels;
 
 public enum PlayerState
 {

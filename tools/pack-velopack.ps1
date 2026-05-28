@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     # csproj에서 version 자동 추출
-    [xml]$csproj = Get-Content DenoPlayer.csproj
+    [xml]$csproj = Get-Content DenoVideoPlayer.csproj
     $Version = ($csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1)
 }
 if ([string]::IsNullOrWhiteSpace($Version)) { throw "Version unresolved" }
@@ -21,9 +21,9 @@ if (-not (Get-Command vpk -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host ">>> Publishing self-contained build for v$Version" -ForegroundColor Cyan
-$pubDir = "publish-sc\DenoPlayer-win-x64"
+$pubDir = "publish-sc\DenoVideoPlayer-win-x64"
 if (Test-Path $pubDir) { Remove-Item -Recurse -Force $pubDir }
-dotnet publish DenoPlayer.csproj -c Release -r win-x64 --self-contained true `
+dotnet publish DenoVideoPlayer.csproj -c Release -r win-x64 --self-contained true `
     -p:PublishReadyToRun=true -p:DebugType=none -p:DebugSymbols=false `
     -o $pubDir
 
@@ -34,10 +34,10 @@ Write-Host ">>> vpk pack" -ForegroundColor Cyan
 $outDir = "Releases"
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 vpk pack `
-    --packId DenoPlayer `
+    --packId DenoVideoPlayer `
     --packVersion $Version `
     --packDir $pubDir `
-    --mainExe DenoPlayer.exe `
+    --mainExe DenoVideoPlayer.exe `
     --packTitle "Deno Video Player" `
     --packAuthors "DENO" `
     --outputDir $outDir
@@ -46,4 +46,4 @@ Write-Host ""
 Write-Host ">>> Done. Output: $outDir\" -ForegroundColor Green
 Write-Host "  자동 update가 가능하려면 $outDir 안 파일들을 release channel(별도 public repo)에" -ForegroundColor Yellow
 Write-Host "  publish해야 합니다. 권장: github.com/Deno2026/deno-player-releases/releases/new v$Version" -ForegroundColor Yellow
-Write-Host "  업로드할 파일: $outDir\DenoPlayer-win-Setup.exe, *.nupkg, RELEASES" -ForegroundColor Yellow
+Write-Host "  업로드할 파일: $outDir\DenoVideoPlayer-win-Setup.exe, *.nupkg, RELEASES" -ForegroundColor Yellow

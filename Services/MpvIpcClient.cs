@@ -4,7 +4,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// mpv JSON IPC 클라이언트. Windows named pipe(`\\.\pipe\name`) 한쪽 끝.

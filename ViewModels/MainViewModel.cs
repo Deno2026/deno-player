@@ -4,11 +4,11 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
-using DenoPlayer.Helpers;
-using DenoPlayer.Models;
-using DenoPlayer.Services;
+using DenoVideoPlayer.Helpers;
+using DenoVideoPlayer.Models;
+using DenoVideoPlayer.Services;
 
-namespace DenoPlayer.ViewModels;
+namespace DenoVideoPlayer.ViewModels;
 
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
@@ -904,12 +904,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         try
         {
-            // 사용자 지정 폴더 우선, 없으면 기본 Pictures\DenoPlayer\
+            // 사용자 지정 폴더 우선, 없으면 기본 Pictures\Deno Video Player\
             var dir = !string.IsNullOrWhiteSpace(Settings.ScreenshotFolder)
                 ? Settings.ScreenshotFolder
                 : Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                    "DenoPlayer");
+                    "Deno Video Player");
             Directory.CreateDirectory(dir);
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var raw  = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);

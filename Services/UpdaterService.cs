@@ -1,7 +1,7 @@
 using Velopack;
 using Velopack.Sources;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// Velopack 기반 자동 업데이트. App startup 시점에 VelopackApp.Build().Run() — 첫 줄 필수.

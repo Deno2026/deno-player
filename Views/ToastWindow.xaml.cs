@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
-namespace DenoPlayer.Views;
+namespace DenoVideoPlayer.Views;
 
 /// <summary>
 /// owned child window로 띄우는 toast. WPF Border로 toast를 영상 위에 띄우면 WPF airspace

@@ -1,4 +1,4 @@
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 public static class TimeFormat
 {

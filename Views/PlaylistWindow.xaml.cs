@@ -4,10 +4,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using DenoPlayer.Models;
-using DenoPlayer.ViewModels;
+using DenoVideoPlayer.Models;
+using DenoVideoPlayer.ViewModels;
 
-namespace DenoPlayer.Views;
+namespace DenoVideoPlayer.Views;
 
 internal static class VisualSearch
 {

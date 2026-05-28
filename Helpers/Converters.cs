@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
-using DenoPlayer.ViewModels;
+using DenoVideoPlayer.ViewModels;
 
-namespace DenoPlayer.Helpers;
+namespace DenoVideoPlayer.Helpers;
 
 public sealed class BoolToVisibilityConverter : IValueConverter
 {

@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// 한 사용자 세션에 Deno Video Player 인스턴스를 하나만 유지. 두 번째 실행은
@@ -12,8 +12,8 @@ namespace DenoPlayer.Services;
 /// </summary>
 internal sealed class SingleInstance : IDisposable
 {
-    private const string MutexName = @"Local\DenoPlayer.SingleInstance.Mutex";
-    private const string PipeName  =          "DenoPlayer.SingleInstance.Pipe";
+    private const string MutexName = @"Local\DenoVideoPlayer.SingleInstance.Mutex";
+    private const string PipeName  =          "DenoVideoPlayer.SingleInstance.Pipe";
 
     private Mutex? _mutex;
     private bool _ownsMutex;

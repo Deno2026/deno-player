@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Win32;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// HKCU 기반 파일 연결 등록 (관리자 권한 불필요).
@@ -9,13 +9,13 @@ namespace DenoPlayer.Services;
 /// Windows 10/11에서 "기본 앱"으로 지정되려면 단순히 Applications\&lt;exe&gt; 등록만으로는
 /// 부족하다 (그건 'Open With' 후보 용도). 다음 3종 세트가 필요:
 ///
-///   1) ProgID                ─ HKCU\Software\Classes\DenoPlayer.Media
+///   1) ProgID                ─ HKCU\Software\Classes\DenoVideoPlayer.Media
 ///                              shell\open\command, DefaultIcon
-///   2) Application Key       ─ HKCU\Software\Classes\Applications\DenoPlayer.exe
+///   2) Application Key       ─ HKCU\Software\Classes\Applications\DenoVideoPlayer.exe
 ///                              FriendlyAppName + SupportedTypes (Open With 후보)
-///   3) Capabilities          ─ HKCU\Software\DenoPlayer\Capabilities
+///   3) Capabilities          ─ HKCU\Software\DenoVideoPlayer\Capabilities
 ///                              ApplicationName / Description / FileAssociations
-///      + RegisteredApplications "Deno Video Player" = "Software\DenoPlayer\Capabilities"
+///      + RegisteredApplications "Deno Video Player" = "Software\DenoVideoPlayer\Capabilities"
 ///
 /// 위 셋이 다 있어야 Windows 설정 → 기본 앱 화면에 "Deno Video Player" 항목이 보이고,
 /// 사용자가 선택했을 때 UserChoice 해시 검증을 통과한다.
@@ -24,14 +24,19 @@ public static class FileAssociationService
 {
     public const string AppName        = "Deno Video Player";
     private const string LegacyAppName = "Deno Player";
-    public const string AppKey         = @"Software\Classes\Applications\DenoPlayer.exe";
-    public const string ProgId         = "DenoPlayer.Media";          // 실제 ProgID
-    public const string OpenWithProgId = "Applications\\DenoPlayer.exe"; // Open With 호환용
-    public const string CapabilitiesKey = @"Software\DenoPlayer\Capabilities";
+    public const string AppKey         = @"Software\Classes\Applications\DenoVideoPlayer.exe";
+    public const string ProgId         = "DenoVideoPlayer.Media";          // 실제 ProgID
+    public const string OpenWithProgId = "Applications\\DenoVideoPlayer.exe"; // Open With 호환용
+    public const string CapabilitiesKey = @"Software\DenoVideoPlayer\Capabilities";
+    private const string LegacyAppKey = @"Software\Classes\Applications\DenoPlayer.exe";
+    private const string LegacyProgId = "DenoPlayer.Media";
+    private const string LegacyOpenWithProgId = "Applications\\DenoPlayer.exe";
+    private const string LegacyCapabilitiesKey = @"Software\DenoPlayer\Capabilities";
 
     public static void RegisterApplication(string exePath, string friendlyName = AppName)
     {
         using var hkcu = Registry.CurrentUser;
+        RemoveLegacyRegistrations(hkcu);
 
         // 1) Application key — "Open With" 메뉴용 (기존 호환)
         using (var appKey = hkcu.CreateSubKey(AppKey, writable: true))
@@ -106,6 +111,8 @@ public static class FileAssociationService
         {
             using var owp = hkcu.CreateSubKey($@"Software\Classes\{e}\OpenWithProgids", writable: true);
             if (owp is null) continue;
+            try { owp.DeleteValue(LegacyProgId); } catch { }
+            try { owp.DeleteValue(LegacyOpenWithProgId); } catch { }
             if (selectedSet.Contains(e))
             {
                 owp.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
@@ -117,6 +124,20 @@ public static class FileAssociationService
                 try { owp.DeleteValue(OpenWithProgId); } catch { }
             }
         }
+    }
+
+    private static void RemoveLegacyRegistrations(RegistryKey hkcu)
+    {
+        try { hkcu.DeleteSubKeyTree(LegacyAppKey, throwOnMissingSubKey: false); } catch { }
+        try { hkcu.DeleteSubKeyTree($@"Software\Classes\{LegacyProgId}", throwOnMissingSubKey: false); } catch { }
+        try { hkcu.DeleteSubKeyTree(LegacyCapabilitiesKey, throwOnMissingSubKey: false); } catch { }
+
+        try
+        {
+            using var regApps = hkcu.OpenSubKey(@"Software\RegisteredApplications", writable: true);
+            regApps?.DeleteValue(LegacyAppName, throwOnMissingValue: false);
+        }
+        catch { }
     }
 
     /// <summary>Windows 10/11 "기본 앱" 화면을 Deno Video Player 페이지로 바로 연다.</summary>

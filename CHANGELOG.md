@@ -24,7 +24,7 @@
 - **Slider 1:1 mapping drag** — SeekBar / Volume slider 모두 thumb 정확히
   안 잡아도 track 아무 위치 click + drag로 즉시 조절. Mouse capture 사용.
 - **스크린샷 저장 폴더 사용자 지정** — `Settings.ScreenshotFolder` (비우면
-  기본 `Pictures\DenoPlayer\`). 환경설정 dialog에서 picker.
+  기본 `Pictures\Deno Video Player\`). 환경설정 dialog에서 picker.
 - **하단 transport bar 영역 hot zone 제외** — 마우스를 transport bar 위에 둘
   때 hover 패널이 튀어나오지 않음. 좌·우 모두 세로 상반부에서만 trigger
   (대칭).

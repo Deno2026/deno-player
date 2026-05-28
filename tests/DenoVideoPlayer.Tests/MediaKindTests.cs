@@ -1,6 +1,6 @@
-using DenoPlayer.Models;
+using DenoVideoPlayer.Models;
 
-namespace DenoPlayer.Tests;
+namespace DenoVideoPlayer.Tests;
 
 public class MediaKindTests
 {

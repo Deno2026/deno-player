@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// runtime/mpv/mpv.exe를 호스트 윈도우 영역에 embed.

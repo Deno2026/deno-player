@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// ffmpeg 기반 단순 잘라내기. stream copy(-c copy)만 사용 — re-encode 없음, 무손실,

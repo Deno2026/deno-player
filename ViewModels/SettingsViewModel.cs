@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using DenoPlayer.Models;
+using DenoVideoPlayer.Models;
 
-namespace DenoPlayer.ViewModels;
+namespace DenoVideoPlayer.ViewModels;
 
 public sealed class ExtItem : INotifyPropertyChanged
 {
@@ -47,7 +47,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     public ObservableCollection<ExtGroup> Groups { get; }
 
     private string _screenshotFolder = "";
-    /// <summary>스크린샷 PNG 저장 폴더. 빈 문자열이면 기본값(Pictures\DenoPlayer\).</summary>
+    /// <summary>스크린샷 PNG 저장 폴더. 빈 문자열이면 기본값(Pictures\Deno Video Player\).</summary>
     public string ScreenshotFolder
     {
         get => _screenshotFolder;

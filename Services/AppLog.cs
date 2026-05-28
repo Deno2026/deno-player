@@ -1,10 +1,10 @@
 using System.IO;
 using System.Text;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
-/// 가벼운 파일 로거. %APPDATA%\DenoPlayer\log.txt 한 파일.
+/// 가벼운 파일 로거. %APPDATA%\DenoVideoPlayer\log.txt 한 파일.
 /// 사용자 문제 보고 시 실제로 무엇이 일어났는지 추적용.
 /// 노이즈 줄이려고 Debug 레벨은 기본 비활성.
 /// </summary>
@@ -18,7 +18,7 @@ public static class AppLog
 
     private static readonly object Sync = new();
     private static readonly string Dir =
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DenoPlayer");
+        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DenoVideoPlayer");
     private static readonly string FilePath = System.IO.Path.Combine(Dir, "log.txt");
     private static bool _started;
 

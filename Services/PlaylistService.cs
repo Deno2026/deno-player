@@ -1,8 +1,8 @@
 using System.IO;
-using DenoPlayer.Helpers;
-using DenoPlayer.Models;
+using DenoVideoPlayer.Helpers;
+using DenoVideoPlayer.Models;
 
-namespace DenoPlayer.Services;
+namespace DenoVideoPlayer.Services;
 
 /// <summary>
 /// "현재 파일이 있는 폴더만 스캔". DB/썸네일/색인 금지.

@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
-using DenoPlayer.Helpers;
+using DenoVideoPlayer.Helpers;
 
-namespace DenoPlayer.Models;
+namespace DenoVideoPlayer.Models;
 
 public sealed class MediaItem : INotifyPropertyChanged
 {
