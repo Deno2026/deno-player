@@ -19,6 +19,9 @@ public sealed class AppSettings
     public string? LastOpenedFolder { get; set; }
     public bool AutoPlayNext { get; set; } = true;
 
+    // 표시 언어: "ko" 또는 "en".
+    public string Language { get; set; } = "ko";
+
     public int ControlAutoHideMs { get; set; } = 2500;
     public bool PlaylistPanelEnabled { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = false;

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DenoVideoPlayer.Models;
+using DenoVideoPlayer.Services;
 
 namespace DenoVideoPlayer.Tests;
 
@@ -20,6 +21,7 @@ public class SettingsRoundTripTests
         Assert.True(s.AutoPlayNext);
         Assert.True(s.ControlAutoHideMs > 0);
         Assert.Equal(1.0, s.PlaybackRate);
+        Assert.Equal("ko", s.Language);
     }
 
     [Fact] public void JsonRoundTripPreservesAllValues()
@@ -36,6 +38,7 @@ public class SettingsRoundTripTests
             PlaybackRate = 1.25,
             LastOpenedFolder = @"C:\Users\test\Videos",
             AutoPlayNext = false,
+            Language = "en",
             ControlAutoHideMs = 4000,
             PlaylistPanelEnabled = false,
             AlwaysOnTop = true
@@ -54,6 +57,7 @@ public class SettingsRoundTripTests
         Assert.Equal(s.PlaybackRate, back.PlaybackRate);
         Assert.Equal(s.LastOpenedFolder, back.LastOpenedFolder);
         Assert.Equal(s.AutoPlayNext, back.AutoPlayNext);
+        Assert.Equal(s.Language, back.Language);
         Assert.Equal(s.ControlAutoHideMs, back.ControlAutoHideMs);
         Assert.Equal(s.PlaylistPanelEnabled, back.PlaylistPanelEnabled);
         Assert.Equal(s.AlwaysOnTop, back.AlwaysOnTop);
@@ -68,5 +72,17 @@ public class SettingsRoundTripTests
         // 누락 키는 default
         Assert.Equal(1.0, back.PlaybackRate);
         Assert.True(back.AutoPlayNext);
+        Assert.Equal("ko", back.Language);
+    }
+
+    [Fact] public void EnglishLocalizationCanBeSelected()
+    {
+        LocalizationService.Apply("en");
+
+        Assert.Equal("Open file", LocalizationService.T("OpenFile"));
+        Assert.Equal("New version 0.4.1 — click to update",
+            LocalizationService.F("UpdateAvailable", "0.4.1"));
+
+        LocalizationService.Apply("ko");
     }
 }

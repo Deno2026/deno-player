@@ -29,7 +29,7 @@ public partial class SettingsWindow : Window
             // .NET 8 WPF의 OpenFolderDialog 사용
             var dlg = new Microsoft.Win32.OpenFolderDialog
             {
-                Title = "스크린샷 저장 폴더 선택",
+                Title = LocalizationService.T("PickScreenshotFolderTitle"),
                 InitialDirectory = !string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
                     ? _vm.ScreenshotFolder
                     : Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
@@ -40,7 +40,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             AppLog.Error("PickScreenshotFolder", ex);
-            MessageBox.Show(this, "폴더 선택 실패: " + ex.Message, "Deno Video Player",
+            MessageBox.Show(this, LocalizationService.F("PickFolderFailed", ex.Message), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -61,7 +61,9 @@ public partial class SettingsWindow : Window
             _settings.ScreenshotFolder = string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
                 ? null
                 : _vm.ScreenshotFolder;
+            _settings.Language = LocalizationService.Normalize(_vm.SelectedLanguage);
             _svc.Save(_settings);
+            LocalizationService.Apply(_settings.Language);
 
             // 2) HKCU 레지스트리 갱신
             var exePath = System.IO.Path.Combine(
@@ -72,12 +74,7 @@ public partial class SettingsWindow : Window
             // 3) 사용자에게 안내 + Windows 기본 앱 화면 열기
             var ans = MessageBox.Show(
                 this,
-                $"등록 완료 ({selected.Count}개 확장자).\n\n" +
-                "탐색기 우클릭 → '연결 프로그램' 메뉴에 Deno Video Player가 나오고,\n" +
-                "Windows '기본 앱' 화면에도 'Deno Video Player' 항목이 추가됐습니다.\n\n" +
-                "지금 그 화면을 열까요? — Deno Video Player 항목 클릭 후 각 확장자를\n" +
-                "Deno Video Player로 지정하면 더블클릭 시 우리 앱이 열립니다.\n\n" +
-                "(Windows 정책상 기본 앱 변경은 사용자가 직접 눌러야 적용됩니다)",
+                LocalizationService.F("SettingsRegisterComplete", selected.Count),
                 "Deno Video Player",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
@@ -90,7 +87,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             AppLog.Error("Settings confirm", ex);
-            MessageBox.Show(this, "등록 중 오류:\n" + ex.Message, "Deno Video Player",
+            MessageBox.Show(this, LocalizationService.F("SettingsRegisterError", ex.Message), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

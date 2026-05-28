@@ -36,12 +36,12 @@
             <Border Grid.Row="0" Padding="14,12"
                     BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
                 <StackPanel>
-                    <TextBlock Text="최근 재생" Style="{StaticResource TextMono}"/>
+                    <TextBlock Text="{DynamicResource RecentPlayback}" Style="{StaticResource TextMono}"/>
                     <TextBlock Style="{StaticResource TextBody}"
                                FontSize="{StaticResource FontSizeSm}"
                                Foreground="{StaticResource BrushFgMuted}">
                         <Run Text="{Binding Recents.Count, Mode=OneWay}"/>
-                        <Run Text=" 항목"/>
+                        <Run Text="{DynamicResource ItemSuffix}"/>
                     </TextBlock>
                 </StackPanel>
             </Border>
@@ -56,10 +56,10 @@
                         <StackPanel>
                             <StackPanel.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="탐색기에서 열기" Click="OnRevealInExplorer"/>
-                                    <MenuItem Header="파일 경로 복사" Click="OnCopyPath"/>
+                                    <MenuItem Header="{DynamicResource OpenInExplorer}" Click="OnRevealInExplorer"/>
+                                    <MenuItem Header="{DynamicResource CopyFilePath}" Click="OnCopyPath"/>
                                     <Separator/>
-                                    <MenuItem Header="이 항목 제거" Click="OnRemoveOne"/>
+                                    <MenuItem Header="{DynamicResource RemoveThisItem}" Click="OnRemoveOne"/>
                                 </ContextMenu>
                             </StackPanel.ContextMenu>
                             <TextBlock Text="{Binding FileName}"
@@ -78,7 +78,7 @@
             <Border Grid.Row="2" Padding="14,8"
                     BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,1,0,0">
                 <Button Style="{StaticResource GhostButton}"
-                        Content="모두 비우기"
+                        Content="{DynamicResource ClearAll}"
                         Click="OnClearAll"
                         HorizontalAlignment="Left"/>
             </Border>

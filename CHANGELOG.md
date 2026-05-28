@@ -2,6 +2,13 @@
 
 Dates are KST (UTC+9).
 
+## Unreleased
+
+### Settings
+- Added a display language setting with Korean and English options.
+- Main screen, settings dialog, side panels, tooltips, dialogs, and common toast
+  messages now follow the selected language.
+
 ## [0.4.0] - 2026-05-28
 
 ### Public Release Setup

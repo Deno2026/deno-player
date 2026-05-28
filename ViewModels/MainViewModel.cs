@@ -39,6 +39,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _isPlaylistOpen = Settings.PlaylistPanelEnabled;
         _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
         _shuffle = Settings.Shuffle;
+        LocalizationService.LanguageChanged += OnLanguageChanged;
 
         // 최근 재생 목록 복원 — 파일 존재 여부와 무관하게 다 보여줌 (열 때 파일 없으면 Failed로)
         if (Settings.RecentFiles is { Count: > 0 })
@@ -102,41 +103,41 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CycleSubtitleCommand           = new RelayCommand(() =>
         {
             if (CurrentMedia is null || CurrentMedia.Kind != MediaKind.Video)
-            { Toast?.Invoke("자막은 영상에서만 동작합니다"); return; }
-            _ = _ipc.CycleSubtitle();           Toast?.Invoke("자막 트랙 ▶");
+            { Toast?.Invoke(L("NoSubtitleForMedia")); return; }
+            _ = _ipc.CycleSubtitle();           Toast?.Invoke(L("SubtitleTrackNext"));
         });
         ToggleSubtitleVisibilityCommand= new RelayCommand(() =>
         {
             if (CurrentMedia is null || CurrentMedia.Kind != MediaKind.Video)
-            { Toast?.Invoke("자막은 영상에서만 동작합니다"); return; }
-            _ = _ipc.CycleSubtitleVisibility(); Toast?.Invoke("자막 표시 토글");
+            { Toast?.Invoke(L("NoSubtitleForMedia")); return; }
+            _ = _ipc.CycleSubtitleVisibility(); Toast?.Invoke(L("SubtitleVisibilityToggle"));
         });
         CycleAudioCommand              = new RelayCommand(() =>
         {
             if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
-            { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
-            _ = _ipc.CycleAudio();              Toast?.Invoke("오디오 트랙 ▶");
+            { Toast?.Invoke(L("NoPlayingMedia")); return; }
+            _ = _ipc.CycleAudio();              Toast?.Invoke(L("AudioTrackNext"));
         });
 
         // ─── 잘라내기 (ffmpeg stream copy, 무손실, 키프레임 단위) ───
         SetTrimInCommand = new RelayCommand(() =>
         {
             if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
-            { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            { Toast?.Invoke(L("ImageCannotTrim")); return; }
             TrimInSec = TimePos;
             Toast?.Invoke($"IN  {Helpers.TimeFormat.Seconds(TimePos)}");
         });
         SetTrimOutCommand = new RelayCommand(() =>
         {
             if (CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
-            { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            { Toast?.Invoke(L("ImageCannotTrim")); return; }
             TrimOutSec = TimePos;
             Toast?.Invoke($"OUT {Helpers.TimeFormat.Seconds(TimePos)}");
         });
         ClearTrimCommand = new RelayCommand(() =>
         {
             TrimInSec = null; TrimOutSec = null;
-            Toast?.Invoke("자르기 지점 초기화");
+            Toast?.Invoke(L("TrimPointsCleared"));
         });
         ExecuteTrimCommand = new RelayCommand(async _ =>
         {
@@ -152,8 +153,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // IsTrimMode && HasTrimRange면 실행 후 exit, IsTrimMode && !HasTrimRange면 cancel.
         ToggleTrimModeCommand = new RelayCommand(async _ =>
         {
-            if (CurrentMedia is null) { Toast?.Invoke("재생 중인 미디어가 없습니다"); return; }
-            if (CurrentMedia.Kind == MediaKind.Image) { Toast?.Invoke("이미지는 자르기 불가"); return; }
+            if (CurrentMedia is null) { Toast?.Invoke(L("NoPlayingMedia")); return; }
+            if (CurrentMedia.Kind == MediaKind.Image) { Toast?.Invoke(L("ImageCannotTrim")); return; }
             if (_trimBusy) return;
 
             if (!IsTrimMode)
@@ -163,7 +164,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 TrimOutSec = Duration > 0 ? Duration : null;
                 IsTrimMode = true;
                 ApplyTrimLoop();  // mpv ab-loop set → IN~OUT 자동 루프
-                Toast?.Invoke("편집 모드 — 양쪽 핸들 드래그로 IN/OUT 조정 → 가위 다시 누르면 저장");
+                Toast?.Invoke(L("TrimModeEntered"));
             }
             else
             {
@@ -172,7 +173,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 IsTrimMode = false;
                 TrimInSec = null; TrimOutSec = null;
                 _ = _ipc.ClearAbLoop();  // mpv 구간 루프 해제
-                Toast?.Invoke("편집 모드 종료");
+                Toast?.Invoke(L("TrimModeExited"));
                 await Task.CompletedTask;
             }
         });
@@ -182,7 +183,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             IsTrimMode = false;
             TrimInSec = null; TrimOutSec = null;
             _ = _ipc.ClearAbLoop();
-            Toast?.Invoke("편집 모드 취소");
+            Toast?.Invoke(L("TrimModeCanceled"));
         });
 
         _ipc.PropertyChanged += OnMpvPropertyChanged;
@@ -203,7 +204,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (!ok)
         {
             Services.AppLog.Error("IPC connect failed (timeout)");
-            StatusMessage = "mpv IPC 연결 실패";
+            StatusMessage = L("MpvIpcFailed");
             State = PlayerState.Failed;
             return;
         }
@@ -410,8 +411,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (Set(ref _updateNewVersion, value)) Raise(nameof(UpdateTooltip)); }
     }
     public string UpdateTooltip => _isUpdateAvailable && _updateNewVersion is not null
-        ? $"새 버전 {_updateNewVersion} — 클릭해서 업데이트"
-        : "업데이트 확인 중";
+        ? LF("UpdateAvailable", _updateNewVersion)
+        : L("UpdateChecking");
     /// <summary>UpdaterService.CheckAsync 결과를 받아서 state 갱신 + UI에 button 표시 trigger.</summary>
     public void SetPendingUpdate(string newVersion, Velopack.UpdateInfo info)
     {
@@ -524,9 +525,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     };
     public string RepeatTooltip => _repeat switch
     {
-        RepeatMode.None      => "반복 끔 (클릭: 전체 반복)",
-        RepeatMode.RepeatAll => "전체 반복 (클릭: 한 곡 반복)",
-        RepeatMode.RepeatOne => "한 곡 반복 (클릭: 끔)",
+        RepeatMode.None      => L("RepeatTooltipNone"),
+        RepeatMode.RepeatAll => L("RepeatTooltipAll"),
+        RepeatMode.RepeatOne => L("RepeatTooltipOne"),
         _ => ""
     };
 
@@ -543,8 +544,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
     public string ShuffleTooltip => _shuffle
-        ? "셔플 켜짐 (클릭: 끔)"
-        : "셔플 꺼짐 (클릭: 랜덤 재생)";
+        ? L("ShuffleOn")
+        : L("ShuffleOff");
 
     // ============================================================
     // commands
@@ -643,11 +644,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (_trimBusy) return false;
         if (CurrentMedia is null)
-        { Toast?.Invoke("재생 중인 미디어가 없습니다"); return false; }
+        { Toast?.Invoke(L("NoPlayingMedia")); return false; }
         if (CurrentMedia.Kind == MediaKind.Image)
-        { Toast?.Invoke("이미지는 자르기 불가"); return false; }
+        { Toast?.Invoke(L("ImageCannotTrim")); return false; }
         if (!HasTrimRange)
-        { Toast?.Invoke("IN/OUT 지점을 먼저 잡으세요"); return false; }
+        { Toast?.Invoke(L("TrimNeedInOut")); return false; }
 
         var src = CurrentMedia!.FullPath;
         var inS = _trimInSec!.Value;
@@ -660,10 +661,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // 사용자가 직접 저장 위치 + 이름 지정
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "자르기 — 저장 위치/이름 지정",
+            Title = L("TrimSaveDialogTitle"),
             FileName = defaultName,
             InitialDirectory = srcDir,
-            Filter = $"같은 형식 (*{ext})|*{ext}|모든 파일|*.*",
+            Filter = LF("SameFormatFilter", ext),
             AddExtension = true,
             DefaultExt = ext,
             OverwritePrompt = true,
@@ -679,18 +680,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ExecuteTrimCommand.RaiseCanExecuteChanged();
         try
         {
-            Toast?.Invoke("자르기 진행 중...");
+            Toast?.Invoke(L("TrimInProgress"));
             var res = await Services.TrimService.TrimAsync(src, inS, outS, outputPath).ConfigureAwait(true);
             if (res.Success && res.OutputPath is not null)
             {
                 var name = System.IO.Path.GetFileName(res.OutputPath);
-                Toast?.Invoke($"저장됨: {name}");
+                Toast?.Invoke(LF("TrimSaved", name));
                 Services.AppLog.Info($"Trim saved: {res.OutputPath}");
                 return true;
             }
             else
             {
-                Toast?.Invoke($"자르기 실패: {res.Error}");
+                Toast?.Invoke(LF("TrimFailed", res.Error));
                 return false;
             }
         }
@@ -733,7 +734,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "미디어 파일 열기",
+            Title = L("OpenMediaDialogTitle"),
             CheckFileExists = true,
             Multiselect = false,
             Filter = BuildFileFilter(),
@@ -749,7 +750,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             var dlg = new Microsoft.Win32.OpenFolderDialog
             {
-                Title = "미디어 폴더 열기 (첫 파일부터 재생)",
+                Title = L("OpenMediaFolderDialogTitle"),
                 InitialDirectory = Settings.LastOpenedFolder ?? ""
             };
             if (dlg.ShowDialog() != true) return;
@@ -761,14 +762,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 .FirstOrDefault();
 
             if (first is null)
-                Toast?.Invoke("이 폴더에 재생 가능한 미디어가 없습니다");
+                Toast?.Invoke(L("NoPlayableMediaInFolder"));
             else
                 OpenPath(first);
         }
         catch (Exception ex)
         {
             Services.AppLog.Error("OpenFolderDialog", ex);
-            Toast?.Invoke("폴더 열기 실패: " + ex.Message);
+            Toast?.Invoke(LF("OpenFolderFailed", ex.Message));
         }
     }
 
@@ -777,7 +778,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var all = MediaKindExtensions.AllSupportedExtensions()
             .Select(e => "*" + e).Distinct().OrderBy(s => s);
         var allJoined = string.Join(";", all);
-        return $"모든 지원 미디어|{allJoined}|모든 파일|*.*";
+        return LF("AllSupportedMediaFilter", allJoined);
     }
 
     // ============================================================
@@ -791,19 +792,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (!File.Exists(path))
         {
             State = PlayerState.Failed;
-            StatusMessage = $"파일을 찾을 수 없습니다: {path}";
+            StatusMessage = LF("FileNotFound", path);
             return;
         }
         if (!MediaKindExtensions.IsSupported(path))
         {
             State = PlayerState.Failed;
-            StatusMessage = $"지원하지 않는 형식: {Path.GetExtension(path)}";
+            StatusMessage = LF("UnsupportedFormat", Path.GetExtension(path));
             return;
         }
         if (!_ipc.IsConnected)
         {
             State = PlayerState.Failed;
-            StatusMessage = "mpv 백엔드 연결이 끊겼습니다. 앱을 다시 시작해주세요.";
+            StatusMessage = L("MpvDisconnectedRestart");
             return;
         }
 
@@ -833,7 +834,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CurrentMedia = media;
         FileNameDisplay = media.FileName;
         State = PlayerState.Loading;
-        StatusMessage = "로딩 중...";
+        StatusMessage = L("LoadingStatus");
         IsAtEnd = false;
         _ = _ipc.LoadFile(media.FullPath);
         _ = _ipc.SetPause(false);
@@ -889,17 +890,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Services.AppLog.Info($"TakeScreenshot invoked: media={CurrentMedia?.FileName ?? "(null)"} ipc={_ipc.IsConnected}");
         if (CurrentMedia is null)
         {
-            Toast?.Invoke("재생 중인 미디어가 없습니다");
+            Toast?.Invoke(L("NoScreenshotWithoutMedia"));
             return;
         }
         if (!_ipc.IsConnected)
         {
-            Toast?.Invoke("mpv 연결이 끊겼습니다 — 앱 재시작 필요");
+            Toast?.Invoke(L("MpvDisconnectedToast"));
             return;
         }
         if (CurrentMedia.Kind == MediaKind.Audio)
         {
-            Toast?.Invoke("오디오 파일은 스크린샷할 수 없습니다");
+            Toast?.Invoke(L("AudioCannotScreenshot"));
             return;
         }
         try
@@ -923,15 +924,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             OnUi(() =>
             {
                 if (ok && File.Exists(path))
-                    Toast?.Invoke($"스크린샷 저장 → {Path.GetFileName(path)}");
+                    Toast?.Invoke(LF("ScreenshotSaved", Path.GetFileName(path)));
                 else
-                    Toast?.Invoke("스크린샷 실패 — mpv 응답 없음");
+                    Toast?.Invoke(L("ScreenshotNoResponse"));
             });
         }
         catch (Exception ex)
         {
             Services.AppLog.Error("Screenshot", ex);
-            OnUi(() => Toast?.Invoke("스크린샷 실패: " + ex.Message));
+            OnUi(() => Toast?.Invoke(LF("ScreenshotFailed", ex.Message)));
         }
     }
 
@@ -1114,10 +1115,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 if (CurrentMedia is not null)
                 {
                     CurrentMedia.HasError = true;
-                    CurrentMedia.ErrorMessage = "재생 실패";
+                    CurrentMedia.ErrorMessage = L("PlaybackFailedShort");
                 }
                 State = PlayerState.Failed;
-                StatusMessage = "이 파일을 재생할 수 없습니다.";
+                StatusMessage = L("CannotPlayThisFile");
             }
         });
     }
@@ -1227,19 +1228,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (CurrentMedia is null)
             {
-                Toast?.Invoke("자막을 추가할 영상이 없습니다 — 먼저 영상을 여세요");
+                Toast?.Invoke(L("NoVideoForSubtitle"));
                 return true;
             }
             if (CurrentMedia.Kind != MediaKind.Video)
             {
-                Toast?.Invoke("자막은 영상 파일에만 추가할 수 있습니다");
+                Toast?.Invoke(L("SubtitleOnlyVideo"));
                 return true;
             }
             foreach (var s in subs)
             {
                 _ = _ipc.LoadSubtitle(s);
             }
-            Toast?.Invoke($"자막 {subs.Count}개 추가됨");
+            Toast?.Invoke(LF("SubtitlesAdded", subs.Count));
             return true;
         }
 
@@ -1270,6 +1271,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (v.ValueKind is JsonValueKind.True) { result = true; return true; }
         if (v.ValueKind is JsonValueKind.False) { result = false; return true; }
         return false;
+    }
+
+    private static string L(string key) => LocalizationService.T(key);
+    private static string LF(string key, params object?[] args) => LocalizationService.F(key, args);
+
+    private void OnLanguageChanged()
+    {
+        OnUi(() =>
+        {
+            Raise(nameof(UpdateTooltip));
+            Raise(nameof(RepeatTooltip));
+            Raise(nameof(ShuffleTooltip));
+        });
     }
 
     private void OnUi(Action a)
@@ -1304,5 +1318,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         return true;
     }
 
-    public void Dispose() => _ipc.Dispose();
+    public void Dispose()
+    {
+        LocalizationService.LanguageChanged -= OnLanguageChanged;
+        _ipc.Dispose();
+    }
 }

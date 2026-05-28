@@ -16,6 +16,9 @@ public partial class App : Application
         AppLog.Start("startup");
         if (StartupArgs.Length > 0) AppLog.Info($"args: {string.Join(" | ", StartupArgs)}");
 
+        var startupSettings = new SettingsService().Load();
+        LocalizationService.Apply(startupSettings.Language);
+
         // ─ Single instance ─ 이미 떠 있으면 첫 인스턴스에 인자 보내고 종료
         _single = new SingleInstance();
         if (!_single.TryClaim(StartupArgs))
@@ -30,13 +33,13 @@ public partial class App : Application
         {
             var msg = ex.ExceptionObject?.ToString() ?? "unknown";
             AppLog.Error("UnhandledException", ex.ExceptionObject as Exception);
-            MessageBox.Show("예기치 못한 오류:\n" + msg, "Deno Video Player",
+            MessageBox.Show(LocalizationService.F("UnexpectedError", msg), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         };
         DispatcherUnhandledException += (_, args) =>
         {
             AppLog.Error("DispatcherUnhandledException", args.Exception);
-            MessageBox.Show("UI 예외:\n" + args.Exception.Message, "Deno Video Player",
+            MessageBox.Show(LocalizationService.F("UiError", args.Exception.Message), "Deno Video Player",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };

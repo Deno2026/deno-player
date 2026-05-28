@@ -1,0 +1,298 @@
+using System.Windows;
+
+namespace DenoVideoPlayer.Services;
+
+public static class LocalizationService
+{
+    public const string Korean = "ko";
+    public const string English = "en";
+
+    private static string _currentLanguage = Korean;
+    public static string CurrentLanguage => _currentLanguage;
+
+    public static event Action? LanguageChanged;
+
+    public static void Apply(string? language)
+    {
+        var normalized = Normalize(language);
+        _currentLanguage = normalized;
+
+        if (Application.Current is { } app)
+        {
+            foreach (var (key, value) in StringsFor(normalized))
+                app.Resources[key] = value;
+        }
+
+        LanguageChanged?.Invoke();
+    }
+
+    public static string Normalize(string? language)
+        => string.Equals(language, English, StringComparison.OrdinalIgnoreCase)
+            ? English
+            : Korean;
+
+    public static string T(string key)
+    {
+        var dict = StringsFor(_currentLanguage);
+        if (dict.TryGetValue(key, out var value)) return value;
+        return KoreanStrings.TryGetValue(key, out var fallback) ? fallback : key;
+    }
+
+    public static string F(string key, params object?[] args)
+        => string.Format(T(key), args);
+
+    private static IReadOnlyDictionary<string, string> StringsFor(string language)
+        => language == English ? EnglishStrings : KoreanStrings;
+
+    private static readonly Dictionary<string, string> KoreanStrings = new()
+    {
+        ["AppName"] = "Deno Video Player",
+        ["TooltipPlaylist"] = "재생목록 (P)",
+        ["TooltipAlwaysOnTop"] = "항상 위 (Ctrl+T)",
+        ["TooltipScreenshot"] = "스크린샷 (Ctrl+S)",
+        ["TooltipTrimStart"] = "자르기 편집 시작",
+        ["TooltipTrimExit"] = "자르기 편집 종료 (저장 안 함)",
+        ["TooltipTrimCancel"] = "취소 — 편집 모드 종료",
+        ["TooltipOpenFolder"] = "폴더 열기",
+        ["TooltipOpenFile"] = "파일 열기 (Ctrl+O)",
+        ["TooltipSettings"] = "환경설정 — 연결 프로그램 등록",
+        ["TooltipMinimize"] = "최소화",
+        ["TooltipMaxRestore"] = "최대화/복원",
+        ["TooltipClose"] = "닫기",
+        ["AudioPlaying"] = "오디오 재생 중",
+        ["HeroBrand"] = "DENO VIDEO PLAYER",
+        ["DropHeadline"] = "미디어를 끌어다 놓으세요",
+        ["DropSubline"] = "또는 Ctrl+O / 더블클릭으로 열기",
+        ["OpenFile"] = "파일 열기",
+        ["OpenFolder"] = "폴더 열기",
+        ["SupportedFormats"] = ".mp4 .mkv .mov .webm  ·  .mp3 .flac .wav  ·  .png .jpg .gif",
+        ["PlaybackFailed"] = "재생할 수 없습니다",
+        ["OpenOtherFile"] = "다른 파일 열기",
+        ["NextFile"] = "다음 파일",
+        ["Loading"] = "로딩 중",
+        ["TrimInPoint"] = "IN 지점",
+        ["TrimOutPoint"] = "OUT 지점",
+        ["TooltipPrev"] = "이전 파일 (PageUp / Ctrl+←)",
+        ["TooltipPlayPause"] = "재생/일시정지 (Space)",
+        ["TooltipNext"] = "다음 파일 (PageDown / Ctrl+→)",
+        ["TooltipRepeatNone"] = "반복 안 함 (전체 한 번 끝나면 멈춤)",
+        ["TooltipRepeatAll"] = "전체 반복 (마지막 곡 끝나면 처음으로)",
+        ["TooltipRepeatOne"] = "한 곡 반복 (현재 곡만 계속)",
+        ["TooltipMute"] = "음소거 (M)",
+        ["TooltipSpeed"] = "배속 — 클릭=프리셋 메뉴, 휠=±0.25, Shift+./, =±0.25",
+        ["SpeedDefault"] = "1.0x — 기본",
+        ["TooltipFullscreen"] = "전체화면 (F)",
+        ["TrimEditingPrefix"] = "편집 중 — ",
+        ["TrimEditingSuffix"] = "  ·  양쪽 핸들 드래그로 IN/OUT 조정",
+        ["TooltipSaveTrim"] = "자른 구간을 파일로 저장 (탐색기 위치/이름 지정)",
+
+        ["PlaylistCurrentFolder"] = "현재 폴더",
+        ["RecentPlayback"] = "최근 재생",
+        ["ItemSuffix"] = " 항목",
+        ["OpenInExplorer"] = "탐색기에서 열기",
+        ["CopyFilePath"] = "파일 경로 복사",
+        ["Failure"] = "실패",
+        ["RemoveThisItem"] = "이 항목 제거",
+        ["ClearAll"] = "모두 비우기",
+
+        ["SettingsTitle"] = "환경설정 — 연결 프로그램 등록",
+        ["SettingsHeader"] = "환경설정",
+        ["SettingsDescription"] = "체크한 확장자를 Deno Video Player의 '연결 프로그램' 후보로 등록합니다. 기본 앱 자동 지정은 Windows 정책상 불가하므로, 확인 후 '기본 앱 설정 열기'를 눌러 Windows 설정에서 한 번에 지정하세요.",
+        ["LanguageHeader"] = "언어",
+        ["LanguageDescription"] = "앱에서 사용할 표시 언어를 선택합니다. 확인을 누르면 바로 적용됩니다.",
+        ["LanguageLabel"] = "표시 언어",
+        ["ScreenshotFolderHeader"] = "스크린샷 저장 폴더",
+        ["ScreenshotFolderDescription"] = "Ctrl+S 또는 카메라 버튼으로 저장한 PNG가 들어갈 폴더. 비워두면 기본값 (사용자\\사진\\Deno Video Player\\) 사용.",
+        ["Browse"] = "찾아보기...",
+        ["Default"] = "기본값",
+        ["Cancel"] = "취소",
+        ["Confirm"] = "확인",
+        ["Video"] = "동영상",
+        ["Audio"] = "오디오",
+        ["Image"] = "이미지",
+
+        ["UpdateAvailable"] = "새 버전 {0} — 클릭해서 업데이트",
+        ["UpdateChecking"] = "업데이트 확인 중",
+        ["RepeatTooltipNone"] = "반복 끔 (클릭: 전체 반복)",
+        ["RepeatTooltipAll"] = "전체 반복 (클릭: 한 곡 반복)",
+        ["RepeatTooltipOne"] = "한 곡 반복 (클릭: 끔)",
+        ["ShuffleOn"] = "셔플 켜짐 (클릭: 끔)",
+        ["ShuffleOff"] = "셔플 꺼짐 (클릭: 랜덤 재생)",
+        ["NoSubtitleForMedia"] = "자막은 영상에서만 동작합니다",
+        ["SubtitleTrackNext"] = "자막 트랙 ▶",
+        ["SubtitleVisibilityToggle"] = "자막 표시 토글",
+        ["NoPlayingMedia"] = "재생 중인 미디어가 없습니다",
+        ["AudioTrackNext"] = "오디오 트랙 ▶",
+        ["ImageCannotTrim"] = "이미지는 자르기 불가",
+        ["TrimPointsCleared"] = "자르기 지점 초기화",
+        ["TrimModeEntered"] = "편집 모드 — 양쪽 핸들 드래그로 IN/OUT 조정 → Save",
+        ["TrimModeExited"] = "편집 모드 종료",
+        ["TrimModeCanceled"] = "편집 모드 취소",
+        ["MpvIpcFailed"] = "mpv IPC 연결 실패",
+        ["TrimNeedInOut"] = "IN/OUT 지점을 먼저 잡으세요",
+        ["TrimSaveDialogTitle"] = "자르기 — 저장 위치/이름 지정",
+        ["SameFormatFilter"] = "같은 형식 (*{0})|*{0}|모든 파일|*.*",
+        ["TrimInProgress"] = "자르기 진행 중...",
+        ["TrimSaved"] = "저장됨: {0}",
+        ["TrimFailed"] = "자르기 실패: {0}",
+        ["OpenMediaDialogTitle"] = "미디어 파일 열기",
+        ["OpenMediaFolderDialogTitle"] = "미디어 폴더 열기 (첫 파일부터 재생)",
+        ["NoPlayableMediaInFolder"] = "이 폴더에 재생 가능한 미디어가 없습니다",
+        ["OpenFolderFailed"] = "폴더 열기 실패: {0}",
+        ["AllSupportedMediaFilter"] = "모든 지원 미디어|{0}|모든 파일|*.*",
+        ["FileNotFound"] = "파일을 찾을 수 없습니다: {0}",
+        ["UnsupportedFormat"] = "지원하지 않는 형식: {0}",
+        ["MpvDisconnectedRestart"] = "mpv 백엔드 연결이 끊겼습니다. 앱을 다시 시작해주세요.",
+        ["LoadingStatus"] = "로딩 중...",
+        ["NoScreenshotWithoutMedia"] = "재생 중인 미디어가 없습니다",
+        ["MpvDisconnectedToast"] = "mpv 연결이 끊겼습니다 — 앱 재시작 필요",
+        ["AudioCannotScreenshot"] = "오디오 파일은 스크린샷할 수 없습니다",
+        ["ScreenshotSaved"] = "스크린샷 저장 → {0}",
+        ["ScreenshotNoResponse"] = "스크린샷 실패 — mpv 응답 없음",
+        ["ScreenshotFailed"] = "스크린샷 실패: {0}",
+        ["PlaybackFailedShort"] = "재생 실패",
+        ["CannotPlayThisFile"] = "이 파일을 재생할 수 없습니다.",
+        ["NoVideoForSubtitle"] = "자막을 추가할 영상이 없습니다 — 먼저 영상을 여세요",
+        ["SubtitleOnlyVideo"] = "자막은 영상 파일에만 추가할 수 있습니다",
+        ["SubtitlesAdded"] = "자막 {0}개 추가됨",
+        ["FirstRunPreparing"] = "첫 실행 준비 중입니다...\n미디어 재생 엔진(mpv)을 자동으로 받고 있어요. 잠시만 기다려 주세요.",
+        ["FirstRunPrepareFailed"] = "미디어 재생 엔진을 준비하지 못했습니다.\n인터넷 연결을 확인한 뒤 앱을 다시 실행하거나 START_HERE.bat를 실행해 주세요.\n\n{0}",
+        ["VideoHostFailed"] = "내부 오류: 비디오 호스트 hwnd가 생성되지 않았습니다.",
+        ["MpvStartFailed"] = "mpv 시작 실패: {0}",
+        ["MpvProcessRepeatedExit"] = "mpv 프로세스가 반복 종료되었습니다. 앱을 다시 시작해주세요.",
+        ["MpvRestartFailed"] = "mpv 재시작 실패: {0}",
+        ["SettingsOpenFailed"] = "환경설정 창을 열 수 없습니다:\n{0}",
+        ["UnexpectedError"] = "예기치 못한 오류:\n{0}",
+        ["UiError"] = "UI 예외:\n{0}",
+        ["PickScreenshotFolderTitle"] = "스크린샷 저장 폴더 선택",
+        ["PickFolderFailed"] = "폴더 선택 실패: {0}",
+        ["SettingsRegisterComplete"] = "등록 완료 ({0}개 확장자).\n\n탐색기 우클릭 → '연결 프로그램' 메뉴에 Deno Video Player가 나오고,\nWindows '기본 앱' 화면에도 'Deno Video Player' 항목이 추가됐습니다.\n\n지금 그 화면을 열까요? — Deno Video Player 항목 클릭 후 각 확장자를\nDeno Video Player로 지정하면 더블클릭 시 우리 앱이 열립니다.\n\n(Windows 정책상 기본 앱 변경은 사용자가 직접 눌러야 적용됩니다)",
+        ["SettingsRegisterError"] = "등록 중 오류:\n{0}",
+    };
+
+    private static readonly Dictionary<string, string> EnglishStrings = new()
+    {
+        ["AppName"] = "Deno Video Player",
+        ["TooltipPlaylist"] = "Playlist (P)",
+        ["TooltipAlwaysOnTop"] = "Always on top (Ctrl+T)",
+        ["TooltipScreenshot"] = "Screenshot (Ctrl+S)",
+        ["TooltipTrimStart"] = "Start trim editing",
+        ["TooltipTrimExit"] = "Exit trim editing without saving",
+        ["TooltipTrimCancel"] = "Cancel trim editing",
+        ["TooltipOpenFolder"] = "Open folder",
+        ["TooltipOpenFile"] = "Open file (Ctrl+O)",
+        ["TooltipSettings"] = "Settings — file associations",
+        ["TooltipMinimize"] = "Minimize",
+        ["TooltipMaxRestore"] = "Maximize / restore",
+        ["TooltipClose"] = "Close",
+        ["AudioPlaying"] = "Playing audio",
+        ["HeroBrand"] = "DENO VIDEO PLAYER",
+        ["DropHeadline"] = "Drop media here",
+        ["DropSubline"] = "Or press Ctrl+O / double-click to open",
+        ["OpenFile"] = "Open file",
+        ["OpenFolder"] = "Open folder",
+        ["SupportedFormats"] = ".mp4 .mkv .mov .webm  ·  .mp3 .flac .wav  ·  .png .jpg .gif",
+        ["PlaybackFailed"] = "Cannot play this file",
+        ["OpenOtherFile"] = "Open another file",
+        ["NextFile"] = "Next file",
+        ["Loading"] = "Loading",
+        ["TrimInPoint"] = "IN point",
+        ["TrimOutPoint"] = "OUT point",
+        ["TooltipPrev"] = "Previous file (PageUp / Ctrl+Left)",
+        ["TooltipPlayPause"] = "Play / pause (Space)",
+        ["TooltipNext"] = "Next file (PageDown / Ctrl+Right)",
+        ["TooltipRepeatNone"] = "No repeat (stop after one pass)",
+        ["TooltipRepeatAll"] = "Repeat all (wrap to first file)",
+        ["TooltipRepeatOne"] = "Repeat one (keep playing current file)",
+        ["TooltipMute"] = "Mute (M)",
+        ["TooltipSpeed"] = "Speed — click=presets, wheel=±0.25, Shift+./, =±0.25",
+        ["SpeedDefault"] = "1.0x — Default",
+        ["TooltipFullscreen"] = "Fullscreen (F)",
+        ["TrimEditingPrefix"] = "Editing — ",
+        ["TrimEditingSuffix"] = "  ·  Drag both handles to adjust IN/OUT",
+        ["TooltipSaveTrim"] = "Save the selected range as a file",
+
+        ["PlaylistCurrentFolder"] = "Current folder",
+        ["RecentPlayback"] = "Recent files",
+        ["ItemSuffix"] = " items",
+        ["OpenInExplorer"] = "Reveal in File Explorer",
+        ["CopyFilePath"] = "Copy file path",
+        ["Failure"] = "Failed",
+        ["RemoveThisItem"] = "Remove this item",
+        ["ClearAll"] = "Clear all",
+
+        ["SettingsTitle"] = "Settings — file associations",
+        ["SettingsHeader"] = "Settings",
+        ["SettingsDescription"] = "Choose which extensions should list Deno Video Player as an 'Open with' option. Windows does not allow apps to change defaults automatically, so use 'Open default app settings' after confirming.",
+        ["LanguageHeader"] = "Language",
+        ["LanguageDescription"] = "Choose the display language for the app. It applies as soon as you press OK.",
+        ["LanguageLabel"] = "Display language",
+        ["ScreenshotFolderHeader"] = "Screenshot folder",
+        ["ScreenshotFolderDescription"] = "PNG screenshots from Ctrl+S or the camera button are saved here. Leave blank to use Pictures\\Deno Video Player\\.",
+        ["Browse"] = "Browse...",
+        ["Default"] = "Default",
+        ["Cancel"] = "Cancel",
+        ["Confirm"] = "OK",
+        ["Video"] = "Video",
+        ["Audio"] = "Audio",
+        ["Image"] = "Image",
+
+        ["UpdateAvailable"] = "New version {0} — click to update",
+        ["UpdateChecking"] = "Checking for updates",
+        ["RepeatTooltipNone"] = "Repeat off (click: repeat all)",
+        ["RepeatTooltipAll"] = "Repeat all (click: repeat one)",
+        ["RepeatTooltipOne"] = "Repeat one (click: off)",
+        ["ShuffleOn"] = "Shuffle on (click: off)",
+        ["ShuffleOff"] = "Shuffle off (click: random playback)",
+        ["NoSubtitleForMedia"] = "Subtitles only work with video",
+        ["SubtitleTrackNext"] = "Subtitle track ▶",
+        ["SubtitleVisibilityToggle"] = "Subtitle visibility toggled",
+        ["NoPlayingMedia"] = "No media is playing",
+        ["AudioTrackNext"] = "Audio track ▶",
+        ["ImageCannotTrim"] = "Images cannot be trimmed",
+        ["TrimPointsCleared"] = "Trim points cleared",
+        ["TrimModeEntered"] = "Trim editing — drag both handles to adjust IN/OUT → Save",
+        ["TrimModeExited"] = "Trim editing closed",
+        ["TrimModeCanceled"] = "Trim editing canceled",
+        ["MpvIpcFailed"] = "mpv IPC connection failed",
+        ["TrimNeedInOut"] = "Set IN and OUT points first",
+        ["TrimSaveDialogTitle"] = "Trim — choose save location and name",
+        ["SameFormatFilter"] = "Same format (*{0})|*{0}|All files|*.*",
+        ["TrimInProgress"] = "Trimming...",
+        ["TrimSaved"] = "Saved: {0}",
+        ["TrimFailed"] = "Trim failed: {0}",
+        ["OpenMediaDialogTitle"] = "Open media file",
+        ["OpenMediaFolderDialogTitle"] = "Open media folder (play from first file)",
+        ["NoPlayableMediaInFolder"] = "No playable media found in this folder",
+        ["OpenFolderFailed"] = "Open folder failed: {0}",
+        ["AllSupportedMediaFilter"] = "All supported media|{0}|All files|*.*",
+        ["FileNotFound"] = "File not found: {0}",
+        ["UnsupportedFormat"] = "Unsupported format: {0}",
+        ["MpvDisconnectedRestart"] = "The mpv backend disconnected. Please restart the app.",
+        ["LoadingStatus"] = "Loading...",
+        ["NoScreenshotWithoutMedia"] = "No media is playing",
+        ["MpvDisconnectedToast"] = "mpv disconnected — restart required",
+        ["AudioCannotScreenshot"] = "Audio files cannot be screenshotted",
+        ["ScreenshotSaved"] = "Screenshot saved → {0}",
+        ["ScreenshotNoResponse"] = "Screenshot failed — no mpv response",
+        ["ScreenshotFailed"] = "Screenshot failed: {0}",
+        ["PlaybackFailedShort"] = "Playback failed",
+        ["CannotPlayThisFile"] = "This file cannot be played.",
+        ["NoVideoForSubtitle"] = "Open a video before adding subtitles",
+        ["SubtitleOnlyVideo"] = "Subtitles can only be added to video files",
+        ["SubtitlesAdded"] = "{0} subtitle file(s) added",
+        ["FirstRunPreparing"] = "Preparing first launch...\nDeno Video Player is downloading the mpv playback engine. Please wait a moment.",
+        ["FirstRunPrepareFailed"] = "Could not prepare the playback engine.\nCheck your internet connection, then restart the app or run START_HERE.bat.\n\n{0}",
+        ["VideoHostFailed"] = "Internal error: the video host window was not created.",
+        ["MpvStartFailed"] = "mpv failed to start: {0}",
+        ["MpvProcessRepeatedExit"] = "mpv exited repeatedly. Please restart the app.",
+        ["MpvRestartFailed"] = "mpv restart failed: {0}",
+        ["SettingsOpenFailed"] = "Could not open Settings:\n{0}",
+        ["UnexpectedError"] = "Unexpected error:\n{0}",
+        ["UiError"] = "UI error:\n{0}",
+        ["PickScreenshotFolderTitle"] = "Choose screenshot folder",
+        ["PickFolderFailed"] = "Folder selection failed: {0}",
+        ["SettingsRegisterComplete"] = "Registration complete ({0} extensions).\n\nDeno Video Player now appears in File Explorer's 'Open with' menu,\nand in Windows Default apps.\n\nOpen that Windows screen now? Select Deno Video Player there for each extension you want to open by double-clicking.\n\n(Windows requires the user to confirm default app changes manually.)",
+        ["SettingsRegisterError"] = "Registration error:\n{0}",
+    };
+}

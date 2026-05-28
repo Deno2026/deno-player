@@ -36,7 +36,7 @@
             <Border Grid.Row="0" Padding="14,12"
                     BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
                 <StackPanel>
-                    <TextBlock Text="현재 폴더" Style="{StaticResource TextMono}"/>
+                    <TextBlock Text="{DynamicResource PlaylistCurrentFolder}" Style="{StaticResource TextMono}"/>
                     <TextBlock Text="{Binding FolderDisplay}"
                                Style="{StaticResource TextBody}"
                                FontSize="{StaticResource FontSizeSm}"
@@ -60,8 +60,8 @@
                             </Grid.ColumnDefinitions>
                             <Grid.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="탐색기에서 열기" Click="OnRevealInExplorer"/>
-                                    <MenuItem Header="파일 경로 복사" Click="OnCopyPath"/>
+                                    <MenuItem Header="{DynamicResource OpenInExplorer}" Click="OnRevealInExplorer"/>
+                                    <MenuItem Header="{DynamicResource CopyFilePath}" Click="OnCopyPath"/>
                                 </ContextMenu>
                             </Grid.ContextMenu>
                             <StackPanel Grid.Column="0">
@@ -70,7 +70,7 @@
                                            FontSize="{StaticResource FontSizeSm}"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Style="{StaticResource TextMono}"
-                                           Text="실패"
+                                           Text="{DynamicResource Failure}"
                                            Foreground="{StaticResource BrushDanger}"
                                            Visibility="{Binding HasError, Converter={StaticResource BoolVis}}"/>
                             </StackPanel>
@@ -88,7 +88,7 @@
                     BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,1,0,0">
                 <TextBlock Style="{StaticResource TextMono}">
                     <Run Text="{Binding Playlist.Count, Mode=OneWay}"/>
-                    <Run Text=" 항목"/>
+                    <Run Text="{DynamicResource ItemSuffix}"/>
                 </TextBlock>
             </Border>
         </Grid>

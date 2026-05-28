@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using DenoVideoPlayer.Models;
+using DenoVideoPlayer.Services;
 
 namespace DenoVideoPlayer.ViewModels;
 
@@ -46,6 +47,33 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 {
     public ObservableCollection<ExtGroup> Groups { get; }
 
+    private string _selectedLanguage = LocalizationService.Korean;
+    public string SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            var normalized = LocalizationService.Normalize(value);
+            if (_selectedLanguage == normalized) return;
+            _selectedLanguage = normalized;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedLanguage)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsKoreanSelected)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsEnglishSelected)));
+        }
+    }
+
+    public bool IsKoreanSelected
+    {
+        get => SelectedLanguage == LocalizationService.Korean;
+        set { if (value) SelectedLanguage = LocalizationService.Korean; }
+    }
+
+    public bool IsEnglishSelected
+    {
+        get => SelectedLanguage == LocalizationService.English;
+        set { if (value) SelectedLanguage = LocalizationService.English; }
+    }
+
     private string _screenshotFolder = "";
     /// <summary>스크린샷 PNG 저장 폴더. 빈 문자열이면 기본값(Pictures\Deno Video Player\).</summary>
     public string ScreenshotFolder
@@ -83,12 +111,13 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 
         Groups = new ObservableCollection<ExtGroup>
         {
-            new("동영상", VideoExts.Select(Make)),
-            new("오디오", AudioExts.Select(Make)),
-            new("이미지", ImageExts.Select(Make)),
+            new(LocalizationService.T("Video"), VideoExts.Select(Make)),
+            new(LocalizationService.T("Audio"), AudioExts.Select(Make)),
+            new(LocalizationService.T("Image"), ImageExts.Select(Make)),
         };
 
         _screenshotFolder = settings.ScreenshotFolder ?? "";
+        _selectedLanguage = LocalizationService.Normalize(settings.Language);
     }
 
     public IEnumerable<string> SelectedExtensions =>

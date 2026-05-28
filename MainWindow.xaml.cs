@@ -97,7 +97,7 @@ public partial class MainWindow : Window
             else
             {
                 _vm.State = PlayerState.Failed;
-                _vm.StatusMessage = "mpv 프로세스가 반복 종료되었습니다. 앱을 다시 시작해주세요.";
+                _vm.StatusMessage = LocalizationService.T("MpvProcessRepeatedExit");
             }
         });
 
@@ -171,18 +171,13 @@ public partial class MainWindow : Window
         if (!_mpvProc.MpvAvailable)
         {
             _vm.State = PlayerState.Loading;
-            _vm.StatusMessage =
-                "첫 실행 준비 중입니다...\n" +
-                "미디어 재생 엔진(mpv)을 자동으로 받고 있어요. 잠시만 기다려 주세요.";
+            _vm.StatusMessage = LocalizationService.T("FirstRunPreparing");
 
             var prepared = await RuntimeDependencyService.EnsureMpvAsync();
             if (!prepared.Success || !_mpvProc.MpvAvailable)
             {
                 _vm.State = PlayerState.Failed;
-                _vm.StatusMessage =
-                    "미디어 재생 엔진을 준비하지 못했습니다.\n" +
-                    "인터넷 연결을 확인한 뒤 앱을 다시 실행하거나 START_HERE.bat를 실행해 주세요.\n\n" +
-                    prepared.Error;
+                _vm.StatusMessage = LocalizationService.F("FirstRunPrepareFailed", prepared.Error);
                 return;
             }
         }
@@ -190,7 +185,7 @@ public partial class MainWindow : Window
         if (_videoHost.Hwnd == IntPtr.Zero)
         {
             _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = "내부 오류: 비디오 호스트 hwnd가 생성되지 않았습니다.";
+            _vm.StatusMessage = LocalizationService.T("VideoHostFailed");
             return;
         }
 
@@ -203,7 +198,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = "mpv 시작 실패: " + ex.Message;
+            _vm.StatusMessage = LocalizationService.F("MpvStartFailed", ex.Message);
             return;
         }
 
@@ -239,7 +234,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = "mpv 재시작 실패: " + ex.Message;
+            _vm.StatusMessage = LocalizationService.F("MpvRestartFailed", ex.Message);
         }
     }
 
@@ -1080,7 +1075,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Services.AppLog.Error("Open SettingsWindow", ex);
-            MessageBox.Show(this, "환경설정 창을 열 수 없습니다:\n" + ex.Message,
+            MessageBox.Show(this, LocalizationService.F("SettingsOpenFailed", ex.Message),
                 "Deno Video Player", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
