@@ -14,6 +14,7 @@
         TextOptions.TextFormattingMode="Display"
         AllowDrop="True"
         Focusable="True"
+        WindowStyle="None"
         ResizeMode="CanResize"
         MouseDoubleClick="OnRootDoubleClick"
         FocusManager.FocusedElement="{Binding RelativeSource={RelativeSource Self}}">
@@ -259,8 +260,7 @@
                 </StackPanel>
 
                 <!-- 좌: 파일명 (남은 영역 fill).
-                     드래그/더블클릭은 WindowChrome CaptionHeight=36이 OS-native로 처리.
-                     이 Border 자체는 hit-test invisible해서 OS 캡션 처리에 안 끼어듦. -->
+                     드래그/더블클릭은 CaptionHeight=0 상태에서 WPF 핸들러가 처리. -->
                 <Border Background="Transparent">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="14,0">

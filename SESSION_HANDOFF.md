@@ -10,6 +10,13 @@
 산출물 같은 공백 없는 내부 ID는 `DenoVideoPlayer`로 동기화한다. 기존
 `DenoPlayer` 설정은 새 설정 경로로 자동 복사하고, 구 Windows 등록은 설치 시 정리한다.
 
+**Codex follow-up (2026-05-28 KST):** 더블클릭/Fullscreen 전환 뒤 우측 상단에
+Windows 기본 캡션 버튼이 다시 보이는 버그를 수정했다. `MainWindow`는 항상
+`WindowStyle=None`인 커스텀 상단바 창으로 유지하고, Fullscreen 탈출 시
+`SingleBorderWindow`로 되돌리는 경로를 제거했다. 검증: 65/65 tests, publish 갱신,
+실행 캡처/Fullscreen 버튼 왕복 후 캡처에서 기본 버튼 미재현, Win32 style
+`HasCaption=False`.
+
 ## Repository
 
 - **Repo**: https://github.com/Deno2026/deno-player (**PRIVATE**)
@@ -63,7 +70,8 @@ ffmpeg stream copy(`-c copy`) 무손실 cut. ffmpeg.exe는
 - `AnimateBounds()` 헬퍼 — Left/Top/Width/Height 4개 DoubleAnimation 동시
   140ms cubic ease
 - WindowChrome `SetWindowChrome` 호출 제거 (XAML 한 번 set으로 유지)
-- WindowStyle.None + bounds 직접 set (모니터 전체)
+- WindowStyle.None 유지 + bounds 직접 set (모니터 전체). 탈출 시 기본
+  `SingleBorderWindow`로 복원하지 않음.
 - Win32 `MonitorFromWindow` + DPI 변환으로 현재 모니터 bounds 정확히
 - `_savedWasMaximized` 플래그 — fullscreen 진입 전 Maximized였으면 탈출 시
   자동 Maximized 복원

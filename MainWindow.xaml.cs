@@ -20,8 +20,7 @@ public partial class MainWindow : Window
     private readonly Win32VideoHost _videoHost = new();
     private readonly MainViewModel _vm;
     private readonly DispatcherTimer _controlsHideTimer;
-    private WindowStyle _savedStyle;
-    private ResizeMode _savedResize;
+    private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _closing;
     private int _mpvRestartCount;
@@ -37,6 +36,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        EnsureCustomWindowStyle();
         _vm = new MainViewModel(_mpvProc);
         DataContext = _vm;
 
@@ -454,7 +454,7 @@ public partial class MainWindow : Window
             var top  = r.Top  / sy;
             var w    = (r.Right  - r.Left) / sx;
             var h    = (r.Bottom - r.Top)  / sy;
-            if (WindowStyle != WindowStyle.None && WindowState == WindowState.Maximized)
+            if (WindowState == WindowState.Maximized && !_vm.IsFullscreen)
             {
                 var wa = SystemParameters.WorkArea;
                 if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
@@ -512,9 +512,9 @@ public partial class MainWindow : Window
             var w    = (r.Right  - r.Left) / sx;
             var h    = (r.Bottom - r.Top)  / sy;
 
-            // 일반 Maximized(WindowChrome 적용)는 chrome border만큼 화면 밖으로 살짝 튀어나옴(보통 -8,-8).
+            // 일반 Maximized(WindowChrome 적용)는 chrome border만큼 화면 밖으로 살짝 튀어나올 수 있음(보통 -8,-8).
             // 작업표시줄까지 가는 진짜 풀스크린이 아니라면 work-area로 클램프해 panel이 작업표시줄 밖으로 안 가게.
-            if (WindowStyle != WindowStyle.None && WindowState == WindowState.Maximized)
+            if (WindowState == WindowState.Maximized && !_vm.IsFullscreen)
             {
                 var wa = SystemParameters.WorkArea;
                 if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
@@ -1060,7 +1060,7 @@ public partial class MainWindow : Window
     // 풀스크린 진입/탈출 — 200ms cubic ease 애니메이션으로 부드럽게 grow/shrink.
     // 핵심:
     //   - WindowChrome SetWindowChrome 호출 안 함 (XAML 한 번 set으로 유지)
-    //   - WindowStyle 변경은 진입 시 한 번 (chrome 사라짐), 탈출 시 animate 종료 후 복원
+    //   - WindowStyle=None을 계속 유지해 Windows 기본 캡션 버튼이 다시 뜨는 경로 차단
     //   - Bounds 4개 (Left/Top/Width/Height)를 DoubleAnimation으로 동시에 interpolate
     //     → WPF가 매 frame layout, mpv child hwnd가 자연스럽게 따라옴
     //   - WindowState 토글 안 함 (Maximized hack 제거)
@@ -1072,7 +1072,6 @@ public partial class MainWindow : Window
         if (fs)
         {
             try { Root.Focus(); Keyboard.Focus(Root); } catch { }
-            _savedStyle = WindowStyle;
             _savedResize = ResizeMode;
             _savedWasMaximized = WindowState == WindowState.Maximized;
             if (_savedWasMaximized)
@@ -1095,8 +1094,7 @@ public partial class MainWindow : Window
                 _savedWidth = Width; _savedHeight = Height;
             }
 
-            // chrome 제거 (한 번의 reflow). 그 후 bounds animate.
-            WindowStyle = WindowStyle.None;
+            EnsureCustomWindowStyle();
             ResizeMode = ResizeMode.NoResize;
 
             var mb = GetCurrentMonitorBounds();
@@ -1106,14 +1104,14 @@ public partial class MainWindow : Window
         else
         {
             Mouse.OverrideCursor = null;
-            // 먼저 bounds를 saved로 animate, 끝난 후 WindowStyle 복원
+            // 먼저 bounds를 saved로 animate, 끝난 후 resize/maximize 상태만 복원
             var tx = _savedLeft;
             var ty = _savedTop;
             var tw = _savedWidth  > 0 ? _savedWidth  : 1280;
             var th = _savedHeight > 0 ? _savedHeight : 760;
             AnimateBounds(tx, ty, tw, th, durationMs: 140, onCompleted: () =>
             {
-                WindowStyle = _savedStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : _savedStyle;
+                EnsureCustomWindowStyle();
                 ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
                 if (_savedWasMaximized) WindowState = WindowState.Maximized;
             });
@@ -1121,6 +1119,12 @@ public partial class MainWindow : Window
         }
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
+    }
+
+    private void EnsureCustomWindowStyle()
+    {
+        if (WindowStyle != WindowStyle.None)
+            WindowStyle = WindowStyle.None;
     }
 
     /// <summary>
