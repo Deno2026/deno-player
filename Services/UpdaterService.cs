@@ -16,7 +16,7 @@ public static class UpdaterService
     /// Default channel. 사용자가 직접 release zip을 host하는 다른 URL로 바꾸려면
     /// 환경변수 DENO_PLAYER_UPDATE_URL 설정.
     /// </summary>
-    public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-player";
+    public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-video-player";
 
     /// <summary>
     /// 백그라운드 update check만 (download/install 안 함). 새 버전 발견하면 새 version

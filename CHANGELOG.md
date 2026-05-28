@@ -8,7 +8,7 @@ Dates are KST (UTC+9).
 - First public-ready release flow.
 - GitHub Releases now produces a recommended `DenoVideoPlayer-win-Setup.exe`.
 - Portable zip remains available for advanced users.
-- Default update channel now points to the public `Deno2026/deno-player` releases.
+- Default update channel now points to the public `Deno2026/deno-video-player` releases.
 
 ### Installation
 - First launch can prepare the mpv playback backend automatically, so Setup.exe

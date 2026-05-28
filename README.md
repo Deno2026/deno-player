@@ -11,7 +11,7 @@
 
 **처음 설치한다면 이것만 받으면 됩니다.**
 
-[Download DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+[Download DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
 
 1. `DenoVideoPlayer-win-Setup.exe` 다운로드
 2. 실행

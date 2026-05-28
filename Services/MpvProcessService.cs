@@ -16,7 +16,7 @@ public sealed class MpvProcessService : IDisposable
 
     public MpvProcessService()
     {
-        PipeName = $"deno-player-{Environment.ProcessId}-{Guid.NewGuid():N}".Substring(0, 40);
+        PipeName = $"deno-video-player-{Environment.ProcessId}-{Guid.NewGuid():N}".Substring(0, 40);
         MpvPath = ResolveMpvPath();
     }
 

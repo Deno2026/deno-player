@@ -49,5 +49,5 @@ vpk pack `
 Write-Host ""
 Write-Host ">>> Done. Output: $outDir\" -ForegroundColor Green
 Write-Host "  자동 update가 가능하려면 $outDir 안 파일들을 public GitHub Release에" -ForegroundColor Yellow
-Write-Host "  publish해야 합니다. 권장: github.com/Deno2026/deno-player/releases/new v$Version" -ForegroundColor Yellow
+Write-Host "  publish해야 합니다. 권장: github.com/Deno2026/deno-video-player/releases/new v$Version" -ForegroundColor Yellow
 Write-Host "  업로드할 파일: $outDir\DenoVideoPlayer-win-Setup.exe, *.nupkg, RELEASES" -ForegroundColor Yellow
