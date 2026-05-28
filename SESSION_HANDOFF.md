@@ -31,6 +31,15 @@ TopBar 하단 1px outline에만 적용했다. 전체 톤은 유지하고 상단 
 재생목록 hover 경계선이 전체 높이로 보이던 것을 좌측 최근파일 hint와 동일한 상반부
 그라디언트로 변경했다.
 
+**Codex follow-up (2026-05-28 KST):** public release 준비로 설치 흐름을
+`GitHub 방문 → DenoVideoPlayer-win-Setup.exe 다운로드 → 실행 → 바로 사용` 중심으로
+재정비했다. 앱 첫 실행에서 mpv backend를 자동 준비하도록
+`RuntimeDependencyService`를 추가했고, Velopack 진입점은 명시적 `Program.Main()`의
+첫 줄로 이동했다. 버전은 `0.4.0`, 기본 update channel은 public
+`Deno2026/deno-player` Releases로 변경. README는 Setup.exe 중심 초보자 흐름으로
+재작성했고 실제 앱 캡처 `docs/assets/preview.png`를 추가했다. Gemma4 copy review
+transcript는 ignored `out/review/20260528-161234-review-and-suggest-concise-public-facing-copy-st.md`.
+
 ## Repository
 
 - **Repo**: https://github.com/Deno2026/deno-player (**PRIVATE**)

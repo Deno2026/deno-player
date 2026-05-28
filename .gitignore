@@ -3,6 +3,7 @@ bin/
 obj/
 out/
 publish/
+Releases/
 *.user
 *.suo
 .vs/
@@ -34,3 +35,4 @@ runtime/ffmpeg/*
 *.local.json
 *.log
 publish-sc/
+gemma4-copy-review-logs/

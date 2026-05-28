@@ -170,11 +170,21 @@ public partial class MainWindow : Window
 
         if (!_mpvProc.MpvAvailable)
         {
-            _vm.State = PlayerState.Failed;
+            _vm.State = PlayerState.Loading;
             _vm.StatusMessage =
-                $"mpv.exe를 찾을 수 없습니다.\n경로: {_mpvProc.MpvPath}\n" +
-                "README의 'mpv 설치' 섹션을 참고하세요.";
-            return;
+                "첫 실행 준비 중입니다...\n" +
+                "미디어 재생 엔진(mpv)을 자동으로 받고 있어요. 잠시만 기다려 주세요.";
+
+            var prepared = await RuntimeDependencyService.EnsureMpvAsync();
+            if (!prepared.Success || !_mpvProc.MpvAvailable)
+            {
+                _vm.State = PlayerState.Failed;
+                _vm.StatusMessage =
+                    "미디어 재생 엔진을 준비하지 못했습니다.\n" +
+                    "인터넷 연결을 확인한 뒤 앱을 다시 실행하거나 START_HERE.bat를 실행해 주세요.\n\n" +
+                    prepared.Error;
+                return;
+            }
         }
 
         if (_videoHost.Hwnd == IntPtr.Zero)
@@ -188,6 +198,7 @@ public partial class MainWindow : Window
         {
             _mpvProc.Start(_videoHost.Hwnd);
             await _vm.ConnectIpcAsync();
+            _ = PrepareOptionalFfmpegAsync();
         }
         catch (Exception ex)
         {
@@ -201,6 +212,15 @@ public partial class MainWindow : Window
 
         // mouse hot zone polling 시작 (mpv IPC mouse-pos 우회 — 좌표계 신뢰 안 됨)
         StartHotZonePolling();
+    }
+
+    private static async Task PrepareOptionalFfmpegAsync()
+    {
+        if (TrimService.FindFfmpeg() is not null) return;
+
+        var prepared = await RuntimeDependencyService.EnsureFfmpegAsync();
+        if (!prepared.Success)
+            Services.AppLog.Warn("Optional ffmpeg prepare failed: " + prepared.Error);
     }
 
     private async Task RestartMpvAsync()

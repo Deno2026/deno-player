@@ -1,5 +1,5 @@
 # vpk으로 Velopack release package 생성. 사용자가 다음 launch 시 자동 검출 + opt-in 적용.
-# 사전 1회: dotnet tool install --global vpk
+# GitHub Actions는 tag push 시 이 흐름을 자동 수행한다.
 
 param(
     [string]$Version = "",
@@ -27,8 +27,9 @@ dotnet publish DenoVideoPlayer.csproj -c Release -r win-x64 --self-contained tru
     -p:PublishReadyToRun=true -p:DebugType=none -p:DebugSymbols=false `
     -o $pubDir
 
-# mpv binary 제외 (GPL 경계 — 첫 launch 시 fetch-mpv.ps1이 받음)
+# 외부 runtime binary 제외 — 첫 launch 시 앱이 필요한 backend를 준비함.
 Remove-Item -Force "$pubDir\runtime\mpv\mpv.exe" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$pubDir\runtime\ffmpeg" -ErrorAction SilentlyContinue
 
 Write-Host ">>> vpk pack" -ForegroundColor Cyan
 $outDir = "Releases"
@@ -40,10 +41,13 @@ vpk pack `
     --mainExe DenoVideoPlayer.exe `
     --packTitle "Deno Video Player" `
     --packAuthors "DENO" `
-    --outputDir $outDir
+    --icon icon.ico `
+    --outputDir $outDir `
+    --yes `
+    --skip-updates
 
 Write-Host ""
 Write-Host ">>> Done. Output: $outDir\" -ForegroundColor Green
-Write-Host "  자동 update가 가능하려면 $outDir 안 파일들을 release channel(별도 public repo)에" -ForegroundColor Yellow
-Write-Host "  publish해야 합니다. 권장: github.com/Deno2026/deno-player-releases/releases/new v$Version" -ForegroundColor Yellow
+Write-Host "  자동 update가 가능하려면 $outDir 안 파일들을 public GitHub Release에" -ForegroundColor Yellow
+Write-Host "  publish해야 합니다. 권장: github.com/Deno2026/deno-player/releases/new v$Version" -ForegroundColor Yellow
 Write-Host "  업로드할 파일: $outDir\DenoVideoPlayer-win-Setup.exe, *.nupkg, RELEASES" -ForegroundColor Yellow

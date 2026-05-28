@@ -8,29 +8,15 @@ namespace DenoVideoPlayer.Services;
 /// 별도 thread에서 update channel(GitHub release) 확인 + background download + 다음 launch 시
 /// 자동 적용. 사용자가 수동 install 안 해도 다음 실행 때 새 버전 가동.
 ///
-/// Update channel: 우선 환경변수 DENO_PLAYER_UPDATE_URL, 없으면 default GitHub repo.
+/// Update channel: 우선 환경변수 DENO_PLAYER_UPDATE_URL, 없으면 public GitHub repo.
 /// </summary>
 public static class UpdaterService
 {
     /// <summary>
-    /// Default channel — 별도 public repo에 release를 publish하는 패턴(코드 repo는 private 유지).
-    /// 사용자가 직접 release zip을 host하는 다른 URL로 바꾸려면 환경변수 DENO_PLAYER_UPDATE_URL 설정.
+    /// Default channel. 사용자가 직접 release zip을 host하는 다른 URL로 바꾸려면
+    /// 환경변수 DENO_PLAYER_UPDATE_URL 설정.
     /// </summary>
-    public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-player-releases";
-
-    /// <summary>Velopack 진입점. App.OnAppStartup 첫 줄에서 호출.</summary>
-    public static void RunVelopack(string[] args)
-    {
-        try
-        {
-            // Velopack 0.0.1298 signature: Run() takes no args (process args 자체 사용).
-            VelopackApp.Build().Run();
-        }
-        catch (Exception ex)
-        {
-            AppLog.Warn($"VelopackApp.Run failed: {ex.Message}");
-        }
-    }
+    public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-player";
 
     /// <summary>
     /// 백그라운드 update check만 (download/install 안 함). 새 버전 발견하면 새 version

@@ -9,8 +9,16 @@ Deno Video Player does **not** redistribute mpv binaries or link mpv code into i
 own executable. mpv runs as a separate process and Deno Video Player communicates
 with it through a JSON IPC named pipe.
 
-End users obtain mpv themselves (see `README.md` → "mpv 설치"). The bundled
-`runtime/mpv/mpv.exe` location is reserved for user-supplied builds.
+The app can prepare mpv on first launch by downloading a Windows build into
+`runtime/mpv/`. The bundled `runtime/mpv/mpv.exe` location is reserved for this
+user-side downloaded build.
+
+## FFmpeg
+
+The trim feature can use **FFmpeg** (https://ffmpeg.org/) as an external command
+line tool for stream-copy clipping. Deno Video Player does not redistribute
+FFmpeg binaries in the source repository. The app or `START_HERE.bat` can prepare
+FFmpeg on the user's machine by downloading it into `runtime/ffmpeg/`.
 
 ## Icons
 

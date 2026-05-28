@@ -12,9 +12,6 @@ public partial class App : Application
 
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
-        // Velopack 진입점 — 첫 줄 필수. update 적용 흐름 / restart 후 routing 처리.
-        UpdaterService.RunVelopack(e.Args ?? Array.Empty<string>());
-
         StartupArgs = e.Args ?? Array.Empty<string>();
         AppLog.Start("startup");
         if (StartupArgs.Length > 0) AppLog.Info($"args: {string.Join(" | ", StartupArgs)}");
