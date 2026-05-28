@@ -185,7 +185,7 @@
                 Grid.Row="0"
                 Height="36"
                 Background="{StaticResource BrushBgRaised}"
-                BorderBrush="{StaticResource BrushBorderSubtle}"
+                BorderBrush="{StaticResource BrushChromeOutline}"
                 BorderThickness="0,0,0,1"
                 MouseLeftButtonDown="OnTopBarMouseDown"
                 MouseMove="OnTopBarMouseMove"

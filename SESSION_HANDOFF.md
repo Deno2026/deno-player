@@ -23,6 +23,10 @@ Fullscreen bounds 애니메이션 완료 후 450ms 뒤 한 번은 hover를 무�
 숨겨 바로 영상만 보이는 상태로 정착시킨다. 이후 마우스 움직임/키 입력 시 기존처럼
 컨트롤이 다시 나타난다.
 
+**Codex follow-up (2026-05-28 KST):** 검은 배경 위에서 TopBar 위치가 묻히는
+문제를 줄이기 위해 상단바 전용 `BrushChromeOutline` 색상(`#FF3A4D36`)을 추가하고
+TopBar 하단 1px outline에만 적용했다. 전체 톤은 유지하고 상단 경계 시인성만 보강.
+
 ## Repository
 
 - **Repo**: https://github.com/Deno2026/deno-player (**PRIVATE**)

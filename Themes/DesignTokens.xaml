@@ -20,6 +20,7 @@
     <!-- ▣ Border -->
     <Color x:Key="ColorBorderSubtle">#FF1E281C</Color>
     <Color x:Key="ColorBorderStrong">#FF2A3826</Color>
+    <Color x:Key="ColorChromeOutline">#FF3A4D36</Color>
 
     <!-- ▣ Foreground (글자) -->
     <Color x:Key="ColorFgPrimary">#FFE6EDE3</Color>
@@ -46,6 +47,7 @@
 
     <SolidColorBrush x:Key="BrushBorderSubtle" Color="{StaticResource ColorBorderSubtle}"/>
     <SolidColorBrush x:Key="BrushBorderStrong" Color="{StaticResource ColorBorderStrong}"/>
+    <SolidColorBrush x:Key="BrushChromeOutline" Color="{StaticResource ColorChromeOutline}"/>
 
     <SolidColorBrush x:Key="BrushFgPrimary" Color="{StaticResource ColorFgPrimary}"/>
     <SolidColorBrush x:Key="BrushFgSecondary" Color="{StaticResource ColorFgSecondary}"/>
