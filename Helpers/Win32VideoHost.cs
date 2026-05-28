@@ -21,6 +21,7 @@ public sealed class Win32VideoHost : HwndHost
     private const int WM_SETFOCUS    = 0x0007;
     private const int WM_MOUSEACTIVATE = 0x0021;
     private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_LBUTTONDBLCLK = 0x0203;
     private const int WM_RBUTTONDOWN = 0x0204;
     private const int WM_MBUTTONDOWN = 0x0207;
     private const int WM_KEYDOWN     = 0x0100;
@@ -57,6 +58,7 @@ public sealed class Win32VideoHost : HwndHost
     private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     public IntPtr Hwnd { get; private set; }
+    public event Action? DoubleClicked;
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
@@ -83,6 +85,12 @@ public sealed class Win32VideoHost : HwndHost
         {
             handled = true;
             return new IntPtr(MA_NOACTIVATE);
+        }
+        if (msg == WM_LBUTTONDBLCLK)
+        {
+            handled = true;
+            DoubleClicked?.Invoke();
+            return IntPtr.Zero;
         }
         return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
     }

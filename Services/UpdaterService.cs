@@ -3,77 +3,140 @@ using Velopack.Sources;
 
 namespace DenoVideoPlayer.Services;
 
+public sealed record UpdateCheckResult(
+    bool Available,
+    string? NewVersion,
+    UpdateInfo? Info,
+    bool ReadyToApply,
+    bool Portable);
+
 /// <summary>
-/// Velopack 기반 자동 업데이트. App startup 시점에 VelopackApp.Build().Run() — 첫 줄 필수.
-/// 별도 thread에서 update channel(GitHub release) 확인 + background download + 다음 launch 시
-/// 자동 적용. 사용자가 수동 install 안 해도 다음 실행 때 새 버전 가동.
-///
-/// Update channel: 우선 환경변수 DENO_PLAYER_UPDATE_URL, 없으면 public GitHub repo.
+/// GitHub Releases + Velopack 기반 업데이트.
+/// 설치판은 백그라운드에서 새 버전을 내려받아 준비하고, 사용자가 버튼을 누르면 재시작 적용한다.
+/// Portable/dev 실행은 자동 적용이 불가능하므로 최신 릴리스 페이지를 연다.
 /// </summary>
 public static class UpdaterService
 {
-    /// <summary>
-    /// Default channel. 사용자가 직접 release zip을 host하는 다른 URL로 바꾸려면
-    /// 환경변수 DENO_PLAYER_UPDATE_URL 설정.
-    /// </summary>
     public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-video-player";
 
-    /// <summary>
-    /// 백그라운드 update check만 (download/install 안 함). 새 버전 발견하면 새 version
-    /// string 반환 — UI가 버튼 활성화. download/install은 사용자 click 후 ApplyAsync.
-    /// 강제 강제 안 함 = opt-in pull 패턴.
-    /// </summary>
     public static async Task<(bool available, string? newVersion, UpdateInfo? info)> CheckAsync()
+    {
+        var result = await CheckAndPrepareAsync(autoDownload: false).ConfigureAwait(false);
+        return (result.Available, result.NewVersion, result.Info);
+    }
+
+    public static async Task<UpdateCheckResult> CheckAndPrepareAsync(
+        CancellationToken ct = default,
+        bool autoDownload = true)
     {
         try
         {
-            var url = Environment.GetEnvironmentVariable("DENO_PLAYER_UPDATE_URL")
-                      ?? DefaultChannelUrl;
+            var (url, mgr) = CreateManager();
+            if (!mgr.IsInstalled)
+            {
+                AppLog.Info("Updater: portable/dev mode - automatic update check skipped");
+                return new UpdateCheckResult(false, null, null, false, true);
+            }
+
+            var pending = mgr.UpdatePendingRestart;
+            if (pending is not null)
+            {
+                AppLog.Info($"Updater: prepared update {pending.Version} pending restart");
+                return new UpdateCheckResult(true, pending.Version.ToString(), null, true, false);
+            }
+
             AppLog.Info($"Updater: checking {url}");
-            var source = new GithubSource(url, null, prerelease: false);
-            var mgr = new UpdateManager(source);
             var info = await mgr.CheckForUpdatesAsync().ConfigureAwait(false);
-            if (info is null) { AppLog.Info("Updater: no updates"); return (false, null, null); }
+            if (ct.IsCancellationRequested) throw new OperationCanceledException(ct);
+            if (info is null)
+            {
+                AppLog.Info("Updater: no updates");
+                return new UpdateCheckResult(false, null, null, false, false);
+            }
+
             var ver = info.TargetFullRelease.Version.ToString();
-            AppLog.Info($"Updater: new version {ver} available (opt-in)");
-            return (true, ver, info);
+            if (!autoDownload)
+            {
+                AppLog.Info($"Updater: new version {ver} available");
+                return new UpdateCheckResult(true, ver, info, false, false);
+            }
+
+            try
+            {
+                AppLog.Info($"Updater: background download {ver}...");
+                var lastProgress = -1;
+                await mgr.DownloadUpdatesAsync(info, progress =>
+                {
+                    if (progress / 10 == lastProgress / 10) return;
+                    lastProgress = progress;
+                    AppLog.Info($"Updater: download {progress}%");
+                }, ct).ConfigureAwait(false);
+
+                pending = mgr.UpdatePendingRestart ?? info.TargetFullRelease;
+                AppLog.Info($"Updater: update {pending.Version} ready to apply");
+                return new UpdateCheckResult(true, pending.Version.ToString(), info, true, false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Updater: background download failed: {ex.Message}");
+                return new UpdateCheckResult(true, ver, info, false, false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            AppLog.Info("Updater: cancelled");
+            return new UpdateCheckResult(false, null, null, false, false);
         }
         catch (Exception ex)
         {
             AppLog.Warn($"Updater: check failed: {ex.Message}");
-            return (false, null, null);
+            return new UpdateCheckResult(false, null, null, false, false);
         }
     }
 
-    /// <summary>
-    /// 사용자가 UI 버튼 click 시 호출 — download + apply + 재시작.
-    /// Velopack install된 경우 자동 install + restart. portable 실행이면 browser로 release page 열기.
-    /// </summary>
-    public static async Task<bool> ApplyAsync(UpdateInfo info)
+    public static async Task<bool> ApplyAsync(UpdateInfo? info)
     {
         try
         {
-            var url = Environment.GetEnvironmentVariable("DENO_PLAYER_UPDATE_URL")
-                      ?? DefaultChannelUrl;
-            var source = new GithubSource(url, null, prerelease: false);
-            var mgr = new UpdateManager(source);
-
+            var (url, mgr) = CreateManager();
             if (!mgr.IsInstalled)
             {
-                // portable / dev build — 자동 install 못함. release page 열기 (사용자가 수동 다운).
-                AppLog.Info("Updater: portable mode — opening release page in browser");
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = $"{url}/releases/latest",
-                    UseShellExecute = true
-                });
+                OpenLatestRelease(url);
                 return true;
             }
 
+            var pending = mgr.UpdatePendingRestart;
+            if (pending is not null)
+            {
+                AppLog.Info($"Updater: applying prepared update {pending.Version} + restarting");
+                mgr.ApplyUpdatesAndRestart(pending);
+                return true;
+            }
+
+            info ??= await mgr.CheckForUpdatesAsync().ConfigureAwait(false);
+            if (info is null)
+            {
+                AppLog.Info("Updater: no update to apply");
+                return false;
+            }
+
             AppLog.Info($"Updater: downloading {info.TargetFullRelease.Version}...");
-            await mgr.DownloadUpdatesAsync(info).ConfigureAwait(false);
-            AppLog.Info("Updater: applying + restarting");
-            mgr.ApplyUpdatesAndRestart(info);
+            var lastProgress = -1;
+            await mgr.DownloadUpdatesAsync(info, progress =>
+            {
+                if (progress / 10 == lastProgress / 10) return;
+                lastProgress = progress;
+                AppLog.Info($"Updater: manual download {progress}%");
+            }, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            pending = mgr.UpdatePendingRestart ?? info.TargetFullRelease;
+            AppLog.Info($"Updater: applying {pending.Version} + restarting");
+            mgr.ApplyUpdatesAndRestart(pending);
             return true;
         }
         catch (Exception ex)
@@ -81,5 +144,23 @@ public static class UpdaterService
             AppLog.Error("Updater.ApplyAsync", ex);
             return false;
         }
+    }
+
+    private static (string Url, UpdateManager Manager) CreateManager()
+    {
+        var url = Environment.GetEnvironmentVariable("DENO_PLAYER_UPDATE_URL")
+                  ?? DefaultChannelUrl;
+        var source = new GithubSource(url, null, prerelease: false);
+        return (url, new UpdateManager(source));
+    }
+
+    private static void OpenLatestRelease(string url)
+    {
+        AppLog.Info("Updater: portable mode - opening release page in browser");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = $"{url}/releases/latest",
+            UseShellExecute = true
+        });
     }
 }

@@ -4,6 +4,19 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+### Player UX
+- Made fullscreen double-click toggling consistent across WPF chrome, blank
+  controls space, and the native mpv video host.
+- Blank bottom-bar/top-bar areas now follow the same double-click fullscreen rule,
+  while actual controls such as buttons, sliders, lists, and text inputs are
+  protected from accidental toggles.
+
+### Updates
+- Installed builds now check GitHub Releases periodically and prepare Velopack
+  updates in the background.
+- When an update is ready, the update button applies it by restarting the app;
+  portable/dev runs skip automatic checks.
+
 ### Settings
 - Added a display language setting with Korean and English options.
 - Main screen, settings dialog, side panels, tooltips, dialogs, and common toast

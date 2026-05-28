@@ -92,11 +92,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (p is string s && double.TryParse(s, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var v)) SetSpeedForce(v);
         });
-        ApplyUpdateCommand = new RelayCommand(_ =>
-        {
-            if (_pendingUpdate is not null)
-                _ = Services.UpdaterService.ApplyAsync(_pendingUpdate);
-        }, _ => IsUpdateAvailable);
+        ApplyUpdateCommand = new RelayCommand(_ => _ = ApplyPendingUpdateAsync(),
+            _ => IsUpdateAvailable && !_applyingUpdate);
 
         // 자막 / 오디오 트랙 — mpv 측 사이클. UI에 트랙 list까지 띄우면 무거워지므로 키만.
         // 미디어 없을 때 toast가 misleading하지 않게 가드. 자막은 비디오 전용, 오디오 사이클은 오디오/비디오 둘 다.
@@ -398,6 +395,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     // 자동 update 후보. UpdaterService.CheckAsync가 새 버전 발견 시 채워줌.
     // UI: TopBar에 update button visible 여부 binding.
     private Velopack.UpdateInfo? _pendingUpdate;
+    private bool _updateReadyToApply;
+    private bool _updatePortable;
+    private bool _applyingUpdate;
     private bool _isUpdateAvailable;
     public bool IsUpdateAvailable
     {
@@ -411,17 +411,46 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (Set(ref _updateNewVersion, value)) Raise(nameof(UpdateTooltip)); }
     }
     public string UpdateTooltip => _isUpdateAvailable && _updateNewVersion is not null
-        ? LF("UpdateAvailable", _updateNewVersion)
+        ? (_updatePortable
+            ? LF("UpdatePortableAvailable", _updateNewVersion)
+            : _updateReadyToApply
+                ? LF("UpdateReady", _updateNewVersion)
+                : LF("UpdateAvailable", _updateNewVersion))
         : L("UpdateChecking");
-    /// <summary>UpdaterService.CheckAsync 결과를 받아서 state 갱신 + UI에 button 표시 trigger.</summary>
-    public void SetPendingUpdate(string newVersion, Velopack.UpdateInfo info)
+    /// <summary>UpdaterService 결과를 받아서 state 갱신 + UI에 button 표시 trigger.</summary>
+    public void SetPendingUpdate(
+        string newVersion,
+        Velopack.UpdateInfo? info,
+        bool readyToApply = false,
+        bool portable = false)
     {
         OnUi(() =>
         {
             _pendingUpdate = info;
+            _updateReadyToApply = readyToApply;
+            _updatePortable = portable;
             UpdateNewVersion = newVersion;
+            Raise(nameof(UpdateTooltip));
             IsUpdateAvailable = true;
         });
+    }
+
+    private async Task ApplyPendingUpdateAsync()
+    {
+        if (_applyingUpdate) return;
+        _applyingUpdate = true;
+        ApplyUpdateCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var ok = await Services.UpdaterService.ApplyAsync(_pendingUpdate).ConfigureAwait(false);
+            if (!ok)
+                OnUi(() => Toast?.Invoke(L("UpdateApplyFailed")));
+        }
+        finally
+        {
+            _applyingUpdate = false;
+            ApplyUpdateCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private bool _isAlwaysOnTop;

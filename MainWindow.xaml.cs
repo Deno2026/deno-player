@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -33,6 +34,12 @@ public partial class MainWindow : Window
     private ToastWindow?    _toastWin;
     private const int HotZoneWidth = 180;           // 우측 hover trigger (이전 280 → 2/3 수준)
     private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
+    private const int VkLButton = 0x01;
+    private const int FullscreenToggleDebounceMs = 320;
+    private bool _pollLeftButtonWasDown;
+    private DateTime _lastPollLeftDownUtc = DateTime.MinValue;
+    private DateTime _lastDoubleClickToggleUtc = DateTime.MinValue;
+    private Point _lastPollLeftDownPos;
 
 
     public MainWindow()
@@ -41,6 +48,8 @@ public partial class MainWindow : Window
         EnsureCustomWindowStyle();
         _vm = new MainViewModel(_mpvProc);
         DataContext = _vm;
+        _videoHost.DoubleClicked += () =>
+            Dispatcher.BeginInvoke(() => ToggleFullscreenFromDoubleClick("video-host"));
 
         var s = _vm.Settings;
         if (s.WindowWidth >= 480 && s.WindowHeight >= 320)
@@ -168,6 +177,7 @@ public partial class MainWindow : Window
     private async void OnSourceInit(object? sender, EventArgs e)
     {
         VideoHostSlot.UpdateLayout();
+        StartHotZonePolling();
 
         if (!_mpvProc.MpvAvailable)
         {
@@ -207,8 +217,7 @@ public partial class MainWindow : Window
         // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
         OpenInitialPathIfAny();
 
-        // mouse hot zone polling 시작 (mpv IPC mouse-pos 우회 — 좌표계 신뢰 안 됨)
-        StartHotZonePolling();
+        // mouse hot zone polling은 첫 실행 준비 화면에서도 동작하도록 SourceInitialized에서 시작.
     }
 
     private static async Task PrepareOptionalFfmpegAsync(CancellationToken ct)
@@ -310,8 +319,8 @@ public partial class MainWindow : Window
     // ============================================================
     // TopBar 빈 영역 드래그 + 더블클릭 max/restore
     // ============================================================
-    // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 토글 안 함 — 그건
-    // OnRootDoubleClick이 단독 처리 (위치 무관 fullscreen 토글).
+    // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 공통 fullscreen
+    // 토글 경로로 넘긴다.
     // deferred-drag 패턴: MouseDown에서 arm만, MouseMove threshold 넘으면 DragMove.
     // 빠른 더블클릭은 mouse 안 움직여서 DragMove modal loop 발생 X → 두 번째 click 정상 fire.
     private bool _topBarDragArmed;
@@ -581,11 +590,19 @@ public partial class MainWindow : Window
     // GetCursorPos polling — mpv IPC mouse-pos는 좌표계 신뢰 어려움(host hwnd 안
     // native pixel/logical/video pixel 어떤지 환경마다 다름) + WPF MouseMove는 HwndHost
     // 위에서 fire 안 됨. Win32 GetCursorPos로 직접 screen coord 받아 main window
-    // 안 logical 좌표 변환 + hot zone 검사. 80ms tick은 60Hz 영상에 충분.
+    // 안 logical 좌표 변환 + hot zone/더블클릭 검사. 클릭 edge를 놓치지 않도록 짧게 돈다.
     // ============================================================
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
     private static extern bool GetCursorPos(out PinvokePoint lpPoint);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDoubleClickTime();
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+    private const int SmCxDoubleClick = 36;
+    private const int SmCyDoubleClick = 37;
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     private struct PinvokePoint { public int X; public int Y; }
 
@@ -595,7 +612,7 @@ public partial class MainWindow : Window
     private void StartHotZonePolling()
     {
         if (_hotZonePoll is not null) return;
-        _hotZonePoll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _hotZonePoll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
         _hotZonePoll.Tick += OnHotZonePollTick;
         _hotZonePoll.Start();
     }
@@ -643,6 +660,8 @@ public partial class MainWindow : Window
             : ActualHeight;
         if (w <= 0 || h <= 0) return;
 
+        PollFullscreenDoubleClick(relX, relY, w, h);
+
         // Mouse 움직임 감지 → ShowControls (이전엔 mpv MouseActivity event가 담당).
         // 풀스크린 모드에서 마우스 움직일 때 OSD 다시 보이게 하는 게 핵심.
         if (Math.Abs(ptLogical.X - _lastPollMouse.X) > 0.5 ||
@@ -657,6 +676,52 @@ public partial class MainWindow : Window
         }
 
         UpdateHotZones(relX, relY, w, h);
+    }
+
+    private void PollFullscreenDoubleClick(double relX, double relY, double w, double h)
+    {
+        var leftDown = (GetAsyncKeyState(VkLButton) & unchecked((short)0x8000)) != 0;
+        if (!leftDown)
+        {
+            _pollLeftButtonWasDown = false;
+            return;
+        }
+        if (_pollLeftButtonWasDown) return;
+        _pollLeftButtonWasDown = true;
+
+        if (relX < 0 || relX >= w || relY < 0 || relY >= h) return;
+        if (IsInteractiveDoubleClickTarget(Root.InputHitTest(new Point(relX, relY)) as DependencyObject))
+            return;
+
+        var now = DateTime.UtcNow;
+        var current = new Point(relX, relY);
+        var maxMs = Math.Max((int)GetDoubleClickTime(), 200);
+        var metricDip = GetDoubleClickMetricDip();
+        var maxX = Math.Max(metricDip.X, 8.0);
+        var maxY = Math.Max(metricDip.Y, 8.0);
+        var isDoubleClick =
+            (now - _lastPollLeftDownUtc).TotalMilliseconds <= maxMs &&
+            Math.Abs(current.X - _lastPollLeftDownPos.X) <= maxX &&
+            Math.Abs(current.Y - _lastPollLeftDownPos.Y) <= maxY;
+
+        if (isDoubleClick)
+        {
+            _lastPollLeftDownUtc = DateTime.MinValue;
+            ToggleFullscreenFromDoubleClick("cursor-poll");
+            return;
+        }
+
+        _lastPollLeftDownUtc = now;
+        _lastPollLeftDownPos = current;
+    }
+
+    private Point GetDoubleClickMetricDip()
+    {
+        var px = new Point(GetSystemMetrics(SmCxDoubleClick), GetSystemMetrics(SmCyDoubleClick));
+        var src = System.Windows.PresentationSource.FromVisual(this);
+        return src?.CompositionTarget is null
+            ? px
+            : src.CompositionTarget.TransformFromDevice.Transform(px);
     }
 
     private void UpdateHotZones(double x, double y, double w, double h)
@@ -899,24 +964,34 @@ public partial class MainWindow : Window
 
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        // 단순 규칙: 어디서 더블클릭하든 Fullscreen 토글. 컨트롤 요소(슬라이더/버튼/
-        // 리스트박스/BottomBar)만 제외. 사용자가 짚어준 정확한 의도 — 위치 무관, 현재
-        // 상태(전체/아님) 기준으로만.
-        if (e.OriginalSource is DependencyObject d)
-        {
-            if (FindAncestor<Slider>(d) is not null) return;
-            if (FindAncestor<Button>(d) is not null) return;
-            if (FindAncestor<ListBox>(d) is not null) return;
-            var p = d;
-            while (p is not null)
-            {
-                if (p == BottomBar) return;
-                p = VisualTreeHelper.GetParent(p);
-            }
-        }
-        Services.AppLog.Info($"DblClick → Fullscreen toggle (fs={_vm.IsFullscreen})");
-        _vm.FullscreenCommand.Execute(null);
+        if (e.ChangedButton != MouseButton.Left) return;
+        if (IsInteractiveDoubleClickTarget(e.OriginalSource as DependencyObject)) return;
+        ToggleFullscreenFromDoubleClick("wpf");
         e.Handled = true;
+    }
+
+    private bool ToggleFullscreenFromDoubleClick(string source)
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastDoubleClickToggleUtc).TotalMilliseconds < FullscreenToggleDebounceMs)
+            return false;
+
+        _lastDoubleClickToggleUtc = now;
+        Services.AppLog.Info($"DblClick[{source}] → Fullscreen toggle (fs={_vm.IsFullscreen})");
+        if (_vm.FullscreenCommand.CanExecute(null))
+            _vm.FullscreenCommand.Execute(null);
+        return true;
+    }
+
+    private static bool IsInteractiveDoubleClickTarget(DependencyObject? d)
+    {
+        while (d is not null)
+        {
+            if (d is ButtonBase or Slider or Selector or TextBoxBase or ScrollBar or Thumb)
+                return true;
+            d = VisualTreeHelper.GetParent(d);
+        }
+        return false;
     }
 
     private static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject

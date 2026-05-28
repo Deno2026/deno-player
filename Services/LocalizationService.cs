@@ -115,6 +115,9 @@ public static class LocalizationService
         ["Image"] = "이미지",
 
         ["UpdateAvailable"] = "새 버전 {0} — 클릭해서 업데이트",
+        ["UpdateReady"] = "새 버전 {0} 준비됨 — 클릭해서 재시작",
+        ["UpdatePortableAvailable"] = "새 버전 {0} — 클릭해서 다운로드 페이지 열기",
+        ["UpdateApplyFailed"] = "업데이트 적용에 실패했습니다",
         ["UpdateChecking"] = "업데이트 확인 중",
         ["RepeatTooltipNone"] = "반복 끔 (클릭: 전체 반복)",
         ["RepeatTooltipAll"] = "전체 반복 (클릭: 한 곡 반복)",
@@ -245,6 +248,9 @@ public static class LocalizationService
         ["Image"] = "Image",
 
         ["UpdateAvailable"] = "New version {0} — click to update",
+        ["UpdateReady"] = "New version {0} is ready — click to restart",
+        ["UpdatePortableAvailable"] = "New version {0} — click to open downloads",
+        ["UpdateApplyFailed"] = "Could not apply the update",
         ["UpdateChecking"] = "Checking for updates",
         ["RepeatTooltipNone"] = "Repeat off (click: repeat all)",
         ["RepeatTooltipAll"] = "Repeat all (click: repeat one)",

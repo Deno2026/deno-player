@@ -9,6 +9,7 @@ public partial class App : Application
     public static string[] StartupArgs { get; private set; } = Array.Empty<string>();
     private SingleInstance? _single;
     private MainWindow? _win;     // cross-thread 안전한 직접 캐시 — Application.MainWindow는 UI affinity 가질 수 있음
+    private CancellationTokenSource? _updateCts;
 
     private void OnAppStartup(object sender, StartupEventArgs e)
     {
@@ -48,14 +49,8 @@ public partial class App : Application
         MainWindow = _win;
         _win.Show();
 
-        // 백그라운드 update check (강제 X, opt-in). 새 버전 발견하면 ViewModel.IsUpdateAvailable=true
-        // → TopBar update button 활성. 사용자가 click 시 download + 적용 + 재시작.
-        _ = Task.Run(async () =>
-        {
-            var (available, ver, info) = await UpdaterService.CheckAsync();
-            if (available && ver is not null && info is not null && _win?.DataContext is ViewModels.MainViewModel vm)
-                vm.SetPendingUpdate(ver, info);
-        });
+        _updateCts = new CancellationTokenSource();
+        StartUpdateLoop(_win.DataContext as ViewModels.MainViewModel, _updateCts.Token);
 
         _single.ArgsReceived += args =>
         {
@@ -75,7 +70,45 @@ public partial class App : Application
     private void OnAppExit(object sender, ExitEventArgs e)
     {
         AppLog.Info("--- session end");
+        try { _updateCts?.Cancel(); } catch { }
+        _updateCts?.Dispose();
+        _updateCts = null;
         _single?.Dispose();
         _single = null;
+    }
+
+    private static void StartUpdateLoop(ViewModels.MainViewModel? vm, CancellationToken ct)
+    {
+        if (vm is null) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
+                while (!ct.IsCancellationRequested)
+                {
+                    var result = await UpdaterService.CheckAndPrepareAsync(ct).ConfigureAwait(false);
+                    if (result.Available && result.NewVersion is not null)
+                    {
+                        vm.SetPendingUpdate(
+                            result.NewVersion,
+                            result.Info,
+                            result.ReadyToApply,
+                            result.Portable);
+                    }
+
+                    await Task.Delay(TimeSpan.FromHours(6), ct).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // normal shutdown
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Updater loop stopped: {ex.Message}");
+            }
+        }, ct);
     }
 }
