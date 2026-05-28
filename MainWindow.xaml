@@ -456,34 +456,111 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Loading: 영상 위 살짝 덮음. mpv가 빠르게 첫 frame 그리므로 짧게 -->
+                <!-- Loading / first-run runtime preparation -->
                 <Grid Visibility="{Binding State, Converter={StaticResource ShowOnLoading}}"
-                      Background="#AA0B0E0C"
+                      Background="{StaticResource BrushBgBase}"
                       IsHitTestVisible="False">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Border Width="40" Height="2" Background="{StaticResource BrushBorderStrong}" Margin="0,0,0,10">
-                            <Border Width="14" Height="2"
-                                    Background="{StaticResource BrushAccent}"
-                                    HorizontalAlignment="Left">
-                                <Border.RenderTransform>
-                                    <TranslateTransform x:Name="LoadingTx"/>
-                                </Border.RenderTransform>
-                                <Border.Triggers>
-                                    <EventTrigger RoutedEvent="Loaded">
-                                        <BeginStoryboard>
-                                            <Storyboard RepeatBehavior="Forever">
-                                                <DoubleAnimation Storyboard.TargetName="LoadingTx"
-                                                                 Storyboard.TargetProperty="X"
-                                                                 From="0" To="26" Duration="0:0:0.8"
-                                                                 AutoReverse="True"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </EventTrigger>
-                                </Border.Triggers>
+                    <Border HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MaxWidth="560"
+                            Padding="38,30"
+                            Background="{StaticResource BrushBgRaised}"
+                            BorderBrush="{StaticResource BrushBorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusLg}"
+                            Effect="{StaticResource ShadowControlBar}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Grid Width="86" Height="86" Margin="0,0,0,18">
+                                <Ellipse Width="72" Height="72"
+                                         Stroke="{StaticResource BrushBorderStrong}"
+                                         StrokeThickness="1"
+                                         Opacity="0.7"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                                <Ellipse Width="18" Height="18"
+                                         Fill="{StaticResource BrushAccent}"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         RenderTransformOrigin="0.5,0.5">
+                                    <Ellipse.RenderTransform>
+                                        <ScaleTransform x:Name="LoadingDotScale" ScaleX="1" ScaleY="1"/>
+                                    </Ellipse.RenderTransform>
+                                    <Ellipse.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                    <DoubleAnimation Storyboard.TargetName="LoadingDotScale"
+                                                                     Storyboard.TargetProperty="ScaleX"
+                                                                     From="0.82" To="1.18"
+                                                                     Duration="0:0:0.72"/>
+                                                    <DoubleAnimation Storyboard.TargetName="LoadingDotScale"
+                                                                     Storyboard.TargetProperty="ScaleY"
+                                                                     From="0.82" To="1.18"
+                                                                     Duration="0:0:0.72"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Ellipse.Triggers>
+                                </Ellipse>
+                            </Grid>
+
+                            <TextBlock Text="{Binding LoadingTitle}"
+                                       Style="{StaticResource TextBody}"
+                                       FontSize="{StaticResource FontSizeLg}"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            <TextBlock Text="{Binding StatusMessage}"
+                                       Style="{StaticResource TextMuted}"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       MaxWidth="440"
+                                       Margin="0,0,0,22"/>
+
+                            <Border Width="320"
+                                    Height="4"
+                                    Background="{StaticResource BrushBorderSubtle}"
+                                    CornerRadius="2"
+                                    ClipToBounds="True"
+                                    Margin="0,0,0,18">
+                                <Border Width="110"
+                                        Height="4"
+                                        Background="{StaticResource BrushAccent}"
+                                        CornerRadius="2"
+                                        HorizontalAlignment="Left">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="LoadingTx" X="-110"/>
+                                    </Border.RenderTransform>
+                                    <Border.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard RepeatBehavior="Forever">
+                                                    <DoubleAnimation Storyboard.TargetName="LoadingTx"
+                                                                     Storyboard.TargetProperty="X"
+                                                                     From="-110" To="320"
+                                                                     Duration="0:0:1.35">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <SineEase EasingMode="EaseInOut"/>
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Border.Triggers>
+                                </Border>
                             </Border>
+
+                            <TextBlock Text="{Binding LoadingHint}"
+                                       Style="{StaticResource TextMono}"
+                                       Foreground="{StaticResource BrushFgMuted}"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       MaxWidth="460"/>
+                        </StackPanel>
                         </Border>
-                        <TextBlock Text="{DynamicResource Loading}" Style="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
-                    </StackPanel>
                 </Grid>
             </Grid>
 
@@ -500,7 +577,8 @@
                 x:Name="BottomBar"
                 Background="{StaticResource BrushBgRaised}"
                 BorderBrush="{StaticResource BrushBorderSubtle}"
-                BorderThickness="0,1,0,0">
+                BorderThickness="0,1,0,0"
+                Visibility="{Binding IsBottomBarVisible, Converter={StaticResource BoolVis}}">
             <Grid Margin="14,6,14,8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>  <!-- 0: SeekBar -->

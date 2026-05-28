@@ -13,15 +13,19 @@ public static class RuntimeDependencyService
     public sealed record EnsureResult(bool Success, string? Error = null);
 
     public static Task<EnsureResult> EnsureMpvAsync(CancellationToken ct = default)
+        => EnsureMpvAsync(null, ct);
+
+    public static Task<EnsureResult> EnsureMpvAsync(Action<string>? outputLine, CancellationToken ct = default)
         => RunFetcherAsync("mpv", Path.Combine(AppContext.BaseDirectory, "tools", "fetch-mpv.ps1"),
-            TimeSpan.FromMinutes(8), ct);
+            TimeSpan.FromMinutes(8), ct, outputLine);
 
     public static Task<EnsureResult> EnsureFfmpegAsync(CancellationToken ct = default)
         => RunFetcherAsync("ffmpeg", Path.Combine(AppContext.BaseDirectory, "tools", "fetch-ffmpeg.ps1"),
             TimeSpan.FromMinutes(8), ct);
 
     private static async Task<EnsureResult> RunFetcherAsync(
-        string name, string scriptPath, TimeSpan timeout, CancellationToken ct)
+        string name, string scriptPath, TimeSpan timeout, CancellationToken ct,
+        Action<string>? outputLine = null)
     {
         if (!File.Exists(scriptPath))
             return new EnsureResult(false, $"필요한 준비 스크립트를 찾을 수 없습니다: {scriptPath}");
@@ -49,8 +53,18 @@ public static class RuntimeDependencyService
         using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var output = new StringBuilder();
         var error = new StringBuilder();
-        proc.OutputDataReceived += (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); };
-        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) error.AppendLine(e.Data); };
+        proc.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null) return;
+            output.AppendLine(e.Data);
+            outputLine?.Invoke(e.Data);
+        };
+        proc.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null) return;
+            error.AppendLine(e.Data);
+            outputLine?.Invoke(e.Data);
+        };
 
         try
         {

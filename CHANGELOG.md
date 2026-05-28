@@ -5,6 +5,11 @@ Dates are KST (UTC+9).
 ## Unreleased
 
 ### Player UX
+- First launch now shows a dedicated playback-engine preparation screen instead
+  of exposing a blank native video surface while mpv is being downloaded.
+- The first-run preparation screen surfaces the current stage, hides transport
+  controls until the player is ready, and returns to the normal empty state when
+  no startup file was provided.
 - Made fullscreen double-click toggling consistent across WPF chrome, blank
   controls space, and the native mpv video host.
 - Blank bottom-bar/top-bar areas now follow the same double-click fullscreen rule,

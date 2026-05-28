@@ -249,6 +249,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (!Set(ref _state, value)) return;
             Raise(nameof(IsAudioPlayback));
             Raise(nameof(IsVideoSurfaceVisible));
+            Raise(nameof(IsFirstRunPreparing));
+            Raise(nameof(IsBottomBarVisible));
+            Raise(nameof(LoadingTitle));
+            Raise(nameof(LoadingHint));
         }
     }
 
@@ -273,6 +277,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(HasPrev));
             Raise(nameof(IsAudioPlayback));
             Raise(nameof(IsVideoSurfaceVisible));
+            Raise(nameof(IsFirstRunPreparing));
+            Raise(nameof(IsBottomBarVisible));
+            Raise(nameof(LoadingTitle));
+            Raise(nameof(LoadingHint));
         }
     }
 
@@ -285,6 +293,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsVideoSurfaceVisible =>
         CurrentMedia?.Kind is MediaKind.Video or MediaKind.Image &&
         State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
+    public bool IsFirstRunPreparing => State == PlayerState.Loading && CurrentMedia is null;
+    public bool IsBottomBarVisible => !IsFirstRunPreparing;
+    public string LoadingTitle =>
+        IsFirstRunPreparing
+            ? L("FirstRunPreparingTitle")
+            : L("Loading");
+    public string LoadingHint =>
+        IsFirstRunPreparing
+            ? L("FirstRunPreparingHint")
+            : "";
     public bool HasMedia => CurrentMedia is not null;
     // ⏭/⏮은 자동 진행과 같은 same-kind 규칙을 따른다. 영상 + png + 영상2 폴더에서 영상 보다가
     // ⏭ 누르면 png가 아니라 영상2로. RepeatAll이면 마지막 곡에서도 처음으로 wrap (자동 EOF와 일치).
@@ -1312,6 +1330,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(UpdateTooltip));
             Raise(nameof(RepeatTooltip));
             Raise(nameof(ShuffleTooltip));
+            Raise(nameof(LoadingTitle));
+            Raise(nameof(LoadingHint));
         });
     }
 

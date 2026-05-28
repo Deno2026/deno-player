@@ -182,9 +182,11 @@ public partial class MainWindow : Window
         if (!_mpvProc.MpvAvailable)
         {
             _vm.State = PlayerState.Loading;
-            _vm.StatusMessage = LocalizationService.T("FirstRunPreparing");
+            _vm.StatusMessage = LocalizationService.T("FirstRunStageChecking");
 
-            var prepared = await RuntimeDependencyService.EnsureMpvAsync(_runtimePrepareCts.Token);
+            var prepared = await RuntimeDependencyService.EnsureMpvAsync(
+                UpdateFirstRunPrepareStatus,
+                _runtimePrepareCts.Token);
             if (_closing) return;
             if (!prepared.Success || !_mpvProc.MpvAvailable)
             {
@@ -203,6 +205,8 @@ public partial class MainWindow : Window
 
         try
         {
+            if (_vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
+                _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
             _mpvProc.Start(_videoHost.Hwnd);
             await _vm.ConnectIpcAsync();
             _ = PrepareOptionalFfmpegAsync(_runtimePrepareCts.Token);
@@ -215,9 +219,41 @@ public partial class MainWindow : Window
         }
 
         // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
-        OpenInitialPathIfAny();
+        var openedInitialPath = OpenInitialPathIfAny();
+        if (!openedInitialPath && _vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
+        {
+            _vm.StatusMessage = "";
+            _vm.State = PlayerState.NoFile;
+        }
 
         // mouse hot zone polling은 첫 실행 준비 화면에서도 동작하도록 SourceInitialized에서 시작.
+    }
+
+    private void UpdateFirstRunPrepareStatus(string line)
+    {
+        var status = FirstRunStatusFromFetcherLine(line);
+        if (string.IsNullOrWhiteSpace(status)) return;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_closing) return;
+            if (_vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
+                _vm.StatusMessage = status;
+        });
+    }
+
+    private static string? FirstRunStatusFromFetcherLine(string line)
+    {
+        var lower = line.ToLowerInvariant();
+        if (lower.Contains("resolving latest"))
+            return LocalizationService.T("FirstRunStageChecking");
+        if (lower.Contains("downloading"))
+            return LocalizationService.T("FirstRunStageDownloading");
+        if (lower.Contains("extracting"))
+            return LocalizationService.T("FirstRunStageInstalling");
+        if (lower.Contains("already at") || lower.Contains("done"))
+            return LocalizationService.T("FirstRunStageReady");
+        return null;
     }
 
     private static async Task PrepareOptionalFfmpegAsync(CancellationToken ct)
@@ -250,13 +286,18 @@ public partial class MainWindow : Window
     }
 
     /// <summary>App.StartupArgs / SecondInstanceArgs 첫 인자가 파일이면 열기.</summary>
-    private void OpenInitialPathIfAny()
+    private bool OpenInitialPathIfAny()
     {
         if (App.StartupArgs.Length > 0)
         {
             var first = App.StartupArgs[0];
-            if (File.Exists(first)) _vm.OpenPath(first);
+            if (File.Exists(first))
+            {
+                _vm.OpenPath(first);
+                return true;
+            }
         }
+        return false;
     }
 
     /// <summary>다른 인스턴스가 인자를 보냄 (single-instance hand-off).</summary>
