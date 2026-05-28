@@ -286,7 +286,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     /// <summary>mpv child hwnd를 보여야 할 조건 — 비디오/이미지일 때만. 오디오는 Hidden.</summary>
     public bool IsVideoSurfaceVisible =>
-        CurrentMedia?.Kind != MediaKind.Audio &&
+        CurrentMedia?.Kind is MediaKind.Video or MediaKind.Image &&
         State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
     public bool HasMedia => CurrentMedia is not null;
     // ⏭/⏮은 자동 진행과 같은 same-kind 규칙을 따른다. 영상 + png + 영상2 폴더에서 영상 보다가

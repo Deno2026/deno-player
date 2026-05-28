@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private readonly DispatcherTimer _controlsHideTimer;
     private readonly DispatcherTimer _fullscreenSettleHideTimer;
+    private readonly CancellationTokenSource _runtimePrepareCts = new();
     private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _closing;
@@ -173,7 +174,8 @@ public partial class MainWindow : Window
             _vm.State = PlayerState.Loading;
             _vm.StatusMessage = LocalizationService.T("FirstRunPreparing");
 
-            var prepared = await RuntimeDependencyService.EnsureMpvAsync();
+            var prepared = await RuntimeDependencyService.EnsureMpvAsync(_runtimePrepareCts.Token);
+            if (_closing) return;
             if (!prepared.Success || !_mpvProc.MpvAvailable)
             {
                 _vm.State = PlayerState.Failed;
@@ -193,7 +195,7 @@ public partial class MainWindow : Window
         {
             _mpvProc.Start(_videoHost.Hwnd);
             await _vm.ConnectIpcAsync();
-            _ = PrepareOptionalFfmpegAsync();
+            _ = PrepareOptionalFfmpegAsync(_runtimePrepareCts.Token);
         }
         catch (Exception ex)
         {
@@ -209,12 +211,12 @@ public partial class MainWindow : Window
         StartHotZonePolling();
     }
 
-    private static async Task PrepareOptionalFfmpegAsync()
+    private static async Task PrepareOptionalFfmpegAsync(CancellationToken ct)
     {
-        if (TrimService.FindFfmpeg() is not null) return;
+        if (ct.IsCancellationRequested || TrimService.FindFfmpeg() is not null) return;
 
-        var prepared = await RuntimeDependencyService.EnsureFfmpegAsync();
-        if (!prepared.Success)
+        var prepared = await RuntimeDependencyService.EnsureFfmpegAsync(ct);
+        if (!prepared.Success && !ct.IsCancellationRequested)
             Services.AppLog.Warn("Optional ffmpeg prepare failed: " + prepared.Error);
     }
 
@@ -278,6 +280,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _closing = true;
+        try { _runtimePrepareCts.Cancel(); } catch { }
         try { _hotZonePoll?.Stop(); } catch { }
         _hotZonePoll = null;
         try { _playlistWin?.Close(); } catch { }

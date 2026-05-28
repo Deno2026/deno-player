@@ -77,6 +77,12 @@ public static class RuntimeDependencyService
         catch (OperationCanceledException)
         {
             TryKill(proc);
+            if (ct.IsCancellationRequested)
+            {
+                AppLog.Info($"Runtime prepare canceled: {name}");
+                return new EnsureResult(false, $"{name} 준비가 취소되었습니다.");
+            }
+
             AppLog.Warn($"Runtime prepare timeout: {name}");
             return new EnsureResult(false, $"{name} 다운로드 시간이 초과되었습니다. 인터넷 연결을 확인한 뒤 다시 실행하세요.");
         }
