@@ -669,6 +669,12 @@ public partial class MainWindow : Window
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
     private static extern bool GetCursorPos(out PinvokePoint lpPoint);
     [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(PinvokePoint point);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern uint GetDoubleClickTime();
@@ -693,27 +699,33 @@ public partial class MainWindow : Window
     private void OnHotZonePollTick(object? sender, EventArgs e)
     {
         if (_closing) return;
-        if (!IsActive)
+        if (!TryGetCursorInRoot(out var screenPoint, out var relX, out var relY, out var w, out var h))
         {
-            // 다른 앱이 foreground면 panel은 mouse-over 아닐 때 닫음.
-            if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
-            if (_recentWin?.IsShown == true && !_recentWin.IsMouseOver) _recentWin.HideSlide();
-            _playlistHoverStartedUtc = DateTime.MinValue;
-            _recentHoverStartedUtc = DateTime.MinValue;
+            CloseInactiveHoverPanels();
             return;
         }
-        if (!TryGetCursorInRoot(out var screenPoint, out var relX, out var relY, out var w, out var h))
-            return;
 
-        PollFullscreenDoubleClick(relX, relY, w, h);
+        var cursorInRoot = relX >= 0 && relX < w && relY >= 0 && relY < h;
+        var cursorOverThisApp = cursorInRoot && IsCursorOverThisApp(screenPoint);
+        if (!IsActive && !cursorOverThisApp)
+        {
+            CloseInactiveHoverPanels();
+            return;
+        }
+
+        if (IsActive)
+            PollFullscreenDoubleClick(relX, relY, w, h);
+        else
+            _pollLeftButtonWasDown = false;
 
         // Mouse 움직임 감지 → ShowControls (이전엔 mpv MouseActivity event가 담당).
         // 풀스크린 모드에서 마우스 움직일 때 OSD 다시 보이게 하는 게 핵심.
-        if (Math.Abs(screenPoint.X - _lastPollMouse.X) > 0.5 ||
-            Math.Abs(screenPoint.Y - _lastPollMouse.Y) > 0.5)
+        if (IsActive &&
+            (Math.Abs(screenPoint.X - _lastPollMouse.X) > 0.5 ||
+             Math.Abs(screenPoint.Y - _lastPollMouse.Y) > 0.5))
         {
             _lastPollMouse = screenPoint;
-            if (relX >= 0 && relX < w && relY >= 0 && relY < h)
+            if (cursorInRoot)
             {
                 ShowControls();
                 RestartHideTimer();
@@ -722,6 +734,56 @@ public partial class MainWindow : Window
 
         UpdateHotZones(relX, relY, w, h);
     }
+
+    private void CloseInactiveHoverPanels()
+    {
+        // 다른 앱 위에 마우스가 있으면 panels는 정리하되, panel 자체 위에 있는 경우는 유지.
+        if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+        if (_recentWin?.IsShown == true && !_recentWin.IsMouseOver) _recentWin.HideSlide();
+        _playlistHoverStartedUtc = DateTime.MinValue;
+        _recentHoverStartedUtc = DateTime.MinValue;
+    }
+
+    private bool IsCursorOverThisApp(Point screenPoint)
+    {
+        var hit = WindowFromPoint(new PinvokePoint
+        {
+            X = (int)Math.Round(screenPoint.X),
+            Y = (int)Math.Round(screenPoint.Y)
+        });
+        if (hit == IntPtr.Zero) return false;
+
+        var main = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (IsWindowOrChild(main, hit)) return true;
+
+        if (_playlistWin is not null)
+        {
+            var playlist = new System.Windows.Interop.WindowInteropHelper(_playlistWin).Handle;
+            if (IsWindowOrChild(playlist, hit)) return true;
+        }
+
+        if (_recentWin is not null)
+        {
+            var recent = new System.Windows.Interop.WindowInteropHelper(_recentWin).Handle;
+            if (IsWindowOrChild(recent, hit)) return true;
+        }
+
+        if (GetWindowThreadProcessId(hit, out var processId) == 0) return false;
+        if (processId == (uint)Environment.ProcessId) return true;
+
+        try
+        {
+            var mpv = _mpvProc.Process;
+            if (mpv is { HasExited: false } && processId == (uint)mpv.Id)
+                return true;
+        }
+        catch { /* process may exit while polling */ }
+
+        return false;
+    }
+
+    private static bool IsWindowOrChild(IntPtr parent, IntPtr hit) =>
+        parent != IntPtr.Zero && (hit == parent || IsChild(parent, hit));
 
     private bool TryGetCursorInRoot(out Point screenPoint, out double relX, out double relY, out double w, out double h)
     {
