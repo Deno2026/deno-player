@@ -4,6 +4,18 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.5] - 2026-05-30
+
+### Player UX
+- Reduced accidental side-panel openings by matching the left and right windowed
+  edge trigger width and adding a slightly longer hover intent delay.
+- Restored fullscreen left/right edge panel access across the visible edge
+  while still protecting the bottom transport strip.
+- Re-synced hidden side-panel windows just before opening and after fullscreen
+  animations, preventing stale panel positions after fullscreen transitions.
+- Cursor polling now maps through the actual window rectangle and DPI transform
+  for steadier fullscreen edge detection on maximized or high-DPI displays.
+
 ## [0.4.4] - 2026-05-28
 
 ### Fullscreen
