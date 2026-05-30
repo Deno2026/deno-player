@@ -4,6 +4,16 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.6] - 2026-05-30
+
+### Player UX
+- Side-panel edge hover now works when Deno Video Player is visible but inactive,
+  so moving the mouse from another monitor onto the player can open the left or
+  right panel without first clicking the app.
+- Inactive hover is limited to cases where the cursor is actually over the
+  player, its owned side panels, or the embedded mpv video surface, avoiding
+  panel popups when another app covers the player.
+
 ## [0.4.5] - 2026-05-30
 
 ### Player UX
