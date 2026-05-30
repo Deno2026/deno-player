@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private const int FullscreenHotZoneWidth = 48;  // fullscreen은 더 좁은 edge 의도로만 열어 영상 몰입 방해를 줄임.
     private const int PanelHoverShowDelayMs = 180;  // edge를 스쳐 지나갈 때는 열지 않음
     private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
+    private const int FullscreenSettleHideMs = 3000;
+    private const double FullscreenStationaryRevealThreshold = 2.0;
     private const int VkLButton = 0x01;
     private const int FullscreenToggleDebounceMs = 320;
     private const int WindowButtonDebounceMs = 320;
@@ -49,6 +51,8 @@ public partial class MainWindow : Window
     private DateTime _playlistLastKeepAliveUtc = DateTime.MinValue;
     private DateTime _recentHoverStartedUtc = DateTime.MinValue;
     private DateTime _recentLastKeepAliveUtc = DateTime.MinValue;
+    private bool _ignoreStationaryFullscreenReveal;
+    private Point _fullscreenHiddenAtMouse;
 
 
     public MainWindow()
@@ -96,10 +100,11 @@ public partial class MainWindow : Window
         _controlsHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(s.ControlAutoHideMs) };
         _controlsHideTimer.Tick += (_, _) => HideControls();
 
-        _fullscreenSettleHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
+        _fullscreenSettleHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FullscreenSettleHideMs) };
         _fullscreenSettleHideTimer.Tick += (_, _) =>
         {
             _fullscreenSettleHideTimer.Stop();
+            ArmStationaryFullscreenRevealGuard();
             HideControls(force: true);
         };
 
@@ -418,6 +423,11 @@ public partial class MainWindow : Window
 
     private void OnRootMouseMove(object sender, MouseEventArgs e)
     {
+        if (ShouldIgnoreStationaryFullscreenReveal(GetCurrentCursorScreenPoint()))
+        {
+            CheckRightHotZoneFromWpf(e.GetPosition(Root));
+            return;
+        }
         ShowControls();
         RestartHideTimer();
         // 영상이 없는 상태(NoFile 등)에선 mpv mouse-pos가 안 와서 WPF 좌표로 hot zone 검사
@@ -433,6 +443,7 @@ public partial class MainWindow : Window
 
     private void OnRootPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
+        _ignoreStationaryFullscreenReveal = false;
         ShowControls();
         RestartHideTimer();
         // 영상 위(=mpv child hwnd) click 시 OS가 mpv hwnd에 keyboard focus를 줘서
@@ -455,6 +466,7 @@ public partial class MainWindow : Window
         _controlsHideTimer.Stop();
         _fullscreenSettleHideTimer.Stop();
         if (ControlsAlwaysOn) return;
+        _ignoreStationaryFullscreenReveal = false;
         _fullscreenSettleHideTimer.Start();
     }
 
@@ -463,6 +475,7 @@ public partial class MainWindow : Window
 
     private void ShowControls()
     {
+        _ignoreStationaryFullscreenReveal = false;
         if (_osdShown && TopBar.Visibility == Visibility.Visible) return;
         _osdShown = true;
         TopBar.Visibility = Visibility.Visible;
@@ -484,6 +497,31 @@ public partial class MainWindow : Window
         FadeTo(BottomBar, 0.0, 200, hideAfter: true);
         if (_vm.IsFullscreen)
             Mouse.OverrideCursor = Cursors.None;
+    }
+
+    private void ArmStationaryFullscreenRevealGuard()
+    {
+        if (!_vm.IsFullscreen) return;
+        _fullscreenHiddenAtMouse = GetCurrentCursorScreenPoint();
+        _lastPollMouse = _fullscreenHiddenAtMouse;
+        _ignoreStationaryFullscreenReveal = true;
+    }
+
+    private Point GetCurrentCursorScreenPoint() =>
+        GetCursorPos(out var pt) ? new Point(pt.X, pt.Y) : _lastPollMouse;
+
+    private bool ShouldIgnoreStationaryFullscreenReveal(Point screenPoint)
+    {
+        if (!_ignoreStationaryFullscreenReveal || !_vm.IsFullscreen || _osdShown)
+            return false;
+
+        var dx = Math.Abs(screenPoint.X - _fullscreenHiddenAtMouse.X);
+        var dy = Math.Abs(screenPoint.Y - _fullscreenHiddenAtMouse.Y);
+        if (dx <= FullscreenStationaryRevealThreshold && dy <= FullscreenStationaryRevealThreshold)
+            return true;
+
+        _ignoreStationaryFullscreenReveal = false;
+        return false;
     }
 
     // ============================================================
@@ -727,6 +765,11 @@ public partial class MainWindow : Window
             _lastPollMouse = screenPoint;
             if (cursorInRoot)
             {
+                if (ShouldIgnoreStationaryFullscreenReveal(screenPoint))
+                {
+                    UpdateHotZones(relX, relY, w, h);
+                    return;
+                }
                 ShowControls();
                 RestartHideTimer();
             }
@@ -1256,6 +1299,7 @@ public partial class MainWindow : Window
 
     private void OnAnyKey(object sender, KeyEventArgs e)
     {
+        _ignoreStationaryFullscreenReveal = false;
         ShowControls(); RestartHideTimer();
     }
 
@@ -1271,6 +1315,7 @@ public partial class MainWindow : Window
     private void OnSpaceDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
+        _ignoreStationaryFullscreenReveal = false;
         ShowControls(); RestartHideTimer();
         e.Handled = true;
         if (e.IsRepeat) return; // OS auto-repeat — 첫 keydown만 timer 시작
@@ -1412,9 +1457,11 @@ public partial class MainWindow : Window
     {
         _playlistWin?.HideSlide();
         _recentWin?.HideSlide();
+        UpdateEdgeHintsForFullscreen(fs);
 
         if (fs)
         {
+            ShowControls();
             try { Root.Focus(); Keyboard.Focus(Root); } catch { }
             _savedResize = ResizeMode;
             _savedWasMaximized = WindowState == WindowState.Maximized;
@@ -1453,6 +1500,7 @@ public partial class MainWindow : Window
         else
         {
             _fullscreenSettleHideTimer.Stop();
+            _ignoreStationaryFullscreenReveal = false;
             Mouse.OverrideCursor = null;
             // 먼저 bounds를 saved로 animate, 끝난 후 resize/maximize 상태만 복원
             var tx = _savedLeft;
@@ -1477,6 +1525,13 @@ public partial class MainWindow : Window
     {
         if (WindowStyle != WindowStyle.None)
             WindowStyle = WindowStyle.None;
+    }
+
+    private void UpdateEdgeHintsForFullscreen(bool fullscreen)
+    {
+        var width = fullscreen ? new GridLength(0) : new GridLength(3);
+        LeftEdgeHintColumn.Width = width;
+        RightEdgeHintColumn.Width = width;
     }
 
     /// <summary>

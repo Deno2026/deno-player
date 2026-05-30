@@ -293,9 +293,9 @@
              ============================================================ -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3"/>   <!-- 좌측 hint (최근 — 상반부) -->
+                <ColumnDefinition x:Name="LeftEdgeHintColumn" Width="3"/>   <!-- 좌측 hint (최근 — 상반부) -->
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="3"/>   <!-- 우측 hint (재생목록 — 상반부) -->
+                <ColumnDefinition x:Name="RightEdgeHintColumn" Width="3"/>   <!-- 우측 hint (재생목록 — 상반부) -->
             </Grid.ColumnDefinitions>
 
             <!-- 좌측 hint: 상반부만 보이는 그라디언트 (호버 가능 영역 안내) -->
