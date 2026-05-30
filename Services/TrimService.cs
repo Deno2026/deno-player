@@ -9,17 +9,21 @@ namespace DenoVideoPlayer.Services;
 /// 정확한 cut이 필요하면 video 편집기 사용 권장 — 이 앱의 목적이 아님).
 ///
 /// ffmpeg.exe 경로 우선순위:
-/// 1) AppContext.BaseDirectory + runtime\ffmpeg\ffmpeg.exe (앱 번들)
-/// 2) AppContext.BaseDirectory + runtime\mpv\ffmpeg.exe (mpv 빌드와 합본인 경우)
-/// 3) PATH에서 ffmpeg (시스템 설치)
-/// 4) 못 찾으면 명확한 에러 — 다운로드 안내.
+/// 1) 사용자 고정 cache (%LOCALAPPDATA%\DenoVideoPlayer\runtime\ffmpeg)
+/// 2) AppContext.BaseDirectory + runtime\ffmpeg\ffmpeg.exe (이전 설치/개발 호환)
+/// 3) AppContext.BaseDirectory + runtime\mpv\ffmpeg.exe (mpv 빌드와 합본인 경우)
+/// 4) PATH에서 ffmpeg (시스템 설치)
+/// 5) 못 찾으면 명확한 에러 — 다운로드 안내.
 /// </summary>
 public static class TrimService
 {
     public static string? FindFfmpeg()
     {
+        RuntimeDependencyService.PreserveExistingRuntimeCache();
+
         var candidates = new[]
         {
+            RuntimePaths.FfmpegExe,
             Path.Combine(AppContext.BaseDirectory, "runtime", "ffmpeg", "ffmpeg.exe"),
             Path.Combine(AppContext.BaseDirectory, "runtime", "mpv", "ffmpeg.exe"),
         };

@@ -35,6 +35,7 @@ public partial class RecentWindow : Window
 
     public void ShowSlide()
     {
+        DataContext?.PruneMissingRecents(save: true);
         if (IsShown) return;
         if (!IsVisible)
         {
@@ -119,9 +120,7 @@ public partial class RecentWindow : Window
     {
         if (sender is FrameworkElement fe && fe.DataContext is RecentItem ri && DataContext is { } vm)
         {
-            vm.Recents.Remove(ri);
-            vm.Settings.RecentFiles = vm.Recents.Select(r => r.FullPath).ToList();
-            vm.SaveSettingsNow();
+            vm.RemoveRecent(ri.FullPath, save: true);
         }
     }
 }

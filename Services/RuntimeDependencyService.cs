@@ -16,15 +16,36 @@ public static class RuntimeDependencyService
         => EnsureMpvAsync(null, ct);
 
     public static Task<EnsureResult> EnsureMpvAsync(Action<string>? outputLine, CancellationToken ct = default)
-        => RunFetcherAsync("mpv", Path.Combine(AppContext.BaseDirectory, "tools", "fetch-mpv.ps1"),
-            TimeSpan.FromMinutes(8), ct, outputLine);
+    {
+        PreserveExistingRuntimeCache();
+        return RunFetcherAsync(
+            "mpv",
+            Path.Combine(AppContext.BaseDirectory, "tools", "fetch-mpv.ps1"),
+            RuntimePaths.MpvDirectory,
+            TimeSpan.FromMinutes(8),
+            ct,
+            outputLine);
+    }
 
     public static Task<EnsureResult> EnsureFfmpegAsync(CancellationToken ct = default)
-        => RunFetcherAsync("ffmpeg", Path.Combine(AppContext.BaseDirectory, "tools", "fetch-ffmpeg.ps1"),
-            TimeSpan.FromMinutes(8), ct);
+    {
+        PreserveExistingRuntimeCache();
+        return RunFetcherAsync(
+            "ffmpeg",
+            Path.Combine(AppContext.BaseDirectory, "tools", "fetch-ffmpeg.ps1"),
+            RuntimePaths.FfmpegDirectory,
+            TimeSpan.FromMinutes(8),
+            ct);
+    }
+
+    public static void PreserveExistingRuntimeCache()
+    {
+        PromoteRuntimeDirectory("mpv", "mpv.exe", RuntimePaths.MpvDirectory);
+        PromoteRuntimeDirectory("ffmpeg", "ffmpeg.exe", RuntimePaths.FfmpegDirectory);
+    }
 
     private static async Task<EnsureResult> RunFetcherAsync(
-        string name, string scriptPath, TimeSpan timeout, CancellationToken ct,
+        string name, string scriptPath, string destinationDir, TimeSpan timeout, CancellationToken ct,
         Action<string>? outputLine = null)
     {
         if (!File.Exists(scriptPath))
@@ -46,9 +67,11 @@ public static class RuntimeDependencyService
         psi.ArgumentList.Add("Bypass");
         psi.ArgumentList.Add("-File");
         psi.ArgumentList.Add(scriptPath);
+        psi.ArgumentList.Add("-Dest");
+        psi.ArgumentList.Add(destinationDir);
         psi.ArgumentList.Add("-SkipIfExists");
 
-        AppLog.Info($"Runtime prepare: {name} via {scriptPath}");
+        AppLog.Info($"Runtime prepare: {name} via {scriptPath} -> {destinationDir}");
 
         using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var output = new StringBuilder();
@@ -113,6 +136,56 @@ public static class RuntimeDependencyService
         var systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         var ps = Path.Combine(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
         return File.Exists(ps) ? ps : "powershell.exe";
+    }
+
+    private static void PromoteRuntimeDirectory(string name, string exeName, string destinationDir)
+    {
+        if (File.Exists(Path.Combine(destinationDir, exeName))) return;
+
+        foreach (var sourceDir in RuntimeDirectoryCandidates(name))
+        {
+            if (!Directory.Exists(sourceDir)) continue;
+            var sourceExe = Path.Combine(sourceDir, exeName);
+            if (!File.Exists(sourceExe)) continue;
+
+            try
+            {
+                Directory.CreateDirectory(destinationDir);
+                foreach (var file in Directory.EnumerateFiles(sourceDir, "*", SearchOption.TopDirectoryOnly))
+                {
+                    var dest = Path.Combine(destinationDir, Path.GetFileName(file));
+                    File.Copy(file, dest, overwrite: true);
+                }
+
+                AppLog.Info($"Runtime cache promoted: {name} {sourceDir} -> {destinationDir}");
+                return;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Runtime cache promote failed: {name} {sourceDir} -> {destinationDir}: {ex.Message}");
+            }
+        }
+    }
+
+    private static IEnumerable<string> RuntimeDirectoryCandidates(string name)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var baseDir = AppContext.BaseDirectory;
+        foreach (var dir in ParentRuntimeDirectories(baseDir, name))
+        {
+            if (!dir.StartsWith(RuntimePaths.RuntimeRoot, StringComparison.OrdinalIgnoreCase) && seen.Add(dir))
+                yield return dir;
+        }
+    }
+
+    private static IEnumerable<string> ParentRuntimeDirectories(string baseDir, string name)
+    {
+        var probe = baseDir;
+        for (var i = 0; i < 6 && probe is not null; i++)
+        {
+            yield return Path.Combine(probe, "runtime", name);
+            probe = Path.GetDirectoryName(probe);
+        }
     }
 
     private static void TryKill(Process proc)

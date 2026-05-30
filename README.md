@@ -102,3 +102,5 @@ Code is MIT licensed. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
 
 Playback uses mpv as an external process. Public packages do not redistribute mpv
 or FFmpeg binaries; the app prepares them on the user's machine when needed.
+Those runtime files are cached under `%LOCALAPPDATA%\DenoVideoPlayer\runtime`,
+so normal app updates do not download the playback engine again.

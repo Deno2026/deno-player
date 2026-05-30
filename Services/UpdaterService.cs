@@ -1,3 +1,4 @@
+using System.IO;
 using Velopack;
 using Velopack.Sources;
 
@@ -113,6 +114,7 @@ public static class UpdaterService
             if (pending is not null)
             {
                 AppLog.Info($"Updater: applying prepared update {pending.Version} + restarting");
+                RuntimeDependencyService.PreserveExistingRuntimeCache();
                 mgr.ApplyUpdatesAndRestart(pending);
                 return true;
             }
@@ -136,6 +138,7 @@ public static class UpdaterService
 
             pending = mgr.UpdatePendingRestart ?? info.TargetFullRelease;
             AppLog.Info($"Updater: applying {pending.Version} + restarting");
+            RuntimeDependencyService.PreserveExistingRuntimeCache();
             mgr.ApplyUpdatesAndRestart(pending);
             return true;
         }
@@ -150,8 +153,41 @@ public static class UpdaterService
     {
         var url = Environment.GetEnvironmentVariable("DENO_PLAYER_UPDATE_URL")
                   ?? DefaultChannelUrl;
-        var source = new GithubSource(url, null, prerelease: false);
+        var source = CreateUpdateSource(url);
         return (url, new UpdateManager(source));
+    }
+
+    private static IUpdateSource CreateUpdateSource(string url)
+    {
+        if (TryCreateLocalFileSource(url, out var source))
+        {
+            return source;
+        }
+
+        return new GithubSource(url, null, prerelease: false);
+    }
+
+    private static bool TryCreateLocalFileSource(string url, out IUpdateSource source)
+    {
+        source = null!;
+        var trimmed = Environment.ExpandEnvironmentVariables(url.Trim().Trim('"'));
+        if (Directory.Exists(trimmed))
+        {
+            AppLog.Info($"Updater: using local feed {trimmed}");
+            source = new SimpleFileSource(new DirectoryInfo(trimmed));
+            return true;
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            && uri.IsFile
+            && Directory.Exists(uri.LocalPath))
+        {
+            AppLog.Info($"Updater: using local feed {uri.LocalPath}");
+            source = new SimpleFileSource(new DirectoryInfo(uri.LocalPath));
+            return true;
+        }
+
+        return false;
     }
 
     private static void OpenLatestRelease(string url)

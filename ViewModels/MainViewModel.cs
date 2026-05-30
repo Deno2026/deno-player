@@ -10,6 +10,8 @@ using DenoVideoPlayer.Services;
 
 namespace DenoVideoPlayer.ViewModels;
 
+public sealed record UpdatePromptRequest(string NewVersion, bool ReadyToApply, bool Portable);
+
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly MpvProcessService _mpvProc;
@@ -27,6 +29,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     /// <summary>잠깐 띄울 OSD toast. 스크린샷 저장 같은 짧은 confirm용.</summary>
     public event Action<string>? Toast;
+    public event Action<UpdatePromptRequest>? UpdatePromptRequested;
 
     public MainViewModel(MpvProcessService mpvProc)
     {
@@ -41,11 +44,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _shuffle = Settings.Shuffle;
         LocalizationService.LanguageChanged += OnLanguageChanged;
 
-        // 최근 재생 목록 복원 — 파일 존재 여부와 무관하게 다 보여줌 (열 때 파일 없으면 Failed로)
+        // 최근 재생 목록 복원. 사라진 파일은 초보 사용자에게 실패 항목으로 보이지 않게 정리한다.
         if (Settings.RecentFiles is { Count: > 0 })
         {
             foreach (var p in Settings.RecentFiles)
                 Recents.Add(new RecentItem(p));
+            PruneMissingRecents(save: true);
         }
 
         PlayPauseCommand = new RelayCommand(TogglePlayPause);
@@ -416,6 +420,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _updateReadyToApply;
     private bool _updatePortable;
     private bool _applyingUpdate;
+    private string? _promptedUpdateVersion;
+    private string? _dismissedUpdateVersion;
     private bool _isUpdateAvailable;
     public bool IsUpdateAvailable
     {
@@ -444,16 +450,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         OnUi(() =>
         {
+            if (string.Equals(_dismissedUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                IsUpdateAvailable = false;
+                return;
+            }
+
             _pendingUpdate = info;
             _updateReadyToApply = readyToApply;
             _updatePortable = portable;
             UpdateNewVersion = newVersion;
             Raise(nameof(UpdateTooltip));
             IsUpdateAvailable = true;
+
+            if (!string.Equals(_promptedUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                _promptedUpdateVersion = newVersion;
+                UpdatePromptRequested?.Invoke(new UpdatePromptRequest(newVersion, readyToApply, portable));
+            }
         });
     }
 
-    private async Task ApplyPendingUpdateAsync()
+    public async Task ApplyPendingUpdateAsync()
     {
         if (_applyingUpdate) return;
         _applyingUpdate = true;
@@ -469,6 +487,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _applyingUpdate = false;
             ApplyUpdateCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    public void DismissPendingUpdateForCurrentRun()
+    {
+        OnUi(() =>
+        {
+            if (UpdateNewVersion is { Length: > 0 } version)
+                _dismissedUpdateVersion = version;
+            IsUpdateAvailable = false;
+        });
     }
 
     private bool _isAlwaysOnTop;
@@ -838,6 +866,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (string.IsNullOrWhiteSpace(path)) { Services.AppLog.Warn("OpenPath: empty path"); return; }
         if (!File.Exists(path))
         {
+            RemoveRecent(path, save: true);
             State = PlayerState.Failed;
             StatusMessage = LF("FileNotFound", path);
             return;
@@ -1215,12 +1244,49 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void TouchRecent(string path)
     {
         // 같은 path 있으면 제거 후 맨 위에 다시 → 최신이 0번
-        for (var i = Recents.Count - 1; i >= 0; i--)
-            if (string.Equals(Recents[i].FullPath, path, StringComparison.OrdinalIgnoreCase))
-                Recents.RemoveAt(i);
+        RemoveRecent(path, save: false);
         Recents.Insert(0, new RecentItem(path));
         while (Recents.Count > MaxRecents) Recents.RemoveAt(Recents.Count - 1);
         Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+    }
+
+    public int PruneMissingRecents(bool save = true)
+    {
+        var removed = 0;
+        for (var i = Recents.Count - 1; i >= 0; i--)
+        {
+            var path = Recents[i].FullPath;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) continue;
+            Recents.RemoveAt(i);
+            removed++;
+        }
+
+        if (removed > 0)
+        {
+            Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+            if (save) SaveSettingsNow();
+        }
+
+        return removed;
+    }
+
+    public bool RemoveRecent(string path, bool save = true)
+    {
+        var removed = false;
+        for (var i = Recents.Count - 1; i >= 0; i--)
+        {
+            if (!string.Equals(Recents[i].FullPath, path, StringComparison.OrdinalIgnoreCase)) continue;
+            Recents.RemoveAt(i);
+            removed = true;
+        }
+
+        if (removed)
+        {
+            Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+            if (save) SaveSettingsNow();
+        }
+
+        return removed;
     }
 
     private MediaItem? PickRandomOfSameKind()

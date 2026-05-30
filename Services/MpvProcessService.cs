@@ -11,18 +11,19 @@ public sealed class MpvProcessService : IDisposable
 {
     public string PipeName { get; }
     public Process? Process { get; private set; }
-    public string MpvPath { get; }
+    public string MpvPath => ResolveMpvPath();
     public event Action? Crashed;
 
     public MpvProcessService()
     {
         PipeName = $"deno-video-player-{Environment.ProcessId}-{Guid.NewGuid():N}".Substring(0, 40);
-        MpvPath = ResolveMpvPath();
     }
 
-    /// <summary>mpv.exe 위치: 1) 앱과 같은 폴더 runtime\mpv\mpv.exe → 2) 프로젝트 루트 runtime\mpv\mpv.exe</summary>
+    /// <summary>mpv.exe 위치: 1) 사용자 고정 cache → 2) 앱/개발 폴더 runtime\mpv\mpv.exe.</summary>
     private static string ResolveMpvPath()
     {
+        if (File.Exists(RuntimePaths.MpvExe)) return RuntimePaths.MpvExe;
+
         var baseDir = AppContext.BaseDirectory;
         var p1 = Path.Combine(baseDir, "runtime", "mpv", "mpv.exe");
         if (File.Exists(p1)) return p1;
@@ -35,7 +36,7 @@ public sealed class MpvProcessService : IDisposable
             if (File.Exists(alt)) return alt;
             probe = Path.GetDirectoryName(probe);
         }
-        return p1; // 없어도 경로는 반환(에러는 호출자가 처리)
+        return RuntimePaths.MpvExe; // 없어도 경로는 반환(에러는 호출자가 처리)
     }
 
     public bool MpvAvailable => File.Exists(MpvPath);

@@ -4,6 +4,21 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.8] - 2026-05-30
+
+### Updates
+- New versions now show a clear update confirmation dialog with Update/Cancel
+  instead of relying on a small top-bar icon.
+- Automatic updates can use a local Velopack feed via `DENO_PLAYER_UPDATE_URL`,
+  which keeps update-flow testing off the public release channel.
+
+### Runtime
+- mpv and FFmpeg are now kept in `%LOCALAPPDATA%\DenoVideoPlayer\runtime`
+  instead of the versioned app folder, so app updates do not force the playback
+  engine to download again.
+- Existing per-version runtime files are promoted into the persistent runtime
+  cache before applying an update when possible.
+
 ## [0.4.7] - 2026-05-30
 
 ### Fullscreen
