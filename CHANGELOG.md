@@ -4,6 +4,18 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.4.7] - 2026-05-30
+
+### Fullscreen
+- Fullscreen entry now keeps the interface available briefly, then force-hides
+  the top and bottom controls after three seconds even if the mouse is resting
+  over the controls.
+- After that automatic fullscreen settle, a stationary mouse no longer
+  immediately reopens the interface; moving the mouse or pressing a key brings
+  the controls back.
+- The left and right green edge hint strips are now collapsed in fullscreen so
+  video-only mode has no side guide lines.
+
 ## [0.4.6] - 2026-05-30
 
 ### Player UX
