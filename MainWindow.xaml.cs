@@ -32,9 +32,10 @@ public partial class MainWindow : Window
     private PlaylistWindow? _playlistWin;
     private RecentWindow?   _recentWin;
     private ToastWindow?    _toastWin;
-    private const int HotZoneWidth = 72;            // 우측 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
-    private const int LeftHotZoneWidth = 160;       // 좌측 hover trigger (이전 240 → 2/3 수준)
-    private const int PanelHoverShowDelayMs = 140;  // edge를 스쳐 지나갈 때는 열지 않음
+    private const int HotZoneWidth = 72;            // 창 모드 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
+    private const int LeftHotZoneWidth = 72;        // 좌/우를 같은 폭으로 맞춰 의도치 않은 최근 파일 panel 열림을 줄임.
+    private const int FullscreenHotZoneWidth = 48;  // fullscreen은 더 좁은 edge 의도로만 열어 영상 몰입 방해를 줄임.
+    private const int PanelHoverShowDelayMs = 180;  // edge를 스쳐 지나갈 때는 열지 않음
     private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
     private const int VkLButton = 0x01;
     private const int FullscreenToggleDebounceMs = 320;
@@ -160,7 +161,7 @@ public partial class MainWindow : Window
                     // 재생 항목으로 자동 스크롤은 PlaylistWindow가 ShowSlide 시 직접 처리.
                     break;
                 case nameof(MainViewModel.IsPlaylistOpen):
-                    if (_vm.IsPlaylistOpen) _playlistWin?.ShowSlide();
+                    if (_vm.IsPlaylistOpen) ShowPlaylistPanel();
                     else _playlistWin?.HideSlide();
                     break;
                 case nameof(MainViewModel.IsTrimMode):
@@ -362,8 +363,13 @@ public partial class MainWindow : Window
     {
         UpdateMaxRestoreButton();
         SyncPlaylistWindowPosition();
+        SyncRecentWindowPosition();
         // 최소화될 때 playlist도 같이 숨김 (Owner가 minimize면 자동이긴 하지만 명시)
-        if (WindowState == WindowState.Minimized) _playlistWin?.HideSlide();
+        if (WindowState == WindowState.Minimized)
+        {
+            _playlistWin?.HideSlide();
+            _recentWin?.HideSlide();
+        }
     }
 
     // ============================================================
@@ -531,6 +537,20 @@ public partial class MainWindow : Window
         SyncRecentWindowPosition();
     }
 
+    private void ShowPlaylistPanel()
+    {
+        if (_playlistWin is null) return;
+        SyncPlaylistWindowPosition();
+        _playlistWin.ShowSlide();
+    }
+
+    private void ShowRecentPanel()
+    {
+        if (_recentWin is null) return;
+        SyncRecentWindowPosition();
+        _recentWin.ShowSlide();
+    }
+
     private void SyncRecentWindowPosition()
     {
         if (_recentWin is null || WindowState == WindowState.Minimized) return;
@@ -682,14 +702,8 @@ public partial class MainWindow : Window
             _recentHoverStartedUtc = DateTime.MinValue;
             return;
         }
-        if (!GetCursorPos(out var pt)) return;
-        var screenPoint = new Point(pt.X, pt.Y);
-        var posInRoot = Root.PointFromScreen(screenPoint);
-        var relX = posInRoot.X;
-        var relY = posInRoot.Y;
-        var w = Root.ActualWidth;
-        var h = Root.ActualHeight;
-        if (w <= 0 || h <= 0) return;
+        if (!TryGetCursorInRoot(out var screenPoint, out var relX, out var relY, out var w, out var h))
+            return;
 
         PollFullscreenDoubleClick(relX, relY, w, h);
 
@@ -707,6 +721,48 @@ public partial class MainWindow : Window
         }
 
         UpdateHotZones(relX, relY, w, h);
+    }
+
+    private bool TryGetCursorInRoot(out Point screenPoint, out double relX, out double relY, out double w, out double h)
+    {
+        screenPoint = default;
+        relX = relY = w = h = 0;
+
+        if (!GetCursorPos(out var pt)) return false;
+        screenPoint = new Point(pt.X, pt.Y);
+
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var rect)) return false;
+
+        var src = System.Windows.PresentationSource.FromVisual(this);
+        if (src?.CompositionTarget is not null)
+        {
+            var toDip = src.CompositionTarget.TransformFromDevice;
+            var topLeft = toDip.Transform(new Point(rect.Left, rect.Top));
+            var bottomRight = toDip.Transform(new Point(rect.Right, rect.Bottom));
+            var cursor = toDip.Transform(screenPoint);
+            relX = cursor.X - topLeft.X;
+            relY = cursor.Y - topLeft.Y;
+            w = bottomRight.X - topLeft.X;
+            h = bottomRight.Y - topLeft.Y;
+        }
+        else
+        {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+            var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+            relX = (pt.X - rect.Left) / sx;
+            relY = (pt.Y - rect.Top) / sy;
+            w = (rect.Right - rect.Left) / sx;
+            h = (rect.Bottom - rect.Top) / sy;
+        }
+
+        if (Root.ActualWidth > 0 && Math.Abs(Root.ActualWidth - w) <= 24)
+            w = Root.ActualWidth;
+        if (Root.ActualHeight > 0 && Math.Abs(Root.ActualHeight - h) <= 24)
+            h = Root.ActualHeight;
+
+        return w > 0 && h > 0;
     }
 
     private void PollFullscreenDoubleClick(double relX, double relY, double w, double h)
@@ -760,37 +816,42 @@ public partial class MainWindow : Window
         // 하단 transport bar 영역은 hot zone에서 제외.
         var bottomReserved = (BottomBar?.ActualHeight ?? 80) + 12;
         var inLowerStrip = y >= h - bottomReserved;
-        // 좌측 패널(최근 재생)은 화면 세로 상반부에서만 활성. 작업 중 무심코 좌측
-        // 내리다가 panel이 튀어나오는 것 방지.
+        // 창 모드에서는 화면 세로 상반부에서만 활성. 작업 중 무심코 좌우 edge를
+        // 지나가다가 panel이 튀어나오는 것 방지.
         var inUpperHalf = y < h / 2;
+        // 창 모드에서는 상단 절반만 열어 우발 동작을 줄이고, fullscreen에서는 edge
+        // 어디서든 의도대로 panel이 열리게 한다. 하단 transport strip은 계속 보호.
+        var canTriggerVertically = !inLowerStrip && (_vm.IsFullscreen || inUpperHalf);
         // 패널 보호 영역: TopBar(상단 버튼들) 위에 마우스가 있을 때는 이미 열린 패널을
         // 닫지 않음. 안 그러면 패널 열고 우측의 환경설정/스크린샷/창 버튼 만지려고
         // 위로 갈 때 hot zone 벗어났다고 패널이 닫혀버려서 조작감 안 좋음.
         var inTopBar = y < (TopBar?.ActualHeight ?? 36);
+        var triggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : HotZoneWidth;
+        var leftTriggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : LeftHotZoneWidth;
 
         if (_playlistWin is not null)
         {
-            // 좌측과 일관성 — 우측도 세로 상단 절반 + 하단 transport 영역 제외에서만 trigger.
-            var inRight = x >= w - HotZoneWidth && !inLowerStrip && inUpperHalf;
+            // 좌/우 모두 같은 의도 폭. fullscreen에서는 edge 어디서든 열리되 하단 transport만 제외.
+            var inRight = x >= w - triggerWidth && canTriggerVertically;
             UpdateSlidePanelHover(
                 inRight,
                 _playlistWin.IsShown,
                 _playlistWin.IsMouseOver,
                 inTopBar,
-                _playlistWin.ShowSlide,
+                ShowPlaylistPanel,
                 _playlistWin.HideSlide,
                 ref _playlistHoverStartedUtc,
                 ref _playlistLastKeepAliveUtc);
         }
         if (_recentWin is not null)
         {
-            var inLeft = x >= 0 && x < LeftHotZoneWidth && !inLowerStrip && inUpperHalf;
+            var inLeft = x >= 0 && x < leftTriggerWidth && canTriggerVertically;
             UpdateSlidePanelHover(
                 inLeft,
                 _recentWin.IsShown,
                 _recentWin.IsMouseOver,
                 inTopBar,
-                _recentWin.ShowSlide,
+                ShowRecentPanel,
                 _recentWin.HideSlide,
                 ref _recentHoverStartedUtc,
                 ref _recentLastKeepAliveUtc);
@@ -1320,7 +1381,12 @@ public partial class MainWindow : Window
 
             var mb = GetCurrentMonitorBounds();
             AnimateBounds(mb.X, mb.Y, mb.Width, mb.Height, durationMs: 140,
-                onCompleted: SettleIntoFullscreen);
+                onCompleted: () =>
+                {
+                    SyncPlaylistWindowPosition();
+                    SyncRecentWindowPosition();
+                    SettleIntoFullscreen();
+                });
         }
         else
         {
@@ -1336,6 +1402,8 @@ public partial class MainWindow : Window
                 EnsureCustomWindowStyle();
                 ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
                 if (_savedWasMaximized) WindowState = WindowState.Maximized;
+                SyncPlaylistWindowPosition();
+                SyncRecentWindowPosition();
             });
             ShowControls();
         }
