@@ -71,6 +71,7 @@ public sealed class MpvProcessService : IDisposable
         Arg("--osc=no");
         Arg("--no-osd-bar");
         Arg("--input-default-bindings=no");
+        Arg("--input-builtin-bindings=no");
         Arg("--input-vo-keyboard=no");
         Arg("--input-cursor=yes");          // mouse-pos observe용 (자체 매핑은 no)
         Arg("--cursor-autohide=no");        // 커서 숨김은 우리 OSD 타이머가 관리

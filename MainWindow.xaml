@@ -127,13 +127,8 @@
         <!-- <KeyBinding Key="Space"    Command="{Binding PlayPauseCommand}"/> -->
 
         <KeyBinding Key="M"        Command="{Binding MuteCommand}"/>
-        <KeyBinding Key="F"        Command="{Binding FullscreenCommand}"/>
-        <KeyBinding Key="F11"      Command="{Binding FullscreenCommand}"/>
-        <KeyBinding Key="Enter"    Modifiers="Alt" Command="{Binding FullscreenCommand}"/>
-        <!-- Enter 단독 (메인 키보드 / NumPad Enter 둘 다 잡힘) → 완전 풀스크린 -->
-        <KeyBinding Key="Enter"    Command="{Binding FullscreenCommand}"/>
-        <KeyBinding Key="Return"   Command="{Binding FullscreenCommand}"/>
-        <KeyBinding Key="Escape"   Command="{Binding ExitFullscreenCommand}"/>
+        <!-- Fullscreen shortcuts are handled in code-behind so buttons,
+             double-click, keyboard, and restore all use one transition flow. -->
         <KeyBinding Key="Left"     Command="{Binding Seek5BackwardCommand}"/>
         <KeyBinding Key="Right"    Command="{Binding Seek5ForwardCommand}"/>
         <KeyBinding Key="Left"     Modifiers="Shift" Command="{Binding Seek30BackwardCommand}"/>

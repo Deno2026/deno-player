@@ -25,6 +25,8 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _runtimePrepareCts = new();
     private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
+    private bool _hasFullscreenRestoreBounds;
+    private bool _restoreNormalOnFullscreenExit;
     private bool _closing;
     private int _mpvRestartCount;
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
@@ -34,15 +36,15 @@ public partial class MainWindow : Window
     private ToastWindow?    _toastWin;
     private const int HotZoneWidth = 72;            // 창 모드 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
     private const int LeftHotZoneWidth = 72;        // 좌/우를 같은 폭으로 맞춰 의도치 않은 최근 파일 panel 열림을 줄임.
-    private const int FullscreenHotZoneWidth = 48;  // fullscreen은 더 좁은 edge 의도로만 열어 영상 몰입 방해를 줄임.
+    private const int FullscreenHotZoneWidth = 96;  // fullscreen은 edge 접근성이 더 중요. 실제 화면 끝에서 놓치지 않게 넓힘.
+    private const int FullscreenPanelHoverShowDelayMs = 60;
     private const int PanelHoverShowDelayMs = 180;  // edge를 스쳐 지나갈 때는 열지 않음
     private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
     private const int FullscreenSettleHideMs = 3000;
     private const double FullscreenStationaryRevealThreshold = 16.0;
-    private const double FullscreenTopHotZoneGuardHeight = 48.0;
     private const double WindowResizeBorderDip = 6.0;
     private const int VkLButton = 0x01;
-    private const int FullscreenToggleDebounceMs = 320;
+    private const int FullscreenDoubleClickDuplicateSuppressMs = 650;
     private const int WindowButtonDebounceMs = 320;
     private bool _pollLeftButtonWasDown;
     private bool _ignorePollUntilLeftReleased;
@@ -57,6 +59,7 @@ public partial class MainWindow : Window
     private DateTime _recentLastKeepAliveUtc = DateTime.MinValue;
     private bool _ignoreStationaryFullscreenReveal;
     private Point _fullscreenHiddenAtMouse;
+    private DateTime _fullscreenSettleUntilUtc = DateTime.MinValue;
     private int _boundsAnimationSerial;
     private bool _updatePromptOpen;
 
@@ -68,7 +71,7 @@ public partial class MainWindow : Window
         _vm = new MainViewModel(_mpvProc);
         DataContext = _vm;
         _videoHost.DoubleClicked += () =>
-            Dispatcher.BeginInvoke(() => ToggleFullscreenFromDoubleClick("video-host"));
+            Dispatcher.BeginInvoke(() => RequestFullscreenToggle("video-host", FullscreenRequestKind.DoubleClick));
 
         var s = _vm.Settings;
         if (s.WindowWidth >= 480 && s.WindowHeight >= 320)
@@ -146,6 +149,7 @@ public partial class MainWindow : Window
         Drop      += OnDrop;
         KeyDown   += OnAnyKey;
         KeyDown   += OnSpaceDown;
+        PreviewKeyDown += OnFullscreenShortcutKeyDown;
         PreviewKeyUp += OnSpaceUp;
         StateChanged += OnStateChanged;
         LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
@@ -367,11 +371,27 @@ public partial class MainWindow : Window
         _playlistWin = null;
         _recentWin = null;
         _toastWin = null;
-        var (l, t) = (WindowState == WindowState.Normal ? (double?)Left : null,
-                       WindowState == WindowState.Normal ? (double?)Top  : null);
-        var (w, h) = (WindowState == WindowState.Normal ? Width  : RestoreBounds.Width,
-                      WindowState == WindowState.Normal ? Height : RestoreBounds.Height);
-        _vm.PersistSettings(w, h, l, t, WindowState == WindowState.Maximized);
+        double? l;
+        double? t;
+        double w;
+        double h;
+        var maximized = WindowState == WindowState.Maximized;
+        if (_vm.IsFullscreen && _hasFullscreenRestoreBounds)
+        {
+            maximized = _savedWasMaximized;
+            l = maximized ? null : _savedLeft;
+            t = maximized ? null : _savedTop;
+            w = _savedWidth;
+            h = _savedHeight;
+        }
+        else
+        {
+            l = WindowState == WindowState.Normal ? Left : null;
+            t = WindowState == WindowState.Normal ? Top : null;
+            w = WindowState == WindowState.Normal ? Width : RestoreBounds.Width;
+            h = WindowState == WindowState.Normal ? Height : RestoreBounds.Height;
+        }
+        _vm.PersistSettings(w, h, l, t, maximized);
         _vm.Dispose();
         _mpvProc.Dispose();
     }
@@ -407,7 +427,7 @@ public partial class MainWindow : Window
         if (e.ClickCount >= 2)
         {
             _topBarDragArmed = false;
-            ToggleFullscreenFromDoubleClick("topbar");
+            RequestFullscreenToggle("topbar", FullscreenRequestKind.DoubleClick);
             e.Handled = true;
             return;
         }
@@ -471,6 +491,7 @@ public partial class MainWindow : Window
     {
         _controlsHideTimer.Stop();
         if (ControlsAlwaysOn) return;
+        if (_vm.IsFullscreen && DateTime.UtcNow < _fullscreenSettleUntilUtc) return;
         _controlsHideTimer.Interval = TimeSpan.FromMilliseconds(_vm.Settings.ControlAutoHideMs);
         _controlsHideTimer.Start();
     }
@@ -486,6 +507,7 @@ public partial class MainWindow : Window
         _fullscreenSettleHideTimer.Stop();
         if (ControlsAlwaysOn) return;
         _ignoreStationaryFullscreenReveal = false;
+        _fullscreenSettleUntilUtc = DateTime.UtcNow.AddMilliseconds(FullscreenSettleHideMs);
         _fullscreenSettleHideTimer.Start();
     }
 
@@ -497,8 +519,21 @@ public partial class MainWindow : Window
         if (_vm.IsFullscreen && (!_osdShown || _ignoreStationaryFullscreenReveal))
             Services.AppLog.Info($"ShowControls[{source}] osd={_osdShown} guard={_ignoreStationaryFullscreenReveal}");
         _ignoreStationaryFullscreenReveal = false;
-        if (_osdShown && TopBar.Visibility == Visibility.Visible &&
-            (!_vm.IsBottomBarVisible || BottomBar.Visibility == Visibility.Visible)) return;
+        if (_vm.IsFullscreen)
+            UpdateMediaLayerForFullscreen(immersive: false);
+
+        var alreadyShown = _osdShown &&
+            TopBar.Visibility == Visibility.Visible &&
+            TopBar.Opacity >= 0.99 &&
+            (!_vm.IsBottomBarVisible ||
+             (BottomBar.Visibility == Visibility.Visible && BottomBar.Opacity >= 0.99));
+        if (alreadyShown)
+        {
+            Mouse.OverrideCursor = null;
+            SyncOverlayWindowPositionsSoon();
+            return;
+        }
+
         _osdShown = true;
         SetChromeVisibility(visible: true);
         FadeTo(TopBar, 1.0, 120);
@@ -541,6 +576,9 @@ public partial class MainWindow : Window
         if (!_osdShown && !visible) return;
 
         _osdShown = false;
+        _fullscreenSettleUntilUtc = DateTime.MinValue;
+        if (_vm.IsFullscreen)
+            ArmStationaryFullscreenRevealGuard();
 
         Services.AppLog.Info(
             $"HideControls[{source}] applied force={force} top={TopBar.Visibility} bottom={BottomBar.Visibility}");
@@ -549,9 +587,19 @@ public partial class MainWindow : Window
             HideControlsNow();
         else
         {
-            FadeTo(TopBar, 0.0, 200, hideAfter: true, hideVisibility: HiddenChromeVisibility);
+            var pending = _vm.IsBottomBarVisible ? 2 : 1;
+            void OnChromeHidden()
+            {
+                pending--;
+                if (pending <= 0 && _vm.IsFullscreen && !_osdShown)
+                    UpdateMediaLayerForFullscreen(immersive: true);
+            }
+
+            FadeTo(TopBar, 0.0, 200, hideAfter: true,
+                hideVisibility: HiddenChromeVisibility, onCompleted: OnChromeHidden);
             if (_vm.IsBottomBarVisible)
-                FadeTo(BottomBar, 0.0, 200, hideAfter: true, hideVisibility: HiddenChromeVisibility);
+                FadeTo(BottomBar, 0.0, 200, hideAfter: true,
+                    hideVisibility: HiddenChromeVisibility, onCompleted: OnChromeHidden);
             else
                 BottomBar.SetCurrentValue(UIElement.VisibilityProperty, Visibility.Collapsed);
         }
@@ -568,6 +616,8 @@ public partial class MainWindow : Window
         TopBar.Opacity = 0.0;
         BottomBar.Opacity = 0.0;
         SetChromeVisibility(visible: false);
+        if (_vm.IsFullscreen)
+            UpdateMediaLayerForFullscreen(immersive: true);
     }
 
     private void SetChromeVisibility(bool visible)
@@ -675,7 +725,7 @@ public partial class MainWindow : Window
     }
 
     private static void FadeTo(UIElement el, double target, int ms, bool hideAfter = false,
-        Visibility hideVisibility = Visibility.Collapsed)
+        Visibility hideVisibility = Visibility.Collapsed, Action? onCompleted = null)
     {
         var anim = new DoubleAnimation
         {
@@ -683,11 +733,12 @@ public partial class MainWindow : Window
             Duration = TimeSpan.FromMilliseconds(ms),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
-        if (hideAfter)
+        if (hideAfter || onCompleted is not null)
             anim.Completed += (_, _) =>
             {
-                if (Math.Abs(target) < 0.01)
+                if (hideAfter && Math.Abs(target) < 0.01)
                     el.SetCurrentValue(UIElement.VisibilityProperty, hideVisibility);
+                onCompleted?.Invoke();
             };
         el.BeginAnimation(UIElement.OpacityProperty, anim);
     }
@@ -718,6 +769,8 @@ public partial class MainWindow : Window
     {
         if (_playlistWin is null) return;
         SyncPlaylistWindowPosition();
+        _playlistWin.Topmost = _vm.IsFullscreen || Topmost;
+        Services.AppLog.Info($"Panel[right] show fs={_vm.IsFullscreen} osd={_osdShown}");
         _playlistWin.ShowSlide();
     }
 
@@ -725,6 +778,8 @@ public partial class MainWindow : Window
     {
         if (_recentWin is null) return;
         SyncRecentWindowPosition();
+        _recentWin.Topmost = _vm.IsFullscreen || Topmost;
+        Services.AppLog.Info($"Panel[left] show fs={_vm.IsFullscreen} osd={_osdShown}");
         _recentWin.ShowSlide();
     }
 
@@ -909,7 +964,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (IsActive)
+        if (IsActive && IsCursorOverNativeVideoSurface(screenPoint))
             PollFullscreenDoubleClick(relX, relY, w, h);
         else
             _pollLeftButtonWasDown = false;
@@ -1003,6 +1058,31 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private bool IsCursorOverNativeVideoSurface(Point screenPoint)
+    {
+        var hit = WindowFromPoint(new PinvokePoint
+        {
+            X = (int)Math.Round(screenPoint.X),
+            Y = (int)Math.Round(screenPoint.Y)
+        });
+        if (hit == IntPtr.Zero) return false;
+
+        if (_videoHost.Hwnd != IntPtr.Zero && IsWindowOrChild(_videoHost.Hwnd, hit))
+            return true;
+
+        try
+        {
+            var mpv = _mpvProc.Process;
+            return mpv is { HasExited: false }
+                   && GetWindowThreadProcessId(hit, out var processId) != 0
+                   && processId == (uint)mpv.Id;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool IsWindowOrChild(IntPtr parent, IntPtr hit) =>
         parent != IntPtr.Zero && (hit == parent || IsChild(parent, hit));
 
@@ -1085,7 +1165,7 @@ public partial class MainWindow : Window
         if (isDoubleClick)
         {
             _lastPollLeftDownUtc = DateTime.MinValue;
-            ToggleFullscreenFromDoubleClick("cursor-poll");
+            RequestFullscreenToggle("cursor-poll", FullscreenRequestKind.DoubleClick);
             return;
         }
 
@@ -1125,30 +1205,31 @@ public partial class MainWindow : Window
     {
         // 하단 transport bar 영역은 hot zone에서 제외.
         var bottomReserved = PanelBottomReserved;
-        var inLowerStrip = y >= h - bottomReserved;
+        var inLowerStrip = !_vm.IsFullscreen && y >= h - bottomReserved;
         // 창 모드에서는 화면 세로 상반부에서만 활성. 작업 중 무심코 좌우 edge를
         // 지나가다가 panel이 튀어나오는 것 방지.
         var inUpperHalf = y < h / 2;
         // 창 모드에서는 상단 절반만 열어 우발 동작을 줄이고, fullscreen에서는 edge
-        // 어디서든 의도대로 panel이 열리게 한다. 하단 transport strip은 계속 보호.
-        var canTriggerVertically = !inLowerStrip && (_vm.IsFullscreen || inUpperHalf);
+        // 어디서든 의도대로 panel이 열리게 한다.
+        var canTriggerVertically = _vm.IsFullscreen || (!inLowerStrip && inUpperHalf);
         // 패널 보호 영역: TopBar(상단 버튼들) 위에 마우스가 있을 때는 이미 열린 패널을
         // 닫지 않음. 안 그러면 패널 열고 우측의 환경설정/스크린샷/창 버튼 만지려고
         // 위로 갈 때 hot zone 벗어났다고 패널이 닫혀버려서 조작감 안 좋음.
         var inTopBar = y < (TopBar?.ActualHeight > 0 ? TopBar.ActualHeight : 36);
-        var inFullscreenTopGuard = _vm.IsFullscreen && y < FullscreenTopHotZoneGuardHeight;
         var triggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : HotZoneWidth;
         var leftTriggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : LeftHotZoneWidth;
+        var showDelayMs = _vm.IsFullscreen ? FullscreenPanelHoverShowDelayMs : PanelHoverShowDelayMs;
 
         if (_playlistWin is not null)
         {
-            // 좌/우 모두 같은 의도 폭. fullscreen에서는 edge 어디서든 열리되 하단 transport만 제외.
-            var inRight = x >= w - triggerWidth && canTriggerVertically && !inFullscreenTopGuard;
+            // 좌/우 모두 같은 의도 폭. fullscreen에서는 edge 전체 높이에서 바로 열린다.
+            var inRight = x >= w - triggerWidth && canTriggerVertically;
             UpdateSlidePanelHover(
                 inRight,
                 _playlistWin.IsShown,
                 _playlistWin.IsMouseOver,
-                inTopBar || inFullscreenTopGuard,
+                !_vm.IsFullscreen && inTopBar,
+                showDelayMs,
                 ShowPlaylistPanel,
                 _playlistWin.HideSlide,
                 ref _playlistHoverStartedUtc,
@@ -1156,12 +1237,13 @@ public partial class MainWindow : Window
         }
         if (_recentWin is not null)
         {
-            var inLeft = x >= 0 && x < leftTriggerWidth && canTriggerVertically && !inFullscreenTopGuard;
+            var inLeft = x >= 0 && x < leftTriggerWidth && canTriggerVertically;
             UpdateSlidePanelHover(
                 inLeft,
                 _recentWin.IsShown,
                 _recentWin.IsMouseOver,
-                inTopBar || inFullscreenTopGuard,
+                !_vm.IsFullscreen && inTopBar,
+                showDelayMs,
                 ShowRecentPanel,
                 _recentWin.HideSlide,
                 ref _recentHoverStartedUtc,
@@ -1174,6 +1256,7 @@ public partial class MainWindow : Window
         bool isShown,
         bool isMouseOver,
         bool inTopBar,
+        int showDelayMs,
         Action show,
         Action hide,
         ref DateTime hoverStartedUtc,
@@ -1187,7 +1270,7 @@ public partial class MainWindow : Window
                 hoverStartedUtc = now;
             lastKeepAliveUtc = now;
 
-            if (!isShown && now - hoverStartedUtc >= TimeSpan.FromMilliseconds(PanelHoverShowDelayMs))
+            if (!isShown && now - hoverStartedUtc >= TimeSpan.FromMilliseconds(showDelayMs))
                 show();
             return;
         }
@@ -1439,34 +1522,116 @@ public partial class MainWindow : Window
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (IsInteractiveDoubleClickTarget(e.OriginalSource as DependencyObject)) return;
-        ToggleFullscreenFromDoubleClick("wpf");
+        RequestFullscreenToggle("wpf", FullscreenRequestKind.DoubleClick);
         e.Handled = true;
     }
 
     private void OnFullscreenButtonClick(object? sender, RoutedEventArgs e)
     {
-        ToggleFullscreenFromControl("button");
+        RequestFullscreenToggle("button", FullscreenRequestKind.Control);
         e.Handled = true;
     }
 
-    private bool ToggleFullscreenFromDoubleClick(string source) =>
-        ToggleFullscreenCore(source, fromDoubleClick: true);
+    private enum FullscreenRequestKind
+    {
+        Control,
+        DoubleClick,
+        Keyboard,
+        WindowButton
+    }
 
-    private bool ToggleFullscreenFromControl(string source) =>
-        ToggleFullscreenCore(source, fromDoubleClick: false);
+    private void OnFullscreenShortcutKeyDown(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
+        var noModifiers = modifiers == ModifierKeys.None;
+        var altOnly = modifiers == ModifierKeys.Alt;
 
-    private bool ToggleFullscreenCore(string source, bool fromDoubleClick)
+        if (key == Key.Escape)
+        {
+            if (_vm.IsTrimMode)
+            {
+                _vm.CancelTrimModeCommand?.Execute(null);
+                e.Handled = true;
+                return;
+            }
+
+            if (_vm.IsFullscreen)
+            {
+                RequestFullscreenState(false, "keyboard-esc", FullscreenRequestKind.Keyboard);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        var isFullscreenShortcut =
+            (noModifiers && (key == Key.F || key == Key.F11 || key == Key.Enter || key == Key.Return)) ||
+            (altOnly && (key == Key.Enter || key == Key.Return));
+
+        if (!isFullscreenShortcut) return;
+
+        RequestFullscreenToggle("keyboard", FullscreenRequestKind.Keyboard);
+        e.Handled = true;
+    }
+
+    private bool RequestFullscreenToggle(string source, FullscreenRequestKind kind)
+    {
+        if (kind == FullscreenRequestKind.DoubleClick &&
+            !_vm.IsFullscreen &&
+            WindowState == WindowState.Maximized)
+        {
+            return RequestWindowRestoreFromDoubleClick(source);
+        }
+
+        return RequestFullscreenState(!_vm.IsFullscreen, source, kind);
+    }
+
+    private bool RequestWindowRestoreFromDoubleClick(string source)
     {
         var now = DateTime.UtcNow;
-        if (fromDoubleClick && (now - _lastDoubleClickToggleUtc).TotalMilliseconds < FullscreenToggleDebounceMs)
+        if ((now - _lastDoubleClickToggleUtc).TotalMilliseconds < FullscreenDoubleClickDuplicateSuppressMs)
+        {
+            Services.AppLog.Info($"FullscreenRequest[{source}] ignored duplicate kind=DoubleClick fs={_vm.IsFullscreen}");
             return false;
+        }
 
-        if (fromDoubleClick)
-            _lastDoubleClickToggleUtc = now;
+        _lastDoubleClickToggleUtc = now;
         ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
-        var prefix = fromDoubleClick ? "DblClick" : "Fullscreen";
-        Services.AppLog.Info($"{prefix}[{source}] → Fullscreen toggle (fs={_vm.IsFullscreen})");
-        _vm.IsFullscreen = !_vm.IsFullscreen;
+        Services.AppLog.Info($"FullscreenRequest[{source}] restore maximized window kind=DoubleClick");
+        WindowState = WindowState.Normal;
+        UpdateMaxRestoreButton();
+        return true;
+    }
+
+    private bool RequestFullscreenState(bool targetFullscreen, string source, FullscreenRequestKind kind)
+    {
+        var now = DateTime.UtcNow;
+        if (kind == FullscreenRequestKind.DoubleClick &&
+            (now - _lastDoubleClickToggleUtc).TotalMilliseconds < FullscreenDoubleClickDuplicateSuppressMs)
+        {
+            Services.AppLog.Info($"FullscreenRequest[{source}] ignored duplicate kind={kind} fs={_vm.IsFullscreen}");
+            return false;
+        }
+
+        if (targetFullscreen == _vm.IsFullscreen)
+        {
+            Services.AppLog.Info($"FullscreenRequest[{source}] ignored no-op kind={kind} fs={_vm.IsFullscreen}");
+            ResetFullscreenPointerTracking(suppressPollingUntilRelease: Mouse.LeftButton == MouseButtonState.Pressed);
+            return false;
+        }
+
+        if (kind == FullscreenRequestKind.DoubleClick)
+            _lastDoubleClickToggleUtc = now;
+
+        if (targetFullscreen)
+            _restoreNormalOnFullscreenExit = false;
+        else if (kind == FullscreenRequestKind.DoubleClick && _vm.IsFullscreen && _savedWasMaximized)
+            _restoreNormalOnFullscreenExit = true;
+
+        ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
+        Services.AppLog.Info(
+            $"FullscreenRequest[{source}] {(_vm.IsFullscreen ? "exit" : "enter")} -> {targetFullscreen} kind={kind}");
+        _vm.IsFullscreen = targetFullscreen;
         return true;
     }
 
@@ -1669,16 +1834,12 @@ public partial class MainWindow : Window
 
         if (_vm.IsFullscreen)
         {
-            ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
-            Services.AppLog.Info("Fullscreen[max-restore] → exit fullscreen");
-            _vm.IsFullscreen = false;
+            RequestFullscreenState(false, "max-restore", FullscreenRequestKind.WindowButton);
             e.Handled = true;
             return;
         }
 
-        ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        UpdateMaxRestoreButton();
+        RequestFullscreenState(true, "max-restore", FullscreenRequestKind.WindowButton);
         e.Handled = true;
     }
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
@@ -1686,7 +1847,7 @@ public partial class MainWindow : Window
     private void UpdateMaxRestoreButton()
     {
         if (MaxRestoreBtn is null) return;
-        MaxRestoreBtn.Content = (_vm?.IsFullscreen == true || WindowState == WindowState.Maximized)
+        MaxRestoreBtn.Content = _vm?.IsFullscreen == true
             ? "\uE923"
             : "\uE922";
     }
@@ -1710,29 +1871,22 @@ public partial class MainWindow : Window
 
         if (fs)
         {
-            UpdateMediaLayerForFullscreen(true);
+            UpdateMediaLayerForFullscreen(immersive: false);
             ShowControls("fullscreen-enter");
             try { Root.Focus(); Keyboard.Focus(Root); } catch { }
-            _savedResize = ResizeMode;
-            _savedWasMaximized = WindowState == WindowState.Maximized;
-            if (_savedWasMaximized)
+
+            var isVisuallyMaximized = WindowState == WindowState.Maximized;
+            if (!_hasFullscreenRestoreBounds)
+                CaptureFullscreenRestoreBounds(isVisuallyMaximized);
+
+            if (isVisuallyMaximized)
             {
-                var rb = RestoreBounds;
-                _savedLeft   = double.IsNaN(rb.Left)   ? 100  : rb.Left;
-                _savedTop    = double.IsNaN(rb.Top)    ? 60   : rb.Top;
-                _savedWidth  = rb.Width  > 480 ? rb.Width  : 1280;
-                _savedHeight = rb.Height > 320 ? rb.Height : 760;
                 // Maximized면 RestoreBounds로 visual 위치를 먼저 잡고 거기서 시작.
                 // 안 그러면 Maximized의 가상 bounds(-8,-8,fullW+16,fullH+16)에서
                 // 모니터로 점프 → 어색.
                 WindowState = WindowState.Normal;
                 Left = _savedLeft; Top = _savedTop;
                 Width = _savedWidth; Height = _savedHeight;
-            }
-            else
-            {
-                _savedLeft = Left; _savedTop = Top;
-                _savedWidth = Width; _savedHeight = Height;
             }
 
             EnsureCustomWindowStyle();
@@ -1751,8 +1905,10 @@ public partial class MainWindow : Window
         else
         {
             _fullscreenSettleHideTimer.Stop();
+            _fullscreenSettleUntilUtc = DateTime.MinValue;
             _ignoreStationaryFullscreenReveal = false;
             Mouse.OverrideCursor = null;
+            UpdateMediaLayerForFullscreen(immersive: false);
             SetResizeBorderForFullscreen(false);
             // 먼저 bounds를 saved로 animate, 끝난 후 resize/maximize 상태만 복원
             var tx = _savedLeft;
@@ -1762,9 +1918,12 @@ public partial class MainWindow : Window
             AnimateBounds(tx, ty, tw, th, durationMs: 140, onCompleted: () =>
             {
                 EnsureCustomWindowStyle();
-                UpdateMediaLayerForFullscreen(false);
+                UpdateMediaLayerForFullscreen(immersive: false);
                 ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
-                if (_savedWasMaximized) WindowState = WindowState.Maximized;
+                if (_savedWasMaximized && !_restoreNormalOnFullscreenExit)
+                    WindowState = WindowState.Maximized;
+                _restoreNormalOnFullscreenExit = false;
+                _hasFullscreenRestoreBounds = false;
                 SyncPlaylistWindowPosition();
                 SyncRecentWindowPosition();
             });
@@ -1774,16 +1933,38 @@ public partial class MainWindow : Window
         SyncRecentWindowPosition();
     }
 
+    private void CaptureFullscreenRestoreBounds(bool isVisuallyMaximized)
+    {
+        _savedResize = ResizeMode;
+        _savedWasMaximized = isVisuallyMaximized;
+        if (isVisuallyMaximized)
+        {
+            var rb = RestoreBounds;
+            _savedLeft = double.IsNaN(rb.Left) ? 100 : rb.Left;
+            _savedTop = double.IsNaN(rb.Top) ? 60 : rb.Top;
+            _savedWidth = rb.Width > 480 ? rb.Width : 1280;
+            _savedHeight = rb.Height > 320 ? rb.Height : 760;
+        }
+        else
+        {
+            _savedLeft = Left;
+            _savedTop = Top;
+            _savedWidth = Width;
+            _savedHeight = Height;
+        }
+        _hasFullscreenRestoreBounds = true;
+    }
+
     private void EnsureCustomWindowStyle()
     {
         if (WindowStyle != WindowStyle.None)
             WindowStyle = WindowStyle.None;
     }
 
-    private void UpdateMediaLayerForFullscreen(bool fullscreen)
+    private void UpdateMediaLayerForFullscreen(bool immersive)
     {
-        Grid.SetRow(MediaLayer, fullscreen ? 0 : 1);
-        Grid.SetRowSpan(MediaLayer, fullscreen ? 3 : 1);
+        Grid.SetRow(MediaLayer, immersive ? 0 : 1);
+        Grid.SetRowSpan(MediaLayer, immersive ? 3 : 1);
         Panel.SetZIndex(MediaLayer, 0);
         Panel.SetZIndex(TopBar, 20);
         Panel.SetZIndex(BottomBar, 20);
