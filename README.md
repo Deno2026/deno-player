@@ -1,94 +1,108 @@
 # Deno Video Player
 
-가볍고 빠른 Windows용 로컬 미디어 플레이어입니다. 영상, 오디오, 이미지를 빠르게 열어
-확인하는 데 집중합니다.
+🌐 English | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [简体中文](docs/README.zh-CN.md) | [Español](docs/README.es.md) | [Português (Brasil)](docs/README.pt-BR.md) | [Bahasa Indonesia](docs/README.id.md)
 
-광고 없음. 계정 없음. 클라우드 동기화 없음. 텔레메트리 없음.
+**A clean Windows media player for quickly checking local video, audio, images, and subtitles.**
+
+No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 ![Deno Video Player preview](docs/assets/preview.png)
 
-## Download
+## ✨ Why It’s Useful
 
-**처음 설치한다면 이것만 받으면 됩니다.**
+- Fast drag-and-drop playback for local media files
+- Automatically builds a playlist from the same folder
+- Hover side panels for playlist and recent files
+- Screenshots with `Ctrl + S`
+- Simple lossless clip trimming with `I` → `O` → `Ctrl + E`
+- Fullscreen controls that hide cleanly while watching
+- English and Korean app interface in Settings
+- Updates are shown first and installed only when you choose them
 
-[Download DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+## 🚀 Install in 3 Steps
 
-1. `DenoVideoPlayer-win-Setup.exe` 다운로드
-2. 실행
-3. `Deno Video Player` 실행 후 파일을 끌어다 놓기
+1. Download the latest installer:
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+2. Run the installer.
+3. Open **Deno Video Player**, then drag a media file into the window.
 
-첫 실행 때 필요한 재생 엔진을 자동으로 준비합니다. Windows SmartScreen이 뜰 수
-있습니다. GitHub Releases에서 받은 파일이 맞다면 `More info` -> `Run anyway`로
-진행하면 됩니다.
+On the first launch, the app prepares the playback engine it needs. This is normally a one-time setup.
 
-## What It Does
+If Windows SmartScreen appears, check that the file came from the official GitHub Releases page, then choose **More info** → **Run anyway**.
 
-- 비디오, 오디오, 이미지 파일 빠르게 열기
-- 파일을 열면 같은 폴더의 미디어를 자동 재생목록으로 구성
-- 오른쪽 가장자리 hover로 재생목록, 왼쪽 가장자리 hover로 최근 파일 열기
-- 더블클릭, `F`, `Enter`로 전체화면
-- 스크린샷 저장
-- 재생속도 프리셋
-- 간단한 무손실 구간 추출
-- 설정에서 한국어 / English 표시 언어 선택
-- 새 버전 알림 후 사용자가 클릭할 때만 업데이트
+## 📦 Portable Option
 
-## Portable Option
+Prefer not to install? Download the latest `portable-win-x64.zip` from [Releases](https://github.com/Deno2026/deno-video-player/releases), unzip it, and run `DenoVideoPlayer.exe`.
 
-설치 없이 쓰고 싶다면 Releases에서
-`portable-win-x64.zip` 이름의 portable zip을 받을 수 있습니다.
-압축을 풀고 `DenoVideoPlayer.exe`를 실행하면 됩니다.
+For most beginners, the `Setup.exe` installer is the easier choice.
 
-초보자에게는 `Setup.exe`를 권장합니다.
+## 🎬 What You Can Do
 
-## Trim Clips
+### Open and Review Media Quickly
 
-필요한 구간만 빠르게 저장할 수 있습니다.
+Drop a video, audio file, image, or subtitle-friendly video into the player. Deno Video Player focuses on fast local review, not library management.
 
-1. `I`로 시작점 지정
-2. `O`로 끝점 지정
-3. `Ctrl + E`로 저장
+### Browse the Same Folder
 
-원본 폴더에 `_clip_시작-종료` 파일이 만들어집니다. FFmpeg stream copy 방식이라
-재인코딩 없이 빠르고 화질 손실이 없습니다. 다만 키프레임 단위라 시작/끝 지점이
-몇 초 정도 달라질 수 있습니다.
+When you open one file, the app can use nearby media files in the same folder as a simple playlist. This is useful for checking renders, exports, references, and downloaded clips.
 
-## Shortcuts
+### Trim a Clip Without Re-encoding
 
-| 기능 | 단축키 |
-|---|---|
-| 재생/일시정지 | `Space` |
-| 길게 누르는 동안 2배속 | `Space` hold |
-| 5초 이동 | `←` / `→` |
-| 30초 이동 | `Shift + ←` / `Shift + →` |
-| 볼륨 | `↑` / `↓` 또는 마우스 휠 |
-| 음소거 | `M` |
-| 전체화면 | `F` / `F11` / `Enter` / `Alt + Enter` / 더블클릭 |
-| 전체화면 해제 | `Esc` |
-| 이전/다음 파일 | `PageUp` / `PageDown` 또는 `Ctrl + ←` / `Ctrl + →` |
-| 배속 조절 | 하단 `1.0x` 버튼 또는 `Shift + .` / `Shift + ,` |
-| 스크린샷 | `Ctrl + S` |
-| 항상 위 | `Ctrl + T` |
-| 재생목록 | `P` / `Ctrl + L` |
-| 자막 표시/전환 | `V` / `Shift + V` |
-| 오디오 트랙 전환 | `Ctrl + J` |
-| 구간 추출 | `I` -> `O` -> `Ctrl + E` |
+Use:
 
-## Supported Files
+1. `I` to mark the start point
+2. `O` to mark the end point
+3. `Ctrl + E` to save the clip
 
-- Video: `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- Audio: `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
-- Image: `.jpg .jpeg .png .webp .bmp .gif`
-- Subtitles: `.srt .ass .ssa .vtt .sub .idx .sup .smi`
+The trim feature uses FFmpeg stream copy, so it is fast and does not re-encode the video. Start and end points may land near keyframes instead of the exact visible frame.
 
-## What It Does Not Do
+## 🧩 Supported Files
+
+- **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Image:** `.jpg .jpeg .png .webp .bmp .gif`
+- **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
+
+## 🌍 Language Support
+
+The app interface currently supports:
+
+- English
+- Korean
+
+You can change the display language in **Settings**.
+
+## ⌨️ Handy Shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| Play / pause | `Space` |
+| Hold 2x speed | Hold `Space` |
+| Seek 5 seconds | `←` / `→` |
+| Seek 30 seconds | `Shift + ←` / `Shift + →` |
+| Volume | `↑` / `↓` or mouse wheel |
+| Mute | `M` |
+| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click |
+| Exit fullscreen | `Esc` |
+| Previous / next file | `PageUp` / `PageDown` or `Ctrl + ←` / `Ctrl + →` |
+| Screenshot | `Ctrl + S` |
+| Always on top | `Ctrl + T` |
+| Playlist | `P` / `Ctrl + L` |
+| Subtitle track | `V` / `Shift + V` |
+| Audio track | `Ctrl + J` |
+| Trim clip | `I` → `O` → `Ctrl + E` |
+
+## 🔒 What It Does Not Do
 
 Deno Video Player intentionally avoids heavy media-library behavior.
 
-No ads, login, cloud sync, analytics, recommendations, store, plugin marketplace,
-codec-pack prompts, background library indexing, timeline editor, or AI features.
+It does not include ads, login, cloud sync, analytics, recommendations, background library indexing, a store, plugin marketplace, timeline editor, or AI features.
 
-## Build From Source
+## 🗒️ Updates
+
+See [CHANGELOG.md](CHANGELOG.md) for recent user-facing changes.
+
+## 🛠️ Developer Notes
 
 ```powershell
 dotnet restore DenoVideoPlayer.sln
@@ -96,11 +110,8 @@ dotnet test .\DenoVideoPlayer.sln --configuration Release
 dotnet publish .\DenoVideoPlayer.csproj -c Release -r win-x64 --self-contained true -o .\publish\DenoVideoPlayer-win-x64
 ```
 
-## License
+## 🧾 License
 
-Code is MIT licensed. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+Deno Video Player source code is released under [The Unlicense](LICENSE). You can use, copy, modify, publish, distribute, and use it commercially.
 
-Playback uses mpv as an external process. Public packages do not redistribute mpv
-or FFmpeg binaries; the app prepares them on the user's machine when needed.
-Those runtime files are cached under `%LOCALAPPDATA%\DenoVideoPlayer\runtime`,
-so normal app updates do not download the playback engine again.
+Third-party tools such as mpv, FFmpeg, Velopack, and 7-Zip remain under their own licenses. See [NOTICE.md](NOTICE.md) for details.

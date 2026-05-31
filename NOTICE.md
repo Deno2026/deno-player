@@ -1,5 +1,8 @@
 # Third-party Notices
 
+Deno Video Player source code is released under The Unlicense. Third-party
+tools and libraries listed below keep their own licenses.
+
 ## mpv
 
 This program uses **mpv** (https://mpv.io) as an external media playback
