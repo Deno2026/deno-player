@@ -29,6 +29,9 @@ internal static class VisualSearch
 /// </summary>
 public partial class PlaylistWindow : Window
 {
+    private const int ShowSlideMs = 120;
+    private const int HideSlideMs = 110;
+
     public bool IsShown { get; private set; }
     /// <summary>Show/Hide 시작 시점 통지 — MainWindow가 영상 host margin sync용.</summary>
     public event Action<bool>? ShownChanged;
@@ -69,7 +72,7 @@ public partial class PlaylistWindow : Window
         var slide = new DoubleAnimation
         {
             To = 0,
-            Duration = TimeSpan.FromMilliseconds(100),
+            Duration = TimeSpan.FromMilliseconds(ShowSlideMs),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
@@ -88,8 +91,8 @@ public partial class PlaylistWindow : Window
         var slide = new DoubleAnimation
         {
             To = Width,
-            Duration = TimeSpan.FromMilliseconds(100),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            Duration = TimeSpan.FromMilliseconds(HideSlideMs),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         slide.Completed += (_, _) =>
         {
@@ -99,10 +102,8 @@ public partial class PlaylistWindow : Window
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
     }
 
-    // 패널 닫힘은 MainWindow의 통합 hot zone polling(GetCursorPos 80ms)에서만 처리.
-    // 여기서 즉시 HideSlide 호출하면 패널→TopBar로 마우스 이동 중 self-close 발생해서
-    // 위쪽 TopBar 버튼 조작이 불가. main window가 inTopBar / IsMouseOver 모두 보고
-    // 일관 판정.
+    // 닫힘 판정은 MainWindow의 통합 hot zone polling에서만 처리.
+    // HideSlide는 즉시 시작하되 짧은 slide-out으로 자연스럽게 숨긴다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 

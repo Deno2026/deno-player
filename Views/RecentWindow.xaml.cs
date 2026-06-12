@@ -10,6 +10,9 @@ namespace DenoVideoPlayer.Views;
 
 public partial class RecentWindow : Window
 {
+    private const int ShowSlideMs = 120;
+    private const int HideSlideMs = 110;
+
     public bool IsShown { get; private set; }
     public event Action<bool>? ShownChanged;
     public new MainViewModel? DataContext
@@ -48,7 +51,7 @@ public partial class RecentWindow : Window
         var slide = new DoubleAnimation
         {
             To = 0,
-            Duration = TimeSpan.FromMilliseconds(100),
+            Duration = TimeSpan.FromMilliseconds(ShowSlideMs),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
@@ -63,8 +66,8 @@ public partial class RecentWindow : Window
         var slide = new DoubleAnimation
         {
             To = -Width,
-            Duration = TimeSpan.FromMilliseconds(100),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            Duration = TimeSpan.FromMilliseconds(HideSlideMs),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         slide.Completed += (_, _) =>
         {
@@ -75,7 +78,7 @@ public partial class RecentWindow : Window
     }
 
     // PlaylistWindow와 동일: 닫힘 판정은 MainWindow.UpdateHotZones에서 일원화.
-    // self-close 하면 패널→TopBar로 마우스 올릴 때 닫혀서 위 버튼 조작 불가.
+    // HideSlide는 즉시 시작하되 짧은 slide-out으로 자연스럽게 숨긴다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 

@@ -37,9 +37,12 @@ public partial class MainWindow : Window
     private const int HotZoneWidth = 72;            // 창 모드 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
     private const int LeftHotZoneWidth = 72;        // 좌/우를 같은 폭으로 맞춰 의도치 않은 최근 파일 panel 열림을 줄임.
     private const int FullscreenHotZoneWidth = 96;  // fullscreen은 edge 접근성이 더 중요. 실제 화면 끝에서 놓치지 않게 넓힘.
-    private const int FullscreenPanelHoverShowDelayMs = 60;
-    private const int PanelHoverShowDelayMs = 180;  // edge를 스쳐 지나갈 때는 열지 않음
-    private const int PanelHoverHideGraceMs = 650;  // 경계 근처 mouse wobble로 열림/닫힘 반복 방지
+    private const int PanelEdgeImmediateWidth = 18;
+    private const int FullscreenPanelEdgeImmediateWidth = 24;
+    private const int PanelNearHoverMinDelayMs = 60;
+    private const int PanelNearHoverMaxDelayMs = 170;
+    private const int FullscreenPanelNearHoverMaxDelayMs = 110;
+    private const int PanelHoverHideGraceMs = 0;    // edge/panel 밖으로 나가면 다음 polling tick에서 바로 접힘
     private const int FullscreenSettleHideMs = 3000;
     private const double FullscreenStationaryRevealThreshold = 16.0;
     private const double WindowResizeBorderDip = 6.0;
@@ -1212,24 +1215,24 @@ public partial class MainWindow : Window
         // 창 모드에서는 상단 절반만 열어 우발 동작을 줄이고, fullscreen에서는 edge
         // 어디서든 의도대로 panel이 열리게 한다.
         var canTriggerVertically = _vm.IsFullscreen || (!inLowerStrip && inUpperHalf);
-        // 패널 보호 영역: TopBar(상단 버튼들) 위에 마우스가 있을 때는 이미 열린 패널을
-        // 닫지 않음. 안 그러면 패널 열고 우측의 환경설정/스크린샷/창 버튼 만지려고
-        // 위로 갈 때 hot zone 벗어났다고 패널이 닫혀버려서 조작감 안 좋음.
-        var inTopBar = y < (TopBar?.ActualHeight > 0 ? TopBar.ActualHeight : 36);
         var triggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : HotZoneWidth;
         var leftTriggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : LeftHotZoneWidth;
-        var showDelayMs = _vm.IsFullscreen ? FullscreenPanelHoverShowDelayMs : PanelHoverShowDelayMs;
 
         if (_playlistWin is not null)
         {
-            // 좌/우 모두 같은 의도 폭. fullscreen에서는 edge 전체 높이에서 바로 열린다.
-            var inRight = x >= w - triggerWidth && canTriggerVertically;
+            // 창 밖 오른쪽은 hot zone이 아니다. 이전에는 x > w도 우측 edge로
+            // 해석돼 패널이 남을 수 있었다.
+            var distanceFromRightEdge = w - x;
+            var inRight = distanceFromRightEdge >= 0 && distanceFromRightEdge <= triggerWidth && canTriggerVertically;
+            var rightShowDelayMs = PanelHoverShowDelayForDistance(
+                distanceFromRightEdge,
+                triggerWidth,
+                _vm.IsFullscreen);
             UpdateSlidePanelHover(
                 inRight,
                 _playlistWin.IsShown,
                 _playlistWin.IsMouseOver,
-                !_vm.IsFullscreen && inTopBar,
-                showDelayMs,
+                rightShowDelayMs,
                 ShowPlaylistPanel,
                 _playlistWin.HideSlide,
                 ref _playlistHoverStartedUtc,
@@ -1237,13 +1240,17 @@ public partial class MainWindow : Window
         }
         if (_recentWin is not null)
         {
-            var inLeft = x >= 0 && x < leftTriggerWidth && canTriggerVertically;
+            var distanceFromLeftEdge = x;
+            var inLeft = distanceFromLeftEdge >= 0 && distanceFromLeftEdge <= leftTriggerWidth && canTriggerVertically;
+            var leftShowDelayMs = PanelHoverShowDelayForDistance(
+                distanceFromLeftEdge,
+                leftTriggerWidth,
+                _vm.IsFullscreen);
             UpdateSlidePanelHover(
                 inLeft,
                 _recentWin.IsShown,
                 _recentWin.IsMouseOver,
-                !_vm.IsFullscreen && inTopBar,
-                showDelayMs,
+                leftShowDelayMs,
                 ShowRecentPanel,
                 _recentWin.HideSlide,
                 ref _recentHoverStartedUtc,
@@ -1251,11 +1258,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private static int PanelHoverShowDelayForDistance(double distanceFromEdge, double triggerWidth, bool fullscreen)
+    {
+        var immediateWidth = fullscreen ? FullscreenPanelEdgeImmediateWidth : PanelEdgeImmediateWidth;
+        if (distanceFromEdge <= immediateWidth) return 0;
+
+        var maxDelay = fullscreen ? FullscreenPanelNearHoverMaxDelayMs : PanelNearHoverMaxDelayMs;
+        var rampWidth = Math.Max(1.0, triggerWidth - immediateWidth);
+        var t = Math.Clamp((distanceFromEdge - immediateWidth) / rampWidth, 0.0, 1.0);
+        return (int)Math.Round(PanelNearHoverMinDelayMs + (maxDelay - PanelNearHoverMinDelayMs) * t);
+    }
+
     private static void UpdateSlidePanelHover(
         bool inTrigger,
         bool isShown,
         bool isMouseOver,
-        bool inTopBar,
         int showDelayMs,
         Action show,
         Action hide,
@@ -1281,7 +1298,7 @@ public partial class MainWindow : Window
         if (lastKeepAliveUtc == DateTime.MinValue)
             lastKeepAliveUtc = now;
 
-        if (isMouseOver || inTopBar)
+        if (isMouseOver)
         {
             lastKeepAliveUtc = now;
             return;
