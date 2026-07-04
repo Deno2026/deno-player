@@ -1,6 +1,6 @@
 # Third-party Notices
 
-Deno Video Player source code is released under The Unlicense. Third-party
+Deno Video Player source code is released under GNU GPL v3.0 (`GPL-3.0-only`). Third-party
 tools and libraries listed below keep their own licenses.
 
 ## mpv

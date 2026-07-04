@@ -110,6 +110,6 @@ dotnet publish .\DenoVideoPlayer.csproj -c Release -r win-x64 --self-contained t
 
 ## 🧾 许可证
 
-Deno Video Player 源代码基于 [The Unlicense](../LICENSE) 发布。你可以自由用于个人、商业、复制、修改和分发。
+Deno Video Player 源代码基于 [GNU GPL v3.0](../LICENSE) (`GPL-3.0-only`) 发布。你可以使用、学习、修改和再分发，也可以用于商业用途。分发修改版本时必须遵循 GPL-3.0，并保留所需的许可证和版权声明。
 
 mpv、FFmpeg、Velopack、7-Zip 等第三方工具仍遵循各自的许可证。详情请查看 [NOTICE.md](../NOTICE.md)。

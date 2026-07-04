@@ -110,6 +110,6 @@ dotnet publish .\DenoVideoPlayer.csproj -c Release -r win-x64 --self-contained t
 
 ## 🧾 라이선스
 
-Deno Video Player 소스 코드는 [The Unlicense](../LICENSE)로 배포됩니다. 개인/상업적 이용, 복사, 수정, 배포가 자유롭습니다.
+Deno Video Player 소스 코드는 [GNU GPL v3.0](../LICENSE) (`GPL-3.0-only`)으로 배포됩니다. 사용, 학습, 수정, 재배포, 상업적 이용이 가능합니다. 수정본을 배포할 때는 GPL-3.0을 따라야 하며 필요한 라이선스와 저작권 고지를 유지해야 합니다.
 
 mpv, FFmpeg, Velopack, 7-Zip 같은 외부 도구는 각자의 라이선스를 따릅니다. 자세한 내용은 [NOTICE.md](../NOTICE.md)를 확인하세요.

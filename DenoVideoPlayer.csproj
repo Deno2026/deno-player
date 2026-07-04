@@ -16,7 +16,7 @@
     <AssemblyTitle>Deno Video Player</AssemblyTitle>
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
-    <PackageLicenseExpression>Unlicense</PackageLicenseExpression>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Version>0.4.9</Version>
     <FileVersion>0.4.9.0</FileVersion>
     <InformationalVersion>0.4.9</InformationalVersion>
