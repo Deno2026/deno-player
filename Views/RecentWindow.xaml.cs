@@ -10,9 +10,6 @@ namespace DenoVideoPlayer.Views;
 
 public partial class RecentWindow : Window
 {
-    private const int ShowSlideMs = 120;
-    private const int HideSlideMs = 110;
-
     public bool IsShown { get; private set; }
     public event Action<bool>? ShownChanged;
     public new MainViewModel? DataContext
@@ -24,11 +21,16 @@ public partial class RecentWindow : Window
     // ContextMenu open count — PlaylistWindow와 동일 패턴. 우클릭 메뉴 떴을 때
     // 메인 polling이 IsMouseOver=false라 닫지 않게.
     private int _ctxMenuOpenCount;
+    private long _acceptItemClicksAfterTick;
+    private RecentItem? _pressedItem;
+    private readonly SlidePanelMotion _motion;
 
     public RecentWindow()
     {
         InitializeComponent();
         Width = 340;
+        _motion = new SlidePanelMotion(SlideTx, -Width);
+        _motion.ResetHidden();
         AddHandler(FrameworkElement.ContextMenuOpeningEvent,
             new ContextMenuEventHandler((_, _) => _ctxMenuOpenCount++), true);
         AddHandler(FrameworkElement.ContextMenuClosingEvent,
@@ -38,43 +40,31 @@ public partial class RecentWindow : Window
 
     public void ShowSlide()
     {
-        DataContext?.PruneMissingRecents(save: true);
         if (IsShown) return;
+        _pressedItem = null;
         if (!IsVisible)
         {
-            SlideTx.BeginAnimation(TranslateTransform.XProperty, null);
-            SlideTx.X = -Width;
+            _motion.ResetHidden();
             Show();
         }
         IsShown = true;
         ShownChanged?.Invoke(true);
-        var slide = new DoubleAnimation
-        {
-            To = 0,
-            Duration = TimeSpan.FromMilliseconds(ShowSlideMs),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
+        var revealDurationMs = _motion.Reveal();
+        _acceptItemClicksAfterTick = Environment.TickCount64 + revealDurationMs + 40;
     }
 
     public void HideSlide()
     {
         if (!IsShown) return;
         if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
+        _pressedItem = null;
         IsShown = false;
         ShownChanged?.Invoke(false);
-        var slide = new DoubleAnimation
-        {
-            To = -Width,
-            Duration = TimeSpan.FromMilliseconds(HideSlideMs),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        slide.Completed += (_, _) =>
+        _motion.Conceal(() =>
         {
             if (!IsShown)
                 Hide();
-        };
-        SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
+        });
     }
 
     // PlaylistWindow와 동일: 닫힘 판정은 MainWindow.UpdateHotZones에서 일원화.
@@ -82,12 +72,32 @@ public partial class RecentWindow : Window
     private void OnPanelEnter(object sender, MouseEventArgs e) { }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 
+    private void OnItemPressed(object sender, MouseButtonEventArgs e)
+    {
+        _pressedItem = null;
+        if (Environment.TickCount64 < _acceptItemClicksAfterTick) return;
+        if (e.OriginalSource is DependencyObject d)
+            _pressedItem = VisualSearch.FindAncestor<ListBoxItem>(d)?.Content as RecentItem;
+    }
+
     private void OnItemClicked(object sender, MouseButtonEventArgs e)
     {
+        // The panel can materialize underneath a click that started on the
+        // fullscreen edge. Ignore that release so it cannot open a recent file.
+        if (Environment.TickCount64 < _acceptItemClicksAfterTick)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        var pressedItem = _pressedItem;
+        _pressedItem = null;
+        if (pressedItem is null) return;
+
         if (e.OriginalSource is DependencyObject d)
         {
             var lbi = VisualSearch.FindAncestor<ListBoxItem>(d);
-            if (lbi?.Content is RecentItem ri)
+            if (lbi?.Content is RecentItem ri && ReferenceEquals(pressedItem, ri))
             {
                 DataContext?.OpenPath(ri.FullPath);
                 e.Handled = true;
@@ -100,9 +110,7 @@ public partial class RecentWindow : Window
     private void OnClearAll(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not { } vm) return;
-        vm.Recents.Clear();
-        vm.Settings.RecentFiles = new List<string>();
-        vm.SaveSettingsNow();
+        vm.ClearRecents();
     }
 
     private void OnRevealInExplorer(object sender, RoutedEventArgs e)

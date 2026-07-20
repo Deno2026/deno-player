@@ -19,10 +19,15 @@ public class PlaylistServiceTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch { }
     }
 
-    private string Touch(string name)
+    private string Touch(string name, DateTime? createdUtc = null)
     {
         var p = Path.Combine(_dir, name);
         File.WriteAllText(p, "");
+        if (createdUtc is { } t)
+        {
+            File.SetCreationTimeUtc(p, t);
+            File.SetLastWriteTimeUtc(p, t);
+        }
         return p;
     }
 
@@ -47,11 +52,23 @@ public class PlaylistServiceTests : IDisposable
         Assert.Equal("a.mp4", list[0].FileName);
     }
 
-    [Fact] public void NaturallySortsItems()
+    [Fact] public void SortsNewestCreationTimeFirst()
     {
-        Touch("clip_10.mp4");
-        Touch("clip_2.mp4");
-        Touch("clip_1.mp4");
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("clip_1.mp4", baseTime.AddMinutes(1));
+        Touch("clip_2.mp4", baseTime.AddMinutes(3));
+        Touch("clip_10.mp4", baseTime.AddMinutes(2));
+        var list = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
+        Assert.Equal(new[] { "clip_2.mp4", "clip_10.mp4", "clip_1.mp4" },
+                     list.Select(m => m.FileName).ToArray());
+    }
+
+    [Fact] public void NaturallySortsItemsWithSameCreationTime()
+    {
+        var sameTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("clip_10.mp4", sameTime);
+        Touch("clip_2.mp4", sameTime);
+        Touch("clip_1.mp4", sameTime);
         var list = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
         Assert.Equal(new[] { "clip_1.mp4", "clip_2.mp4", "clip_10.mp4" },
                      list.Select(m => m.FileName).ToArray());
@@ -59,9 +76,10 @@ public class PlaylistServiceTests : IDisposable
 
     [Fact] public void IndexOfFindsItem()
     {
-        Touch("a.mp4");
-        var b = Touch("b.mp4");
-        Touch("c.mp4");
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("a.mp4", baseTime.AddMinutes(1));
+        var b = Touch("b.mp4", baseTime.AddMinutes(2));
+        Touch("c.mp4", baseTime.AddMinutes(3));
         var list = _svc.BuildFromFile(Path.Combine(_dir, "a.mp4"));
         Assert.Equal(1, _svc.IndexOf(list, b));
     }

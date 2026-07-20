@@ -21,7 +21,7 @@ public sealed class ExtItem : INotifyPropertyChanged
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }
 
-public sealed class ExtGroup
+public sealed class ExtGroup : INotifyPropertyChanged
 {
     public string Title { get; }
     public ObservableCollection<ExtItem> Items { get; }
@@ -29,6 +29,14 @@ public sealed class ExtGroup
     {
         Title = title;
         Items = new ObservableCollection<ExtItem>(items);
+        foreach (var item in Items)
+        {
+            item.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ExtItem.Selected))
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AllSelected)));
+            };
+        }
     }
     public IEnumerable<string> SelectedExtensions =>
         Items.Where(i => i.Selected).Select(i => i.Extension);
@@ -39,8 +47,11 @@ public sealed class ExtGroup
         set
         {
             foreach (var i in Items) i.Selected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AllSelected)));
         }
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
@@ -92,7 +103,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     private static readonly string[] VideoExts =
         { ".mp4", ".mkv", ".mov", ".webm", ".avi", ".m4v", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp" };
     private static readonly string[] AudioExts =
-        { ".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".opus", ".wma", ".alac" };
+        { ".mp3", ".wav", ".flac", ".aac", ".m4a", ".mka", ".ogg", ".opus", ".wma", ".alac" };
     private static readonly string[] ImageExts =
         { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
 

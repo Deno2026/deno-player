@@ -20,14 +20,13 @@ public partial class MainWindow : Window
     private readonly MpvProcessService _mpvProc = new();
     private readonly Win32VideoHost _videoHost = new();
     private readonly MainViewModel _vm;
-    private readonly DispatcherTimer _controlsHideTimer;
-    private readonly DispatcherTimer _fullscreenSettleHideTimer;
     private readonly CancellationTokenSource _runtimePrepareCts = new();
     private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _hasFullscreenRestoreBounds;
     private bool _restoreNormalOnFullscreenExit;
     private bool _closing;
+    private bool _mpvStartupOrRecovery;
     private int _mpvRestartCount;
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
@@ -39,17 +38,20 @@ public partial class MainWindow : Window
     private const int FullscreenHotZoneWidth = 96;  // fullscreen은 edge 접근성이 더 중요. 실제 화면 끝에서 놓치지 않게 넓힘.
     private const int PanelEdgeImmediateWidth = 18;
     private const int FullscreenPanelEdgeImmediateWidth = 24;
-    private const int PanelNearHoverMinDelayMs = 60;
-    private const int PanelNearHoverMaxDelayMs = 170;
-    private const int FullscreenPanelNearHoverMaxDelayMs = 110;
+    private const int PanelNearHoverMinDelayMs = 30;
+    private const int PanelNearHoverMaxDelayMs = 90;
+    private const int FullscreenPanelNearHoverMaxDelayMs = 55;
+    private const int FullscreenLeftEdgeOutsideBridgeWidth = 36;
     private const int PanelHoverHideGraceMs = 0;    // edge/panel 밖으로 나가면 다음 polling tick에서 바로 접힘
-    private const int FullscreenSettleHideMs = 3000;
     private const double FullscreenStationaryRevealThreshold = 16.0;
     private const double WindowResizeBorderDip = 6.0;
     private const int VkLButton = 0x01;
+    private const int VkMButton = 0x04;
+    private const int VkControl = 0x11;
     private const int FullscreenDoubleClickDuplicateSuppressMs = 650;
     private const int WindowButtonDebounceMs = 320;
     private bool _pollLeftButtonWasDown;
+    private bool _pollMiddleButtonWasDown;
     private bool _ignorePollUntilLeftReleased;
     private DateTime _lastPollLeftDownUtc = DateTime.MinValue;
     private DateTime _suppressPollClickUntilUtc = DateTime.MinValue;
@@ -58,23 +60,71 @@ public partial class MainWindow : Window
     private Point _lastPollLeftDownPos;
     private DateTime _playlistHoverStartedUtc = DateTime.MinValue;
     private DateTime _playlistLastKeepAliveUtc = DateTime.MinValue;
+    private bool _playlistManuallyOpened;
     private DateTime _recentHoverStartedUtc = DateTime.MinValue;
     private DateTime _recentLastKeepAliveUtc = DateTime.MinValue;
     private bool _ignoreStationaryFullscreenReveal;
     private Point _fullscreenHiddenAtMouse;
-    private DateTime _fullscreenSettleUntilUtc = DateTime.MinValue;
     private int _boundsAnimationSerial;
     private bool _updatePromptOpen;
+    private bool _ownedModalOpen;
+    private bool _videoPanDragging;
+    private bool _videoPanUsesPolledButtonState;
+    private bool _videoPanSawAsyncButtonDown;
+    private int _videoPanAsyncReleaseMisses;
+    private Point _videoPanLastScreenPoint;
+    private Point _videoPanStartPoint;
+    private double _videoPanStartX;
+    private double _videoPanStartY;
+    private double _videoScaleCurrent = 1.0;
+    private double _videoScaleTarget = 1.0;
+    private double _videoPanXCurrent;
+    private double _videoPanYCurrent;
+    private double _videoPanXTarget;
+    private double _videoPanYTarget;
+    private Point _queuedVideoPanScreenPoint;
+    private string _queuedVideoPanSource = "video-pan";
+    private int _videoPanDispatchScheduled;
+    private DateTime _lastVideoPanKeepAliveUtc = DateTime.MinValue;
+    private IntPtr _mouseWheelHook;
+    private LowLevelMouseProc? _mouseWheelHookProc;
+    private int _queuedVideoWheelDelta;
+    private int _videoWheelDispatchScheduled;
+    private int _volumeWheelRemainder;
+    private int _overlaySyncScheduled;
+    private bool _audioAnimationRunning;
+    private bool _loadingAnimationRunning;
+    private const double VideoHostScaleMin = 1.0;
+    private const double VideoHostScaleMax = 8.0;
+    private const double VideoHostWheelFactor = 1.18;
+    private const int VideoPanKeepAliveThrottleMs = 250;
 
 
-    public MainWindow()
+    public MainWindow() : this(new SettingsService().Load())
+    {
+    }
+
+    internal MainWindow(AppSettings startupSettings)
     {
         InitializeComponent();
         EnsureCustomWindowStyle();
-        _vm = new MainViewModel(_mpvProc);
+        _vm = new MainViewModel(_mpvProc, startupSettings);
         DataContext = _vm;
         _videoHost.DoubleClicked += () =>
             Dispatcher.BeginInvoke(() => RequestFullscreenToggle("video-host", FullscreenRequestKind.DoubleClick));
+        _videoHost.ActivationRequested += () => Dispatcher.BeginInvoke(() =>
+        {
+            Activate();
+            try { Root.Focus(); Keyboard.Focus(Root); } catch { }
+        }, DispatcherPriority.Input);
+        _videoHost.MouseWheelDelta += delta =>
+            HandleVideoSurfaceWheel(delta, "video-host");
+        _videoHost.MiddleButtonDown += () =>
+            BeginVideoPanDrag(GetCurrentCursorScreenPoint(), "video-host");
+        _videoHost.MiddleButtonMove += () =>
+            QueueVideoPanDrag(GetCurrentCursorScreenPoint(), "video-host");
+        _videoHost.MiddleButtonUp += () =>
+            EndVideoPanDrag("video-host");
 
         var s = _vm.Settings;
         if (s.WindowWidth >= 480 && s.WindowHeight >= 320)
@@ -109,21 +159,10 @@ public partial class MainWindow : Window
 
         VideoHostSlot.Content = _videoHost;
 
-        _controlsHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(s.ControlAutoHideMs) };
-        _controlsHideTimer.Tick += (_, _) => HideControls(source: "auto-timer");
-
-        _fullscreenSettleHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FullscreenSettleHideMs) };
-        _fullscreenSettleHideTimer.Tick += (_, _) =>
-        {
-            _fullscreenSettleHideTimer.Stop();
-            ArmStationaryFullscreenRevealGuard();
-            Services.AppLog.Info("Fullscreen settle hide fired");
-            HideControls(force: true, source: "fullscreen-settle");
-        };
 
         _mpvProc.Crashed += () => Dispatcher.BeginInvoke(() =>
         {
-            if (_closing) return;
+            if (_closing || _mpvStartupOrRecovery) return;
             // 자동 재시작 — 한 세션에서 일정 한도까지만 (무한 루프 방지)
             if (_mpvRestartCount < MaxMpvRestarts &&
                 DateTime.UtcNow - _lastMpvRestartAt > TimeSpan.FromSeconds(5))
@@ -142,6 +181,7 @@ public partial class MainWindow : Window
         // mouse hot zone / mouse activity 둘 다 GetCursorPos polling tick에서 처리.
         _vm.Toast       += msg => Dispatcher.BeginInvoke(() => ShowToast(msg));
         _vm.UpdatePromptRequested += req => Dispatcher.BeginInvoke(() => ShowUpdatePrompt(req));
+        _vm.PlaylistToggleRequested += () => Dispatcher.BeginInvoke(TogglePlaylistPanel);
 
         SourceInitialized += OnSourceInit;
         Loaded   += OnWindowLoaded;
@@ -155,8 +195,16 @@ public partial class MainWindow : Window
         PreviewKeyDown += OnFullscreenShortcutKeyDown;
         PreviewKeyUp += OnSpaceUp;
         StateChanged += OnStateChanged;
-        LocationChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
-        SizeChanged += (_, _) => { SyncPlaylistWindowPosition(); SyncRecentWindowPosition(); };
+        LocationChanged += (_, _) => SyncOverlayWindowPositionsSoon();
+        SizeChanged += (_, _) =>
+        {
+            SyncOverlayWindowPositionsSoon();
+            _videoHost.FitVideoViewportToHost();
+            ClampNativeVideoPanTarget();
+            _videoPanXCurrent = _videoPanXTarget;
+            _videoPanYCurrent = _videoPanYTarget;
+            ApplyNativeVideoTransform();
+        };
 
         // main window가 deactivate(focus 다른 곳)되면 Space hold timer가 계속 동작해
         // 사용자 의도와 무관하게 2배속 trigger 가능 → timer 중단 + 이미 hold면 복원.
@@ -164,7 +212,9 @@ public partial class MainWindow : Window
         {
             _spaceHoldTimer?.Stop();
             if (_spaceHeld) { _vm.Speed = _speedBeforeHold; _spaceHeld = false; }
+            SyncAmbientVisualAnimations();
         };
+        Activated += (_, _) => SyncAmbientVisualAnimations();
 
         _vm.PropertyChanged += (_, e) =>
         {
@@ -178,14 +228,21 @@ public partial class MainWindow : Window
                     Topmost = _vm.IsAlwaysOnTop;
                     break;
                 case nameof(MainViewModel.CurrentMedia):
+                    ResetNativeVideoTransform();
                     // 재생 항목으로 자동 스크롤은 PlaylistWindow가 ShowSlide 시 직접 처리.
+                    break;
+                case nameof(MainViewModel.VideoDisplayAspectRatio):
+                    ClampNativeVideoPanTarget();
+                    _videoPanXCurrent = _videoPanXTarget;
+                    _videoPanYCurrent = _videoPanYTarget;
+                    ApplyNativeVideoTransform();
                     break;
                 case nameof(MainViewModel.IsBottomBarVisible):
                     ApplyChromeVisibilityForCurrentState();
                     break;
-                case nameof(MainViewModel.IsPlaylistOpen):
-                    if (_vm.IsPlaylistOpen) ShowPlaylistPanel();
-                    else _playlistWin?.HideSlide();
+                case nameof(MainViewModel.IsAudioPlayback):
+                case nameof(MainViewModel.IsLoading):
+                    SyncAmbientVisualAnimations();
                     break;
                 case nameof(MainViewModel.IsTrimMode):
                 case nameof(MainViewModel.TrimInSec):
@@ -212,7 +269,15 @@ public partial class MainWindow : Window
     {
         VideoHostSlot.UpdateLayout();
         StartHotZonePolling();
-        RuntimeDependencyService.PreserveExistingRuntimeCache();
+        InstallMouseWheelHook();
+
+        // SourceInitialized는 첫 프레임보다 먼저 발생한다. 정상 runtime 확인/시작을
+        // Background 우선순위로 넘겨 shell이 먼저 그려지게 한다.
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        if (_closing) return;
+
+        // FFmpeg는 trim/export 시에만 필요하다. 시작 경로에서는 mpv cache만 확인한다.
+        RuntimeDependencyService.PreserveExistingMpvCache();
 
         if (!_mpvProc.MpvAvailable)
         {
@@ -237,21 +302,36 @@ public partial class MainWindow : Window
             _vm.StatusMessage = LocalizationService.T("VideoHostFailed");
             return;
         }
+        ResetNativeVideoTransform();
 
+        _mpvStartupOrRecovery = true;
         try
         {
             if (_vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
                 _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
-            _mpvProc.Start(_videoHost.Hwnd);
-            await _vm.ConnectIpcAsync();
-            _ = PrepareOptionalFfmpegAsync(_runtimePrepareCts.Token);
+            try
+            {
+                await StartMpvAndConnectAsync();
+            }
+            catch (Exception startFailure)
+            {
+                if (!await TryRecoverMpvRuntimeAsync(startFailure))
+                    throw;
+            }
         }
         catch (Exception ex)
         {
+            if (_closing) return;
             _vm.State = PlayerState.Failed;
             _vm.StatusMessage = LocalizationService.F("MpvStartFailed", ex.Message);
             return;
         }
+        finally
+        {
+            _mpvStartupOrRecovery = false;
+        }
+
+        if (_closing) return;
 
         // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
         var openedInitialPath = OpenInitialPathIfAny();
@@ -262,6 +342,53 @@ public partial class MainWindow : Window
         }
 
         // mouse hot zone polling은 첫 실행 준비 화면에서도 동작하도록 SourceInitialized에서 시작.
+    }
+
+    private async Task StartMpvAndConnectAsync()
+    {
+        _mpvProc.Start(_videoHost.Hwnd);
+        if (!await _vm.ConnectIpcAsync())
+            throw new IOException(LocalizationService.T("MpvIpcFailed"));
+    }
+
+    private async Task<bool> TryRecoverMpvRuntimeAsync(Exception startFailure)
+    {
+        _mpvProc.Dispose();
+        if (_closing) return false;
+
+        var mpvPath = _mpvProc.MpvPath;
+        var usable = await Task.Run(
+            () => RuntimeExecutableValidator.IsUsable(mpvPath, "--version"),
+            _runtimePrepareCts.Token);
+        if (_closing) return false;
+
+        // 실행 파일 자체가 정상이면 AV/cold-start/일시적인 IPC 초기화 지연일 수 있다.
+        // 다운로드나 cache 교체 없이 현재 세션에서 딱 한 번 새 process로 재시도한다.
+        if (usable)
+        {
+            Services.AppLog.Warn($"mpv fast start failed; retrying once with the verified runtime: {startFailure.Message}");
+            _vm.State = PlayerState.Loading;
+            _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
+            await StartMpvAndConnectAsync();
+            return true;
+        }
+
+        Services.AppLog.Warn($"mpv fast start failed; one verified recovery will run: {startFailure.Message}");
+        RuntimeExecutableValidator.Invalidate(mpvPath);
+        _vm.State = PlayerState.Loading;
+        _vm.StatusMessage = LocalizationService.T("FirstRunStageChecking");
+
+        var prepared = await RuntimeDependencyService.EnsureMpvAsync(
+            UpdateFirstRunPrepareStatus,
+            _runtimePrepareCts.Token);
+        if (_closing) return false;
+        if (!prepared.Success || !_mpvProc.MpvAvailable)
+            throw new InvalidOperationException(
+                LocalizationService.F("FirstRunPrepareFailed", prepared.Error));
+
+        _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
+        await StartMpvAndConnectAsync();
+        return true;
     }
 
     private void UpdateFirstRunPrepareStatus(string line)
@@ -291,15 +418,6 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private static async Task PrepareOptionalFfmpegAsync(CancellationToken ct)
-    {
-        if (ct.IsCancellationRequested || TrimService.FindFfmpeg() is not null) return;
-
-        var prepared = await RuntimeDependencyService.EnsureFfmpegAsync(ct);
-        if (!prepared.Success && !ct.IsCancellationRequested)
-            Services.AppLog.Warn("Optional ffmpeg prepare failed: " + prepared.Error);
-    }
-
     private async Task RestartMpvAsync()
     {
         try
@@ -308,7 +426,9 @@ public partial class MainWindow : Window
             await Task.Delay(200);
             if (_closing) return;
             _mpvProc.Start(_videoHost.Hwnd);
-            await _vm.ConnectIpcAsync();
+            if (!await _vm.ConnectIpcAsync())
+                throw new IOException(LocalizationService.T("MpvIpcFailed"));
+            ResetNativeVideoTransform();
             _vm.StatusMessage = "";
             // 재생 중이었으면 같은 파일 다시 열기
             if (_vm.CurrentMedia is { } cm) _vm.PlayMedia(cm);
@@ -339,7 +459,7 @@ public partial class MainWindow : Window
     public void ReceiveExternalArgs(string[] args)
     {
         Services.AppLog.Info($"ReceiveExternalArgs entry n={args?.Length ?? -1} access={Dispatcher.CheckAccess()}");
-        if (args is null || args.Length == 0) return;
+        if (args is null) return;
         if (Dispatcher.CheckAccess()) ApplyExternalArgs(args);
         else Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -354,6 +474,7 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         Topmost = true; Topmost = _vm.IsAlwaysOnTop;
+        if (args.Length == 0) return;
         var first = args[0];
         if (File.Exists(first)) _vm.OpenPath(first);
         else Services.AppLog.Warn($"ApplyExternalArgs: file not found '{first}'");
@@ -365,8 +486,10 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _closing = true;
+        StopAmbientVisualAnimations();
         try { _runtimePrepareCts.Cancel(); } catch { }
         try { _hotZonePoll?.Stop(); } catch { }
+        UninstallMouseWheelHook();
         _hotZonePoll = null;
         try { _playlistWin?.Close(); } catch { }
         try { _recentWin?.Close(); } catch { }
@@ -402,12 +525,13 @@ public partial class MainWindow : Window
     private void OnStateChanged(object? sender, EventArgs e)
     {
         UpdateMaxRestoreButton();
+        SyncAmbientVisualAnimations();
         SyncPlaylistWindowPosition();
         SyncRecentWindowPosition();
         // 최소화될 때 playlist도 같이 숨김 (Owner가 minimize면 자동이긴 하지만 명시)
         if (WindowState == WindowState.Minimized)
         {
-            _playlistWin?.HideSlide();
+            DismissPlaylistPanel();
             _recentWin?.HideSlide();
         }
     }
@@ -459,59 +583,45 @@ public partial class MainWindow : Window
 
     private void OnRootMouseMove(object sender, MouseEventArgs e)
     {
+        if (_videoPanDragging)
+        {
+            // Remapped/synthetic middle input can disagree with GetAsyncKeyState.
+            // A matching explicit middle-up ends the gesture; movement never does.
+            QueueVideoPanDrag(GetCurrentCursorScreenPoint(), "root-move");
+            return;
+        }
+
         if (ShouldIgnoreStationaryFullscreenReveal(GetCurrentCursorScreenPoint()))
         {
             ResetPanelHoverIntent();
             return;
         }
         ShowControls("root-move");
-        RestartHideTimer();
         // 영상이 없는 상태(NoFile 등)에선 mpv mouse-pos가 안 와서 WPF 좌표로 hot zone 검사
         CheckRightHotZoneFromWpf(e.GetPosition(Root));
-    }
-
-    private void OnRootMouseLeave(object sender, MouseEventArgs e)
-    {
-        if (ControlsAlwaysOn) return;
-        if (IsCursorInsideRootOrOwnedWindow()) return;
-        _controlsHideTimer.Stop();
-        HideControls(source: "root-leave");
     }
 
     private void OnRootPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         _ignoreStationaryFullscreenReveal = false;
         ShowControls("mouse-down");
-        RestartHideTimer();
         // 영상 위(=mpv child hwnd) click 시 OS가 mpv hwnd에 keyboard focus를 줘서
         // WPF KeyBinding이 fire 안 됨 (F/V/Ctrl+S 등 단축키 죽음).
         // click마다 Root grid(Focusable=True)에 focus 강제 — WPF visual tree 안 element가
         // focus 가지면 Window.InputBindings가 keyboard input 받음.
         try { Root.Focus(); Keyboard.Focus(Root); } catch { }
+
+        if (e.ChangedButton == MouseButton.Middle && IsVideoZoomPointerTarget(e.OriginalSource as DependencyObject))
+        {
+            BeginVideoPanDrag(GetCurrentCursorScreenPoint(), "middle-click");
+            e.Handled = true;
+        }
     }
 
-    private void RestartHideTimer()
+    private void ShowFullscreenControlsOnEntry()
     {
-        _controlsHideTimer.Stop();
-        if (ControlsAlwaysOn) return;
-        if (_vm.IsFullscreen && DateTime.UtcNow < _fullscreenSettleUntilUtc) return;
-        _controlsHideTimer.Interval = TimeSpan.FromMilliseconds(_vm.Settings.ControlAutoHideMs);
-        _controlsHideTimer.Start();
-    }
-
-    private void SettleIntoFullscreen()
-    {
-        StartFullscreenSettleHideTimer();
-    }
-
-    private void StartFullscreenSettleHideTimer()
-    {
-        _controlsHideTimer.Stop();
-        _fullscreenSettleHideTimer.Stop();
-        if (ControlsAlwaysOn) return;
         _ignoreStationaryFullscreenReveal = false;
-        _fullscreenSettleUntilUtc = DateTime.UtcNow.AddMilliseconds(FullscreenSettleHideMs);
-        _fullscreenSettleHideTimer.Start();
+        ShowControls("fullscreen-entry");
     }
 
     // 현재 OSD 표시 상태 — animation 재트리거 방지 (mpv mouse-pos가 픽셀당 보고)
@@ -533,7 +643,6 @@ public partial class MainWindow : Window
         if (alreadyShown)
         {
             Mouse.OverrideCursor = null;
-            SyncOverlayWindowPositionsSoon();
             return;
         }
 
@@ -548,6 +657,11 @@ public partial class MainWindow : Window
 
     private void HideControls(bool force = false, string source = "unknown")
     {
+        if (_ownedModalOpen)
+        {
+            Mouse.OverrideCursor = null;
+            return;
+        }
         if (ControlsAlwaysOn)
         {
             if (force) Services.AppLog.Info($"HideControls[{source}] skipped: windowed");
@@ -555,7 +669,6 @@ public partial class MainWindow : Window
         }
         if (!force && (TopBar.IsMouseOver || BottomBar.IsMouseOver))
         {
-            RestartHideTimer();
             return;
         }
         if (force && Mouse.LeftButton != MouseButtonState.Pressed)
@@ -571,7 +684,6 @@ public partial class MainWindow : Window
         {
             Services.AppLog.Info(
                 $"HideControls[{source}] blocked force={force} seeking={_vm.Seeking} seekDrag={_seekDragging} volDrag={_volDragging}");
-            RestartHideTimer();
             return;
         }
 
@@ -579,7 +691,6 @@ public partial class MainWindow : Window
         if (!_osdShown && !visible) return;
 
         _osdShown = false;
-        _fullscreenSettleUntilUtc = DateTime.MinValue;
         if (_vm.IsFullscreen)
             ArmStationaryFullscreenRevealGuard();
 
@@ -666,6 +777,39 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private void BeginOwnedModalInteraction(string source)
+    {
+        _ownedModalOpen = true;
+        _ignoreStationaryFullscreenReveal = false;
+        Mouse.OverrideCursor = null;
+        ResetPanelHoverIntent();
+        DismissPlaylistPanel();
+        _recentWin?.HideSlide();
+        if (_vm.IsFullscreen)
+        {
+            Services.AppLog.Info($"OwnedModal[{source}] begin");
+            _osdShown = true;
+            TopBar.BeginAnimation(UIElement.OpacityProperty, null);
+            BottomBar.BeginAnimation(UIElement.OpacityProperty, null);
+            TopBar.Opacity = 1.0;
+            BottomBar.Opacity = 1.0;
+            SetChromeVisibility(visible: true);
+            UpdateMediaLayerForFullscreen(immersive: false);
+            SyncOverlayWindowPositionsSoon();
+        }
+    }
+
+    private void EndOwnedModalInteraction(string source)
+    {
+        _ownedModalOpen = false;
+        _ignoreStationaryFullscreenReveal = false;
+        Mouse.OverrideCursor = null;
+        if (_vm.IsFullscreen && !_closing)
+        {
+            Services.AppLog.Info($"OwnedModal[{source}] end");
+        }
+    }
+
     // ============================================================
     // Toast — owned ToastWindow로 위임 (WPF airspace 우회)
     // ============================================================
@@ -676,6 +820,7 @@ public partial class MainWindow : Window
 
         try
         {
+            BeginOwnedModalInteraction("update");
             if (WindowState == WindowState.Minimized)
                 WindowState = WindowState.Normal;
 
@@ -701,6 +846,7 @@ public partial class MainWindow : Window
             };
 
             var accepted = dlg.ShowDialog() == true;
+            EndOwnedModalInteraction("update");
             if (accepted)
                 await _vm.ApplyPendingUpdateAsync().ConfigureAwait(true);
             else
@@ -713,6 +859,8 @@ public partial class MainWindow : Window
         }
         finally
         {
+            if (_ownedModalOpen)
+                EndOwnedModalInteraction("update-finally");
             _updatePromptOpen = false;
         }
     }
@@ -751,6 +899,22 @@ public partial class MainWindow : Window
     // ============================================================
     private void OnWindowLoaded(object? sender, RoutedEventArgs e)
     {
+        SyncAmbientVisualAnimations();
+        // 별도 panel XAML/HWND 준비가 첫 main-window render를 막지 않게 idle에서 예열한다.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_closing) EnsurePanelWindows();
+        }), DispatcherPriority.ContextIdle);
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_closing) _ = _vm.PruneMissingRecentsAsync(save: true);
+        }),
+            DispatcherPriority.ApplicationIdle);
+    }
+
+    private void EnsurePanelWindows()
+    {
+        if (_closing || !IsLoaded) return;
         if (_playlistWin is null)
         {
             _playlistWin = new PlaylistWindow { Owner = this };
@@ -770,31 +934,57 @@ public partial class MainWindow : Window
 
     private void ShowPlaylistPanel()
     {
+        EnsurePanelWindows();
         if (_playlistWin is null) return;
+        if (!_vm.Settings.PlaylistPanelEnabled && !_playlistManuallyOpened)
+        {
+            DismissPlaylistPanel();
+            return;
+        }
         SyncPlaylistWindowPosition();
         _playlistWin.Topmost = _vm.IsFullscreen || Topmost;
-        Services.AppLog.Info($"Panel[right] show fs={_vm.IsFullscreen} osd={_osdShown}");
+        // 입력 직후 동기 파일 write가 animation 첫 frame을 막지 않게 기본 비활성 진단으로 둔다.
+        Services.AppLog.Debug($"Panel[right] show fs={_vm.IsFullscreen} osd={_osdShown}");
         _playlistWin.ShowSlide();
+    }
+
+    private void TogglePlaylistPanel()
+    {
+        if (_playlistWin?.IsShown == true)
+            DismissPlaylistPanel();
+        else
+        {
+            _playlistManuallyOpened = true;
+            ShowPlaylistPanel();
+        }
+    }
+
+    private void DismissPlaylistPanel()
+    {
+        _playlistManuallyOpened = false;
+        _playlistWin?.HideSlide();
     }
 
     private void ShowRecentPanel()
     {
+        EnsurePanelWindows();
         if (_recentWin is null) return;
         SyncRecentWindowPosition();
         _recentWin.Topmost = _vm.IsFullscreen || Topmost;
-        Services.AppLog.Info($"Panel[left] show fs={_vm.IsFullscreen} osd={_osdShown}");
+        Services.AppLog.Debug($"Panel[left] show fs={_vm.IsFullscreen} osd={_osdShown}");
         _recentWin.ShowSlide();
     }
 
     private void SyncOverlayWindowPositionsSoon()
     {
-        SyncPlaylistWindowPosition();
-        SyncRecentWindowPosition();
+        if (Interlocked.Exchange(ref _overlaySyncScheduled, 1) != 0) return;
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            Interlocked.Exchange(ref _overlaySyncScheduled, 0);
+            if (_closing) return;
             SyncPlaylistWindowPosition();
             SyncRecentWindowPosition();
-        }), DispatcherPriority.ContextIdle);
+        }), DispatcherPriority.Render);
     }
 
     private double PanelTopOffset => _vm.IsFullscreen && !_osdShown
@@ -808,37 +998,26 @@ public partial class MainWindow : Window
     private void SyncRecentWindowPosition()
     {
         if (_recentWin is null || WindowState == WindowState.Minimized) return;
-        DoSyncOnce();
-        Dispatcher.BeginInvoke(new Action(DoSyncOnce), DispatcherPriority.ContextIdle);
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r)) return;
+        if (WindowState == WindowState.Maximized && !_vm.IsFullscreen &&
+            TryGetMonitorWorkArea(hwnd, out var workArea))
+            ClampWindowRectToWorkArea(ref r, workArea);
 
-        void DoSyncOnce()
-        {
-            if (_recentWin is null) return;
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero) return;
-            if (!GetWindowRect(hwnd, out var r)) return;
-            var dpi = VisualTreeHelper.GetDpi(this);
-            var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
-            var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
-            var left = r.Left / sx;
-            var top  = r.Top  / sy;
-            var w    = (r.Right  - r.Left) / sx;
-            var h    = (r.Bottom - r.Top)  / sy;
-            if (WindowState == WindowState.Maximized && !_vm.IsFullscreen)
-            {
-                var wa = SystemParameters.WorkArea;
-                if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
-                if (top  < wa.Top)  { h -= (wa.Top  - top);  top  = wa.Top;  }
-                if (left + w > wa.Right) w = wa.Right - left;
-                if (top  + h > wa.Bottom) h = wa.Bottom - top;
-            }
-            if (w <= 0 || h <= 0) return;
-            var topOffset = PanelTopOffset;
-            var bottomReserved = PanelBottomReserved;
-            _recentWin.Left = left;
-            _recentWin.Top  = top + topOffset;
-            _recentWin.Height = Math.Max(160, h - topOffset - bottomReserved);
-        }
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+        var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+        var left = r.Left / sx;
+        var top = r.Top / sy;
+        var width = (r.Right - r.Left) / sx;
+        var height = (r.Bottom - r.Top) / sy;
+        if (width <= 0 || height <= 0) return;
+
+        var topOffset = PanelTopOffset;
+        var bottomReserved = PanelBottomReserved;
+        _recentWin.Left = left;
+        _recentWin.Top = top + topOffset;
+        _recentWin.Height = Math.Max(160, height - topOffset - bottomReserved);
     }
 
     /// <summary>
@@ -846,61 +1025,78 @@ public partial class MainWindow : Window
     /// mpv가 매번 letterbox 재계산할 일이 없음 — 영상 비율/위치 그대로 유지.
     /// 이벤트는 남겨두지만 더 이상 영상 host margin을 만지지 않는다.
     /// </summary>
-    private void OnPlaylistShownChanged(bool shown) { /* no-op: panel은 영상 위에 덮음 */ }
+    private void OnPlaylistShownChanged(bool shown) => _vm.SetPlaylistOpen(shown);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hwnd, out PInvokeRect rect);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    private const uint MonitorDefaultToNearest = 2;
+
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     private struct PInvokeRect { public int Left, Top, Right, Bottom; }
 
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public PInvokeRect Monitor;
+        public PInvokeRect WorkArea;
+        public uint Flags;
+    }
+
+    private static bool TryGetMonitorWorkArea(IntPtr hwnd, out PInvokeRect workArea)
+    {
+        workArea = default;
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return false;
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref info)) return false;
+        workArea = info.WorkArea;
+        return true;
+    }
+
+    private static void ClampWindowRectToWorkArea(ref PInvokeRect rect, PInvokeRect workArea)
+    {
+        rect.Left = Math.Max(rect.Left, workArea.Left);
+        rect.Top = Math.Max(rect.Top, workArea.Top);
+        rect.Right = Math.Min(rect.Right, workArea.Right);
+        rect.Bottom = Math.Min(rect.Bottom, workArea.Bottom);
+    }
+
     private void SyncPlaylistWindowPosition()
     {
-        if (_playlistWin is null) return;
-        if (WindowState == WindowState.Minimized) return;
+        if (_playlistWin is null || WindowState == WindowState.Minimized) return;
 
         // 풀스크린/Maximized/멀티모니터/HiDPI에서 WPF Left/ActualWidth가 부정확할 수 있음.
         // hwnd의 실제 화면 좌표를 직접 가져온 뒤 DPI scale로 DIP 변환. 이 값은 어떤 환경에서도 신뢰 가능.
-        DoSyncOnce();
-        Dispatcher.BeginInvoke(new Action(DoSyncOnce), DispatcherPriority.ContextIdle);
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r)) return;
+        if (WindowState == WindowState.Maximized && !_vm.IsFullscreen &&
+            TryGetMonitorWorkArea(hwnd, out var workArea))
+            ClampWindowRectToWorkArea(ref r, workArea);
 
-        void DoSyncOnce()
-        {
-            if (_playlistWin is null) return;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
+        var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
+        var left = r.Left / sx;
+        var top = r.Top / sy;
+        var width = (r.Right - r.Left) / sx;
+        var height = (r.Bottom - r.Top) / sy;
+        if (width <= 0 || height <= 0) return;
 
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero) return;
-            if (!GetWindowRect(hwnd, out var r)) return;
-
-            var dpi = VisualTreeHelper.GetDpi(this);
-            var sx = dpi.DpiScaleX <= 0 ? 1.0 : dpi.DpiScaleX;
-            var sy = dpi.DpiScaleY <= 0 ? 1.0 : dpi.DpiScaleY;
-
-            var left = r.Left / sx;
-            var top  = r.Top  / sy;
-            var w    = (r.Right  - r.Left) / sx;
-            var h    = (r.Bottom - r.Top)  / sy;
-
-            // 일반 Maximized(WindowChrome 적용)는 chrome border만큼 화면 밖으로 살짝 튀어나올 수 있음(보통 -8,-8).
-            // 작업표시줄까지 가는 진짜 풀스크린이 아니라면 work-area로 클램프해 panel이 작업표시줄 밖으로 안 가게.
-            if (WindowState == WindowState.Maximized && !_vm.IsFullscreen)
-            {
-                var wa = SystemParameters.WorkArea;
-                if (left < wa.Left) { w -= (wa.Left - left); left = wa.Left; }
-                if (top  < wa.Top)  { h -= (wa.Top  - top);  top  = wa.Top;  }
-                if (left + w > wa.Right) w = wa.Right - left;
-                if (top  + h > wa.Bottom) h = wa.Bottom - top;
-            }
-
-            if (w <= 0 || h <= 0) return;
-
-            var topOffset = PanelTopOffset;
-            var bottomReserved = PanelBottomReserved;
-            _playlistWin.Left = left + w - _playlistWin.Width;
-            _playlistWin.Top  = top + topOffset;
-            _playlistWin.Height = Math.Max(160, h - topOffset - bottomReserved);
-        }
+        var topOffset = PanelTopOffset;
+        var bottomReserved = PanelBottomReserved;
+        _playlistWin.Left = left + width - _playlistWin.Width;
+        _playlistWin.Top = top + topOffset;
+        _playlistWin.Height = Math.Max(160, height - topOffset - bottomReserved);
     }
 
     /// <summary>WPF 영역(영상 host 외)에서 마우스 위치 → 좌/우 hot zone 둘 다 즉시 반영.</summary>
@@ -924,6 +1120,15 @@ public partial class MainWindow : Window
     private static extern bool GetCursorPos(out PinvokePoint lpPoint);
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern IntPtr WindowFromPoint(PinvokePoint point);
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetModuleHandle(string? lpModuleName);
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
     [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -936,8 +1141,23 @@ public partial class MainWindow : Window
     private static extern int GetSystemMetrics(int nIndex);
     private const int SmCxDoubleClick = 36;
     private const int SmCyDoubleClick = 37;
+    private const int WhMouseLl = 14;
+    private const int WmMouseMove = 0x0200;
+    private const int WmMButtonDown = 0x0207;
+    private const int WmMButtonUp = 0x0208;
+    private const int WmMouseWheel = 0x020A;
+    private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     private struct PinvokePoint { public int X; public int Y; }
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct LowLevelMouseHookStruct
+    {
+        public PinvokePoint pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
 
     private DispatcherTimer? _hotZonePoll;
     private Point _lastPollMouse;
@@ -950,22 +1170,200 @@ public partial class MainWindow : Window
         _hotZonePoll.Start();
     }
 
+    private void InstallMouseWheelHook()
+    {
+        if (_mouseWheelHook != IntPtr.Zero) return;
+        _mouseWheelHookProc = OnLowLevelMouseInput;
+        _mouseWheelHook = SetWindowsHookEx(WhMouseLl, _mouseWheelHookProc, GetModuleHandle(null), 0);
+        if (_mouseWheelHook == IntPtr.Zero)
+            Services.AppLog.Warn("Mouse wheel hook install failed");
+    }
+
+    private void UninstallMouseWheelHook()
+    {
+        if (_mouseWheelHook == IntPtr.Zero) return;
+        try { UnhookWindowsHookEx(_mouseWheelHook); } catch { }
+        _mouseWheelHook = IntPtr.Zero;
+        _mouseWheelHookProc = null;
+    }
+
+    private IntPtr OnLowLevelMouseInput(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0)
+        {
+            try
+            {
+                var message = wParam.ToInt32();
+                // 1000Hz mouse에서는 대부분이 평범한 WM_MOUSEMOVE다. pan 중이 아닐 때는
+                // 구조체 marshal/Point 생성 전에 통과시켜 UI thread와 panel animation을 보호한다.
+                var needsCoordinates = message == WmMouseWheel ||
+                                       message == WmMButtonDown ||
+                                       message == WmMButtonUp ||
+                                       (message == WmMouseMove && _videoPanDragging);
+                if (!needsCoordinates)
+                    return CallNextHookEx(_mouseWheelHook, nCode, wParam, lParam);
+
+                var info = Marshal.PtrToStructure<LowLevelMouseHookStruct>(lParam);
+                var screenPoint = new Point(info.pt.X, info.pt.Y);
+                if (message == WmMouseWheel && ShouldHandleGlobalVideoWheel(screenPoint))
+                {
+                    var delta = (short)((info.mouseData >> 16) & 0xffff);
+                    // Hook callback 시점의 modifier 상태를 보존한다. Dispatcher가 밀린 뒤
+                    // Ctrl 상태를 다시 읽으면 빠른 key-up에서 wheel 의미가 volume으로 바뀐다.
+                    HandleVideoSurfaceWheel(delta, "mouse-hook", IsVideoZoomWheelModifierDown());
+                    return new IntPtr(1);
+                }
+
+                // mpv child HWND, capture 경계, remapped middle button을 모두 같은 경로로
+                // 추적한다. Hook은 이벤트를 삼키지 않고 앱의 drag state만 갱신한다.
+                if (message == WmMButtonDown && ShouldBeginGlobalVideoPan(screenPoint))
+                    BeginVideoPanDrag(screenPoint, "mouse-hook");
+                else if (message == WmMouseMove && _videoPanDragging)
+                    QueueVideoPanDrag(screenPoint, "mouse-hook");
+                else if (message == WmMButtonUp && _videoPanDragging)
+                    EndVideoPanDrag("mouse-hook");
+            }
+            catch (Exception ex)
+            {
+                Services.AppLog.Warn($"Mouse input hook failed: {ex.Message}");
+            }
+        }
+
+        return CallNextHookEx(_mouseWheelHook, nCode, wParam, lParam);
+    }
+
+    private void SyncAmbientVisualAnimations()
+    {
+        var canAnimate = !_closing && IsVisible && IsActive && WindowState != WindowState.Minimized;
+        SetAudioAnimation(canAnimate && _vm.IsAudioPlayback);
+        SetLoadingAnimation(canAnimate && _vm.IsLoading);
+    }
+
+    private void StopAmbientVisualAnimations()
+    {
+        SetAudioAnimation(false);
+        SetLoadingAnimation(false);
+    }
+
+    private void SetAudioAnimation(bool shouldRun)
+    {
+        if (!shouldRun)
+        {
+            if (!_audioAnimationRunning && !AudioBounce.HasAnimatedProperties) return;
+            _audioAnimationRunning = false;
+            AudioBounce.BeginAnimation(TranslateTransform.YProperty, null);
+            AudioBounce.Y = 0;
+            return;
+        }
+        if (_audioAnimationRunning) return;
+        _audioAnimationRunning = true;
+
+        var bounce = new DoubleAnimation
+        {
+            From = 0,
+            To = -22,
+            Duration = TimeSpan.FromMilliseconds(550),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+        AudioBounce.BeginAnimation(TranslateTransform.YProperty, bounce,
+            HandoffBehavior.SnapshotAndReplace);
+    }
+
+    private void SetLoadingAnimation(bool shouldRun)
+    {
+        if (!shouldRun)
+        {
+            if (!_loadingAnimationRunning &&
+                !LoadingDotScale.HasAnimatedProperties &&
+                !LoadingTx.HasAnimatedProperties)
+                return;
+            _loadingAnimationRunning = false;
+            LoadingDotScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            LoadingDotScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            LoadingTx.BeginAnimation(TranslateTransform.XProperty, null);
+            LoadingDotScale.ScaleX = 1;
+            LoadingDotScale.ScaleY = 1;
+            LoadingTx.X = -110;
+            return;
+        }
+        if (_loadingAnimationRunning) return;
+        _loadingAnimationRunning = true;
+
+        static DoubleAnimation Pulse() => new()
+        {
+            From = 0.82,
+            To = 1.18,
+            Duration = TimeSpan.FromMilliseconds(720),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+
+        LoadingDotScale.BeginAnimation(ScaleTransform.ScaleXProperty, Pulse(),
+            HandoffBehavior.SnapshotAndReplace);
+        LoadingDotScale.BeginAnimation(ScaleTransform.ScaleYProperty, Pulse(),
+            HandoffBehavior.SnapshotAndReplace);
+
+        var sweep = new DoubleAnimation
+        {
+            From = -110,
+            To = 320,
+            Duration = TimeSpan.FromMilliseconds(1350),
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+        LoadingTx.BeginAnimation(TranslateTransform.XProperty, sweep,
+            HandoffBehavior.SnapshotAndReplace);
+    }
+
+    private bool ShouldHandleGlobalVideoWheel(Point screenPoint)
+    {
+        if (_closing || _ownedModalOpen || !IsActive)
+            return false;
+        if (!IsCursorOverNativeVideoSurface(screenPoint))
+            return false;
+        return true;
+    }
+
+    private bool ShouldBeginGlobalVideoPan(Point screenPoint)
+    {
+        if (_closing || _ownedModalOpen || !IsActive || !_vm.CanZoomVideo)
+            return false;
+        if (_videoScaleTarget <= VideoHostScaleMin + 0.001)
+            return false;
+        return IsCursorOverNativeVideoSurface(screenPoint);
+    }
+
     private void OnHotZonePollTick(object? sender, EventArgs e)
     {
         if (_closing) return;
+        if (_ownedModalOpen)
+        {
+            Mouse.OverrideCursor = null;
+            EndVideoPanDrag("modal");
+            CloseInactiveHoverPanels();
+            return;
+        }
+
         if (!TryGetCursorInRoot(out var screenPoint, out var relX, out var relY, out var w, out var h))
         {
+            EndVideoPanDrag("cursor-lost");
             CloseInactiveHoverPanels();
             return;
         }
 
         var cursorInRoot = relX >= 0 && relX < w && relY >= 0 && relY < h;
-        var cursorOverThisApp = cursorInRoot && IsCursorOverThisApp(screenPoint);
+        var cursorOverThisApp = IsCursorOverThisApp(screenPoint);
         if (!IsActive && !cursorOverThisApp)
         {
+            EndVideoPanDrag("inactive");
             CloseInactiveHoverPanels();
             return;
         }
+
+        if (PollVideoPanDrag(screenPoint))
+            return;
 
         if (IsActive && IsCursorOverNativeVideoSurface(screenPoint))
             PollFullscreenDoubleClick(relX, relY, w, h);
@@ -987,7 +1385,6 @@ public partial class MainWindow : Window
                     return;
                 }
                 ShowControls("cursor-poll");
-                RestartHideTimer();
             }
         }
 
@@ -1003,7 +1400,7 @@ public partial class MainWindow : Window
     private void CloseInactiveHoverPanels()
     {
         // 다른 앱 위에 마우스가 있으면 panels는 정리하되, panel 자체 위에 있는 경우는 유지.
-        if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) _playlistWin.HideSlide();
+        if (_playlistWin?.IsShown == true && !_playlistWin.IsMouseOver) DismissPlaylistPanel();
         if (_recentWin?.IsShown == true && !_recentWin.IsMouseOver) _recentWin.HideSlide();
         _playlistHoverStartedUtc = DateTime.MinValue;
         _recentHoverStartedUtc = DateTime.MinValue;
@@ -1013,14 +1410,6 @@ public partial class MainWindow : Window
     {
         _playlistHoverStartedUtc = DateTime.MinValue;
         _recentHoverStartedUtc = DateTime.MinValue;
-    }
-
-    private bool IsCursorInsideRootOrOwnedWindow()
-    {
-        if (!TryGetCursorInRoot(out var screenPoint, out var relX, out var relY, out var w, out var h))
-            return false;
-        var cursorInRoot = relX >= 0 && relX < w && relY >= 0 && relY < h;
-        return cursorInRoot && IsCursorOverThisApp(screenPoint);
     }
 
     private bool IsCursorOverThisApp(Point screenPoint)
@@ -1209,12 +1598,13 @@ public partial class MainWindow : Window
         // 하단 transport bar 영역은 hot zone에서 제외.
         var bottomReserved = PanelBottomReserved;
         var inLowerStrip = !_vm.IsFullscreen && y >= h - bottomReserved;
-        // 창 모드에서는 화면 세로 상반부에서만 활성. 작업 중 무심코 좌우 edge를
-        // 지나가다가 panel이 튀어나오는 것 방지.
+        // 우측 playlist는 풀스크린에서도 상단 절반만 trigger로 둔다. 오른쪽 edge는
+        // 사용 중 자주 지나가므로 세로 전체가 반응하면 너무 산만하다.
         var inUpperHalf = y < h / 2;
-        // 창 모드에서는 상단 절반만 열어 우발 동작을 줄이고, fullscreen에서는 edge
-        // 어디서든 의도대로 panel이 열리게 한다.
-        var canTriggerVertically = _vm.IsFullscreen || (!inLowerStrip && inUpperHalf);
+        // 좌측 패널은 이전 듀얼 모니터 보정 때문에 fullscreen에서는 전체 edge를 유지한다.
+        var inVerticalBounds = y >= 0 && y <= h;
+        var canTriggerLeftVertically = inVerticalBounds && (_vm.IsFullscreen || (!inLowerStrip && inUpperHalf));
+        var canTriggerRightVertically = inVerticalBounds && inUpperHalf;
         var triggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : HotZoneWidth;
         var leftTriggerWidth = _vm.IsFullscreen ? FullscreenHotZoneWidth : LeftHotZoneWidth;
 
@@ -1223,7 +1613,8 @@ public partial class MainWindow : Window
             // 창 밖 오른쪽은 hot zone이 아니다. 이전에는 x > w도 우측 edge로
             // 해석돼 패널이 남을 수 있었다.
             var distanceFromRightEdge = w - x;
-            var inRight = distanceFromRightEdge >= 0 && distanceFromRightEdge <= triggerWidth && canTriggerVertically;
+            var inRight = _playlistManuallyOpened ||
+                          (distanceFromRightEdge >= 0 && distanceFromRightEdge <= triggerWidth && canTriggerRightVertically);
             var rightShowDelayMs = PanelHoverShowDelayForDistance(
                 distanceFromRightEdge,
                 triggerWidth,
@@ -1241,7 +1632,8 @@ public partial class MainWindow : Window
         if (_recentWin is not null)
         {
             var distanceFromLeftEdge = x;
-            var inLeft = distanceFromLeftEdge >= 0 && distanceFromLeftEdge <= leftTriggerWidth && canTriggerVertically;
+            var inLeft = IsInLeftPanelTrigger(distanceFromLeftEdge, leftTriggerWidth, _vm.IsFullscreen) &&
+                         canTriggerLeftVertically;
             var leftShowDelayMs = PanelHoverShowDelayForDistance(
                 distanceFromLeftEdge,
                 leftTriggerWidth,
@@ -1258,8 +1650,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool IsInLeftPanelTrigger(double distanceFromLeftEdge, double triggerWidth, bool fullscreen)
+    {
+        if (distanceFromLeftEdge >= 0 && distanceFromLeftEdge <= triggerWidth)
+            return true;
+
+        // 우측 모니터 fullscreen에서 왼쪽 edge는 모니터 seam과 겹칠 수 있다.
+        // seam 밖으로 아주 살짝 넘어간 좌표는 같은 hover 의도로 보고 flicker를 막는다.
+        return fullscreen &&
+               distanceFromLeftEdge < 0 &&
+               distanceFromLeftEdge >= -FullscreenLeftEdgeOutsideBridgeWidth;
+    }
+
     private static int PanelHoverShowDelayForDistance(double distanceFromEdge, double triggerWidth, bool fullscreen)
     {
+        distanceFromEdge = Math.Max(0, distanceFromEdge);
         var immediateWidth = fullscreen ? FullscreenPanelEdgeImmediateWidth : PanelEdgeImmediateWidth;
         if (distanceFromEdge <= immediateWidth) return 0;
 
@@ -1522,17 +1927,399 @@ public partial class MainWindow : Window
         // 좌클릭 시 attached ContextMenu(=speed preset 메뉴) 펼치기. YouTube/VLC 패턴.
         if (sender is Button b && b.ContextMenu is not null)
         {
+            BeginOwnedModalInteraction("speed-menu");
             b.ContextMenu.PlacementTarget = b;
             b.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            b.ContextMenu.Closed -= OnOwnedContextMenuClosed;
+            b.ContextMenu.Closed += OnOwnedContextMenuClosed;
             b.ContextMenu.IsOpen = true;
         }
+    }
+
+    private void OnOwnedContextMenuClosed(object? sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.ContextMenu menu)
+            menu.Closed -= OnOwnedContextMenuClosed;
+        if (_ownedModalOpen)
+            EndOwnedModalInteraction("context-menu");
     }
     private void OnRootMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (e.Handled) return;
-        if (e.Delta > 0) _vm.VolumeUpCommand.Execute(null);
-        else _vm.VolumeDownCommand.Execute(null);
+        if (IsVideoZoomPointerTarget(e.OriginalSource as DependencyObject))
+        {
+            HandleVideoSurfaceWheel(e.Delta, "root-wheel");
+            e.Handled = true;
+            return;
+        }
+
+        ApplyVolumeWheel(e.Delta);
         e.Handled = true;
+    }
+
+    private void HandleVideoSurfaceWheel(int wheelDelta, string source, bool? zoomModifierDown = null)
+    {
+        if (wheelDelta == 0)
+            return;
+
+        if (!Dispatcher.CheckAccess())
+        {
+            var capturedZoomModifier = zoomModifierDown ?? IsVideoZoomWheelModifierDown();
+            Dispatcher.BeginInvoke(
+                new Action(() => HandleVideoSurfaceWheel(wheelDelta, source, capturedZoomModifier)),
+                DispatcherPriority.Input);
+            return;
+        }
+
+        if (_vm.CanZoomVideo && (zoomModifierDown ?? IsVideoZoomWheelModifierDown()))
+        {
+            QueueVideoWheelDelta(wheelDelta, source);
+            return;
+        }
+
+        ApplyVolumeWheel(wheelDelta);
+    }
+
+    private void ApplyVolumeWheel(int wheelDelta)
+    {
+        _volumeWheelRemainder += wheelDelta;
+        var steps = _volumeWheelRemainder / 120;
+        if (steps == 0) return;
+        _volumeWheelRemainder -= steps * 120;
+        _vm.Volume = Math.Clamp(_vm.Volume + steps * 5, 0, 100);
+    }
+
+    private static bool IsVideoZoomWheelModifierDown() =>
+        IsKeyStateDown(GetAsyncKeyState(VkControl));
+
+    private bool IsVideoZoomPointerTarget(DependencyObject? source)
+    {
+        if (!_vm.CanZoomVideo) return false;
+        if (source is not null && (IsInsideVisual(source, TopBar) || IsInsideVisual(source, BottomBar)))
+            return false;
+
+        var pos = Mouse.GetPosition(VideoHostContainer);
+        return pos.X >= 0 && pos.Y >= 0 &&
+               pos.X <= VideoHostContainer.ActualWidth &&
+               pos.Y <= VideoHostContainer.ActualHeight;
+    }
+
+    private void QueueVideoWheelDelta(int wheelDelta, string source)
+    {
+        if (wheelDelta == 0 || !_vm.CanZoomVideo)
+            return;
+
+        Interlocked.Add(ref _queuedVideoWheelDelta, wheelDelta);
+        if (Interlocked.Exchange(ref _videoWheelDispatchScheduled, 1) == 0)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => FlushQueuedVideoWheelDelta(source)),
+                DispatcherPriority.Input);
+        }
+    }
+
+    private void FlushQueuedVideoWheelDelta(string source)
+    {
+        Interlocked.Exchange(ref _videoWheelDispatchScheduled, 0);
+        var wheelDelta = Interlocked.Exchange(ref _queuedVideoWheelDelta, 0);
+        if (wheelDelta != 0)
+            ApplyVideoZoomFromWheel(wheelDelta, source);
+
+        if (Volatile.Read(ref _queuedVideoWheelDelta) != 0 &&
+            Interlocked.Exchange(ref _videoWheelDispatchScheduled, 1) == 0)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => FlushQueuedVideoWheelDelta("wheel-queue")),
+                DispatcherPriority.Input);
+        }
+    }
+
+    private void ApplyVideoZoomFromWheel(int wheelDelta, string source)
+    {
+        if (wheelDelta == 0 || !_vm.CanZoomVideo)
+            return;
+
+        ShowControls($"video-zoom-{source}");
+        var pointer = VideoHostContainer.PointFromScreen(GetCurrentCursorScreenPoint());
+        SetNativeVideoZoomFromWheel(wheelDelta, pointer);
+    }
+
+    private void BeginVideoPanDrag(Point screenPoint, string source)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => BeginVideoPanDrag(screenPoint, source)),
+                DispatcherPriority.Input);
+            return;
+        }
+
+        if (!_vm.CanZoomVideo || _videoScaleTarget <= VideoHostScaleMin + 0.001)
+            return;
+        if (_videoPanDragging)
+            return;
+
+        _videoPanStartPoint = VideoHostContainer.PointFromScreen(screenPoint);
+        _videoPanStartX = _videoPanXTarget;
+        _videoPanStartY = _videoPanYTarget;
+
+        _videoPanDragging = true;
+        _videoPanUsesPolledButtonState = source == "poll";
+        _videoPanSawAsyncButtonDown = IsKeyStateDown(GetAsyncKeyState(VkMButton));
+        _videoPanAsyncReleaseMisses = 0;
+        _pollMiddleButtonWasDown = true;
+        _videoPanLastScreenPoint = screenPoint;
+        _queuedVideoPanScreenPoint = screenPoint;
+        _queuedVideoPanSource = source;
+        Interlocked.Exchange(ref _videoPanDispatchScheduled, 0);
+        _lastVideoPanKeepAliveUtc = DateTime.UtcNow;
+        ResetPanelHoverIntent();
+        DismissPlaylistPanel();
+        _recentWin?.HideSlide();
+        ShowControls($"video-pan-{source}");
+        Mouse.OverrideCursor = Cursors.SizeAll;
+        try { Root.Focus(); Keyboard.Focus(Root); } catch { }
+        Services.AppLog.Info($"VideoPan[{source}] begin scale={_videoScaleTarget:0.###}");
+    }
+
+    private void QueueVideoPanDrag(Point screenPoint, string source)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => QueueVideoPanDrag(screenPoint, source)),
+                DispatcherPriority.Input);
+            return;
+        }
+
+        if (!_videoPanDragging)
+            return;
+
+        _queuedVideoPanScreenPoint = screenPoint;
+        _queuedVideoPanSource = source;
+        if (Interlocked.Exchange(ref _videoPanDispatchScheduled, 1) == 0)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(FlushQueuedVideoPanDrag),
+                DispatcherPriority.Render);
+        }
+    }
+
+    private void FlushQueuedVideoPanDrag()
+    {
+        Interlocked.Exchange(ref _videoPanDispatchScheduled, 0);
+        if (!_videoPanDragging)
+            return;
+
+        ContinueVideoPanDrag(_queuedVideoPanScreenPoint, _queuedVideoPanSource);
+    }
+
+    private void ContinueVideoPanDrag(Point screenPoint, string source)
+    {
+        if (!_videoPanDragging)
+            return;
+
+        _videoPanLastScreenPoint = screenPoint;
+        var point = VideoHostContainer.PointFromScreen(screenPoint);
+        _videoPanXTarget = _videoPanStartX + (point.X - _videoPanStartPoint.X);
+        _videoPanYTarget = _videoPanStartY + (point.Y - _videoPanStartPoint.Y);
+        ClampNativeVideoPanTarget();
+        _videoPanXCurrent = _videoPanXTarget;
+        _videoPanYCurrent = _videoPanYTarget;
+        ApplyNativeVideoTransform();
+        KeepVideoPanDragAlive(source);
+    }
+
+    private void KeepVideoPanDragAlive(string source)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastVideoPanKeepAliveUtc < TimeSpan.FromMilliseconds(VideoPanKeepAliveThrottleMs))
+            return;
+
+        _lastVideoPanKeepAliveUtc = now;
+        ShowControls(source);
+        Mouse.OverrideCursor = Cursors.SizeAll;
+    }
+
+    private bool PollVideoPanDrag(Point screenPoint)
+    {
+        var state = GetAsyncKeyState(VkMButton);
+        var middleDown = IsKeyStateDown(state);
+        var middlePressedSinceLastPoll = (state & 0x0001) != 0;
+
+        if (_videoPanDragging)
+        {
+            if (middleDown)
+            {
+                _videoPanSawAsyncButtonDown = true;
+                _videoPanAsyncReleaseMisses = 0;
+            }
+            // Remapped input은 async state가 처음부터 false일 수 있으므로 explicit Up을
+            // 기다린다. 실제 physical down을 한 번이라도 본 gesture만 2회 연속 release로
+            // 보조 종료해 hook/capture 손실 시 cursor가 고정되는 것도 막는다.
+            else if ((_videoPanUsesPolledButtonState || _videoPanSawAsyncButtonDown) &&
+                     ++_videoPanAsyncReleaseMisses >= 2)
+            {
+                EndVideoPanDrag("middle-up");
+                return false;
+            }
+
+            var dx = screenPoint.X - _videoPanLastScreenPoint.X;
+            var dy = screenPoint.Y - _videoPanLastScreenPoint.Y;
+            if (Math.Abs(dx) > 0.5 || Math.Abs(dy) > 0.5)
+                QueueVideoPanDrag(screenPoint, "video-pan-poll");
+            return true;
+        }
+
+        if (middleDown &&
+            (middlePressedSinceLastPoll || !_pollMiddleButtonWasDown) &&
+            IsActive &&
+            IsCursorOverNativeVideoSurface(screenPoint))
+        {
+            BeginVideoPanDrag(screenPoint, "poll");
+            _pollMiddleButtonWasDown = middleDown;
+            return _videoPanDragging;
+        }
+
+        _pollMiddleButtonWasDown = middleDown;
+        return false;
+    }
+
+    private static bool IsKeyStateDown(short state) =>
+        (state & unchecked((short)0x8000)) != 0;
+
+    private void EndVideoPanDrag(string source)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => EndVideoPanDrag(source)),
+                DispatcherPriority.Input);
+            return;
+        }
+
+        if (!_videoPanDragging) return;
+        _videoPanDragging = false;
+        _videoPanUsesPolledButtonState = false;
+        _videoPanSawAsyncButtonDown = false;
+        _videoPanAsyncReleaseMisses = 0;
+        _pollMiddleButtonWasDown = false;
+        Interlocked.Exchange(ref _videoPanDispatchScheduled, 0);
+        Mouse.OverrideCursor = null;
+        Services.AppLog.Info($"VideoPan[{source}] end");
+    }
+
+    private void SetNativeVideoZoomFromWheel(int wheelDelta, Point pointer)
+    {
+        var width = VideoHostContainer.ActualWidth;
+        var height = VideoHostContainer.ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+
+        var oldScale = _videoScaleTarget;
+        var notches = wheelDelta / 120.0;
+        var nextScale = Math.Clamp(oldScale * Math.Pow(VideoHostWheelFactor, notches),
+            VideoHostScaleMin, VideoHostScaleMax);
+        if (nextScale <= 1.01)
+            nextScale = VideoHostScaleMin;
+        if (Math.Abs(nextScale - oldScale) <= 0.0001)
+            return;
+
+        _videoScaleTarget = nextScale;
+        if (nextScale <= VideoHostScaleMin + 0.001)
+        {
+            _videoPanXTarget = 0;
+            _videoPanYTarget = 0;
+        }
+        else
+        {
+            var safeOldScale = Math.Max(VideoHostScaleMin, oldScale);
+            var (contentX, contentY, contentWidth, contentHeight) = GetNativeVideoContentRect(width, height);
+            var offsetX = Math.Clamp(pointer.X, contentX, contentX + contentWidth) - width / 2.0;
+            var offsetY = Math.Clamp(pointer.Y, contentY, contentY + contentHeight) - height / 2.0;
+            var ratio = nextScale / safeOldScale;
+            _videoPanXTarget = (_videoPanXTarget - offsetX) * ratio + offsetX;
+            _videoPanYTarget = (_videoPanYTarget - offsetY) * ratio + offsetY;
+            ClampNativeVideoPanTarget();
+        }
+
+        ApplyNativeVideoTransformImmediately();
+    }
+
+    private void ApplyNativeVideoTransformImmediately()
+    {
+        _videoScaleCurrent = _videoScaleTarget;
+        _videoPanXCurrent = _videoPanXTarget;
+        _videoPanYCurrent = _videoPanYTarget;
+        ApplyNativeVideoTransform();
+    }
+
+    private void ResetNativeVideoTransform()
+    {
+        _videoScaleCurrent = _videoScaleTarget = VideoHostScaleMin;
+        _videoPanXCurrent = _videoPanYCurrent = 0;
+        _videoPanXTarget = _videoPanYTarget = 0;
+        _videoHost.FitVideoViewportToHost();
+        _vm.SetRendererVideoTransform(VideoHostScaleMin, 0, 0);
+    }
+
+    private void ClampNativeVideoPanTarget()
+    {
+        var width = VideoHostContainer.ActualWidth;
+        var height = VideoHostContainer.ActualHeight;
+        if (_videoScaleTarget <= VideoHostScaleMin + 0.001 || width <= 0 || height <= 0)
+        {
+            _videoPanXTarget = 0;
+            _videoPanYTarget = 0;
+            return;
+        }
+
+        var (_, _, contentWidth, contentHeight) = GetNativeVideoContentRect(width, height);
+        var maxX = Math.Max(0, (contentWidth * _videoScaleTarget - width) / 2.0);
+        var maxY = Math.Max(0, (contentHeight * _videoScaleTarget - height) / 2.0);
+        _videoPanXTarget = Math.Clamp(_videoPanXTarget, -maxX, maxX);
+        _videoPanYTarget = Math.Clamp(_videoPanYTarget, -maxY, maxY);
+    }
+
+    private void ApplyNativeVideoTransform()
+    {
+        var width = VideoHostContainer.ActualWidth;
+        var height = VideoHostContainer.ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+        var (_, _, contentWidth, contentHeight) = GetNativeVideoContentRect(width, height);
+        // mpv video-pan-x/y의 단위는 확대된 영상 전체 크기의 비율이다.
+        // viewport로 나누면 확대 배율만큼 과도하게 이동해 검은 영역이 노출된다.
+        var scaledContentWidth = Math.Max(1.0, contentWidth * _videoScaleCurrent);
+        var scaledContentHeight = Math.Max(1.0, contentHeight * _videoScaleCurrent);
+        var panX = _videoPanXCurrent / scaledContentWidth;
+        var panY = _videoPanYCurrent / scaledContentHeight;
+        _vm.SetRendererVideoTransform(_videoScaleCurrent, panX, panY);
+    }
+
+    private (double X, double Y, double Width, double Height) GetNativeVideoContentRect(
+        double viewportWidth,
+        double viewportHeight)
+    {
+        var aspectRatio = _vm.VideoDisplayAspectRatio;
+        if (aspectRatio <= 0 || double.IsNaN(aspectRatio) || double.IsInfinity(aspectRatio))
+            return (0, 0, viewportWidth, viewportHeight);
+
+        var viewportAspectRatio = viewportWidth / Math.Max(1, viewportHeight);
+        double width;
+        double height;
+        if (viewportAspectRatio > aspectRatio)
+        {
+            height = viewportHeight;
+            width = height * aspectRatio;
+        }
+        else
+        {
+            width = viewportWidth;
+            height = width / aspectRatio;
+        }
+
+        return ((viewportWidth - width) / 2.0, (viewportHeight - height) / 2.0, width, height);
     }
 
     private void OnRootDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1546,6 +2333,13 @@ public partial class MainWindow : Window
     private void OnFullscreenButtonClick(object? sender, RoutedEventArgs e)
     {
         RequestFullscreenToggle("button", FullscreenRequestKind.Control);
+        e.Handled = true;
+    }
+
+    private void OnImmersiveFullscreenButtonClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm.IsFullscreen)
+            HideControls(force: true, source: "immersive-button");
         e.Handled = true;
     }
 
@@ -1575,6 +2369,12 @@ public partial class MainWindow : Window
 
             if (_vm.IsFullscreen)
             {
+                if (!_osdShown)
+                {
+                    ShowControls("keyboard-esc");
+                    e.Handled = true;
+                    return;
+                }
                 RequestFullscreenState(false, "keyboard-esc", FullscreenRequestKind.Keyboard);
                 e.Handled = true;
             }
@@ -1672,6 +2472,16 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private static bool IsInsideVisual(DependencyObject? d, DependencyObject target)
+    {
+        while (d is not null)
+        {
+            if (ReferenceEquals(d, target)) return true;
+            d = VisualTreeHelper.GetParent(d);
+        }
+        return false;
+    }
+
     private static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
     {
         while (d is not null)
@@ -1727,7 +2537,7 @@ public partial class MainWindow : Window
     private void OnAnyKey(object sender, KeyEventArgs e)
     {
         _ignoreStationaryFullscreenReveal = false;
-        ShowControls("key"); RestartHideTimer();
+        ShowControls("key");
     }
 
 
@@ -1743,9 +2553,9 @@ public partial class MainWindow : Window
     {
         if (e.Key != Key.Space) return;
         _ignoreStationaryFullscreenReveal = false;
-        ShowControls("space-down"); RestartHideTimer();
+        ShowControls("space-down");
         e.Handled = true;
-        if (e.IsRepeat) return; // OS auto-repeat — 첫 keydown만 timer 시작
+        if (e.IsRepeat) return;
 
         // 1초 후 hold = true + 2x. 그 전에 KeyUp 들어오면 단발 play/pause.
         // YouTube와 같이 0.5초 후 2배속 시작 (그 전 release면 단순 play/pause toggle).
@@ -1762,7 +2572,7 @@ public partial class MainWindow : Window
         _spaceHeld = true;
         _speedBeforeHold = _vm.Speed;
         _vm.Speed = 2.0;
-        ShowControls("space-hold"); RestartHideTimer();
+        ShowControls("space-hold");
     }
 
     private void OnSpaceUp(object sender, KeyEventArgs e)
@@ -1827,14 +2637,21 @@ public partial class MainWindow : Window
     {
         try
         {
+            BeginOwnedModalInteraction("settings");
             var dlg = new SettingsWindow(_vm.Settings) { Owner = this };
             dlg.ShowDialog();
+            EndOwnedModalInteraction("settings");
         }
         catch (Exception ex)
         {
             Services.AppLog.Error("Open SettingsWindow", ex);
             MessageBox.Show(this, LocalizationService.F("SettingsOpenFailed", ex.Message),
                 "Deno Video Player", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (_ownedModalOpen)
+                EndOwnedModalInteraction("settings-finally");
         }
     }
 
@@ -1882,7 +2699,7 @@ public partial class MainWindow : Window
     private void ApplyFullscreen(bool fs)
     {
         ResetFullscreenPointerTracking(suppressPollingUntilRelease: Mouse.LeftButton == MouseButtonState.Pressed);
-        _playlistWin?.HideSlide();
+        DismissPlaylistPanel();
         _recentWin?.HideSlide();
         UpdateEdgeHintsForFullscreen(fs);
 
@@ -1916,13 +2733,11 @@ public partial class MainWindow : Window
                 {
                     SyncPlaylistWindowPosition();
                     SyncRecentWindowPosition();
-                    SettleIntoFullscreen();
+                    ShowFullscreenControlsOnEntry();
                 });
         }
         else
         {
-            _fullscreenSettleHideTimer.Stop();
-            _fullscreenSettleUntilUtc = DateTime.MinValue;
             _ignoreStationaryFullscreenReveal = false;
             Mouse.OverrideCursor = null;
             UpdateMediaLayerForFullscreen(immersive: false);
@@ -2054,16 +2869,16 @@ public partial class MainWindow : Window
         try
         {
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            var mh = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            var mi = new MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
+            var mh = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+            var mi = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
             if (GetMonitorInfo(mh, ref mi))
             {
                 var src = System.Windows.PresentationSource.FromVisual(this);
                 var dpiX = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
                 var dpiY = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
-                var r = mi.rcMonitor;
-                return new Rect(r.left / dpiX, r.top / dpiY,
-                    (r.right - r.left) / dpiX, (r.bottom - r.top) / dpiY);
+                var r = mi.Monitor;
+                return new Rect(r.Left / dpiX, r.Top / dpiY,
+                    (r.Right - r.Left) / dpiX, (r.Bottom - r.Top) / dpiY);
             }
         }
         catch (Exception ex)
@@ -2073,19 +2888,4 @@ public partial class MainWindow : Window
         return new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight);
     }
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct WIN32RECT { public int left, top, right, bottom; }
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct MONITORINFO
-    {
-        public int cbSize;
-        public WIN32RECT rcMonitor;
-        public WIN32RECT rcWork;
-        public uint dwFlags;
-    }
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
-    private const uint MONITOR_DEFAULTTONEAREST = 2;
 }

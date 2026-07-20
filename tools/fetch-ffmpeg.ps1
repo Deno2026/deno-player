@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Downloads a static Windows x64 ffmpeg build from BtbN/FFmpeg-Builds
-  (LGPL/GPL static binaries, ~30 MB compressed). Used by the in-app
+  (LGPL/GPL static binaries; download size varies and can be hundreds of MB). Used by the in-app
   trim feature (lossless stream copy, no re-encode).
 
   ffmpeg is LGPLv2.1+/GPLv2+. This repo does NOT redistribute ffmpeg;
@@ -39,6 +39,65 @@ if ([string]::IsNullOrWhiteSpace($Dest)) {
     $Dest = Join-Path $scriptRoot "..\runtime\ffmpeg"
 }
 
+function Install-FileAtomically([string]$Source, [string]$Destination) {
+    $dir = Split-Path $Destination -Parent
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $temp = Join-Path $dir ('.' + [IO.Path]::GetFileName($Destination) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    $backup = $temp + '.bak'
+    try {
+        Copy-Item -LiteralPath $Source -Destination $temp -Force
+        if (Test-Path -LiteralPath $Destination) {
+            [IO.File]::Replace($temp, $Destination, $backup, $true)
+            Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+        } else {
+            Move-Item -LiteralPath $temp -Destination $Destination
+        }
+    } finally {
+        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Assert-GitHubAssetDigest($Asset, [string]$Path) {
+    $digest = [string]$Asset.digest
+    if ([string]::IsNullOrWhiteSpace($digest) -or -not $digest.StartsWith('sha256:')) {
+        throw "GitHub did not provide a SHA-256 digest for $($Asset.name). Existing runtime was left unchanged."
+    }
+    $expected = $digest.Substring('sha256:'.Length).ToUpperInvariant()
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($actual -ne $expected) {
+        throw "SHA-256 verification failed for $($Asset.name). Existing runtime was left unchanged."
+    }
+    Write-Host ">>> SHA-256 verified." -ForegroundColor DarkGreen
+}
+
+function Test-FfmpegExecutable([string]$Path) {
+    $process = New-Object System.Diagnostics.Process
+    try {
+        $process.StartInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $process.StartInfo.FileName = $Path
+        $process.StartInfo.Arguments = '-version'
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        if (-not $process.Start()) { return $false }
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(5000)) {
+            try { $process.Kill() } catch {}
+            return $false
+        }
+        $text = ([string]$stdout.Result + [string]$stderr.Result).Trim()
+        if ($text.Length -gt 0) { Write-Host (($text -split '\r?\n')[0]) }
+        return $process.ExitCode -eq 0
+    } catch {
+        return $false
+    } finally {
+        $process.Dispose()
+    }
+}
+
 $destParent = Split-Path $Dest -Parent
 if (-not (Test-Path $destParent)) { New-Item -ItemType Directory -Path $destParent -Force | Out-Null }
 $Dest = (Resolve-Path $destParent).Path + "\" + (Split-Path $Dest -Leaf)
@@ -46,9 +105,11 @@ New-Item -ItemType Directory -Path $Dest -Force | Out-Null
 
 $existing = Join-Path $Dest "ffmpeg.exe"
 if ($SkipIfExists -and (Test-Path $existing)) {
-    Write-Host ">>> ffmpeg.exe already at $existing - skipping download (-SkipIfExists)." -ForegroundColor Yellow
-    & $existing -version | Select-Object -First 1
-    exit 0
+    if (Test-FfmpegExecutable $existing) {
+        Write-Host ">>> Valid ffmpeg.exe already at $existing - skipping download." -ForegroundColor Yellow
+        exit 0
+    }
+    Write-Warning "Existing ffmpeg.exe failed validation. Downloading a clean replacement."
 }
 
 Write-Host ">>> Resolving latest ffmpeg release from $Owner/$Repo ..." -ForegroundColor Cyan
@@ -62,9 +123,12 @@ if (-not $asset) {
     exit 1
 }
 
-$tmpZip = Join-Path $env:TEMP $asset.name
-Write-Host ">>> Downloading $($asset.name) (~30 MB) ..." -ForegroundColor Cyan
+$tmpZip = Join-Path $env:TEMP (([Guid]::NewGuid().ToString("N")) + "-" + $asset.name)
+$extractDir = $null
+try {
+Write-Host ">>> Downloading $($asset.name) (large download; size varies by build) ..." -ForegroundColor Cyan
 Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $tmpZip
+Assert-GitHubAssetDigest $asset $tmpZip
 
 $extractDir = Join-Path $env:TEMP ("ffmpeg-extract-" + [Guid]::NewGuid().ToString("N").Substring(0,8))
 New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
@@ -73,21 +137,29 @@ Expand-Archive -Path $tmpZip -DestinationPath $extractDir -Force
 
 $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
 if (-not $exe) {
-    Write-Error "ffmpeg.exe not found inside extracted archive: $extractDir"
-    exit 1
+    throw "ffmpeg.exe not found inside extracted archive. Existing runtime was left unchanged."
 }
 
-Copy-Item -Path $exe.FullName -Destination (Join-Path $Dest "ffmpeg.exe") -Force
+if (-not (Test-FfmpegExecutable $exe.FullName)) {
+    throw "Downloaded ffmpeg.exe failed its version check. Existing runtime was left unchanged."
+}
 
-# ffprobe도 함께 (메타데이터 조회용, 향후 확장 여지)
+# ffprobe를 먼저 교체하고 ffmpeg.exe를 마지막 ready marker로 교체한다.
 $probe = Get-ChildItem -Path $extractDir -Recurse -Filter "ffprobe.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($probe) {
-    Copy-Item -Path $probe.FullName -Destination (Join-Path $Dest "ffprobe.exe") -Force
+    Install-FileAtomically $probe.FullName (Join-Path $Dest "ffprobe.exe")
 }
-
-Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
-Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+Install-FileAtomically $exe.FullName (Join-Path $Dest "ffmpeg.exe")
 
 Write-Host ""
 Write-Host ">>> Done. Installed at: $Dest\ffmpeg.exe" -ForegroundColor Green
-& (Join-Path $Dest "ffmpeg.exe") -version | Select-Object -First 1
+if (-not (Test-FfmpegExecutable (Join-Path $Dest "ffmpeg.exe"))) {
+    throw "Installed ffmpeg.exe failed its version check."
+}
+}
+finally {
+    Remove-Item -LiteralPath $tmpZip -Force -ErrorAction SilentlyContinue
+    if ($extractDir) {
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

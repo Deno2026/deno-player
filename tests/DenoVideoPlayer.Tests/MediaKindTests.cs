@@ -17,6 +17,7 @@ public class MediaKindTests
     [Theory]
     [InlineData("song.mp3", MediaKind.Audio)]
     [InlineData("track.FLAC", MediaKind.Audio)]
+    [InlineData("extract.mka", MediaKind.Audio)]
     [InlineData("voice.opus", MediaKind.Audio)]
     public void DetectsAudio(string path, MediaKind expected)
         => Assert.Equal(expected, MediaKindExtensions.FromPath(path));
@@ -47,6 +48,7 @@ public class MediaKindTests
         var all = MediaKindExtensions.AllSupportedExtensions().ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains(".mp4", all);
         Assert.Contains(".mp3", all);
+        Assert.Contains(".mka", all);
         Assert.Contains(".png", all);
         Assert.DoesNotContain(".txt", all);
     }

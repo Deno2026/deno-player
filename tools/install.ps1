@@ -14,8 +14,9 @@
     2. Registers HKCU\Software\Classes\Applications\DenoVideoPlayer.exe
        with SupportedTypes for video/audio extensions so the EXE
        shows up under Explorer's "Open with" menu
-    3. Adds Deno Video Player to video/audio HKCU\...\OpenWithProgids so
-       Windows offers it in the "Open with" dialog. Images stay opt-in from
+    3. Adds type-specific Deno Video Player ProgIDs to video/audio
+       HKCU\...\OpenWithProgids so Windows offers it in the "Open with"
+       dialog without making audio look like video. Images stay opt-in from
        the app Settings screen.
     4. Creates a Desktop shortcut
     5. Creates a Start Menu shortcut
@@ -56,10 +57,16 @@ if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
 
 $VideoExt = @('.mp4','.mkv','.mov','.webm','.avi','.m4v','.ts','.mts','.m2ts','.wmv','.flv','.3gp')
-$AudioExt = @('.mp3','.wav','.flac','.aac','.m4a','.ogg','.opus','.wma','.alac')
+$AudioExt = @('.mp3','.wav','.flac','.aac','.m4a','.mka','.ogg','.opus','.wma','.alac')
 $ImageExt = @('.jpg','.jpeg','.png','.webp','.bmp','.gif')
 $DefaultExt = $VideoExt + $AudioExt
 $AllExt   = $VideoExt + $AudioExt + $ImageExt
+$VideoProgId = 'DenoVideoPlayer.Video'
+$AudioProgId = 'DenoVideoPlayer.Audio'
+$ImageProgId = 'DenoVideoPlayer.Image'
+$CompatibilityProgId = 'DenoVideoPlayer.Media'
+$LegacyProgId = 'DenoPlayer.Media'
+$CurrentProgIds = @($VideoProgId, $AudioProgId, $ImageProgId)
 $DefaultExtLookup = @{}
 foreach ($e in $DefaultExt) { $DefaultExtLookup[$e.ToLowerInvariant()] = $true }
 
@@ -78,6 +85,9 @@ function Find-Exe {
     $candidates = @(
         (Join-Path $repoRoot 'publish\DenoVideoPlayer-win-x64\DenoVideoPlayer.exe'),
         (Join-Path $repoRoot 'publish\DenoVideoPlayer-win-x64-fxdep\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\x64\Release\net8.0-windows\win-x64\publish\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\x64\Release\net8.0-windows\DenoVideoPlayer.exe'),
+        (Join-Path $repoRoot 'bin\x64\Debug\net8.0-windows\DenoVideoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Release\net8.0-windows\win-x64\publish\DenoVideoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Release\net8.0-windows\publish\DenoVideoPlayer.exe'),
         (Join-Path $repoRoot 'bin\Release\net8.0-windows\DenoVideoPlayer.exe'),
@@ -100,6 +110,57 @@ function New-Shortcut([string]$target, [string]$lnk, [string]$workdir, [string]$
     $sc.Save()
 }
 
+function Get-ProgIdForExtension([string]$ext) {
+    $normalized = $ext.Trim().ToLowerInvariant()
+    if ($VideoExt -contains $normalized) { return $VideoProgId }
+    if ($AudioExt -contains $normalized) { return $AudioProgId }
+    if ($ImageExt -contains $normalized) { return $ImageProgId }
+    return $CompatibilityProgId
+}
+
+function Get-IconReference([string]$exe, [string]$relativeIconPath) {
+    $work = Split-Path $exe -Parent
+    $iconPath = Join-Path $work $relativeIconPath
+    if (Test-Path $iconPath) { return ('"' + $iconPath + '",0') }
+    return ('"' + $exe + '",0')
+}
+
+function Register-ProgId(
+    [string]$progId,
+    [string]$typeName,
+    [string]$friendlyTypeName,
+    [string]$iconReference,
+    [string]$exe
+) {
+    New-Item -Path "HKCU:\Software\Classes\$progId" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
+        -Name '(Default)' -Value $typeName -Force
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
+        -Name 'FriendlyTypeName' -Value $friendlyTypeName -Force
+    New-Item -Path "HKCU:\Software\Classes\$progId\DefaultIcon" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\DefaultIcon" `
+        -Name '(Default)' -Value $iconReference -Force
+    New-Item -Path "HKCU:\Software\Classes\$progId\shell\open\command" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\shell\open\command" `
+        -Name '(Default)' -Value ('"' + $exe + '" "%1"') -Force
+}
+
+function Notify-AssociationChanged {
+    if (-not ('DenoVideoPlayer.ShellNativeMethods' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace DenoVideoPlayer {
+    public static class ShellNativeMethods {
+        [DllImport("shell32.dll")]
+        public static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
+    }
+}
+'@
+    }
+    [DenoVideoPlayer.ShellNativeMethods]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
+}
+
 function Install-DenoVideoPlayer {
     $exe = Find-Exe
     $work = Split-Path $exe -Parent
@@ -107,10 +168,9 @@ function Install-DenoVideoPlayer {
     Write-Host "    exe: $exe" -ForegroundColor DarkGray
 
     $hkcu = [Microsoft.Win32.Registry]::CurrentUser
-    $progId        = 'DenoVideoPlayer.Media'
     $openWithProg  = 'Applications\DenoVideoPlayer.exe'
     $capabilities  = 'Software\DenoVideoPlayer\Capabilities'
-    $legacyProgId = 'DenoPlayer.Media'
+    $legacyProgId = $LegacyProgId
     $legacyOpenWithProg = 'Applications\DenoPlayer.exe'
     $legacyCapabilities = 'Software\DenoPlayer\Capabilities'
 
@@ -130,18 +190,45 @@ function Install-DenoVideoPlayer {
         Set-ItemProperty -Path "$AppRegKey\SupportedTypes" -Name $e -Value '' -Force
     }
 
-    # 2) ProgID — required to be selectable as a real default app
-    New-Item -Path "HKCU:\Software\Classes\$progId" -Force | Out-Null
-    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
-        -Name '(Default)' -Value 'Deno Video Player Media File' -Force
-    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId" `
-        -Name 'FriendlyTypeName' -Value 'Deno Video Player Media' -Force
-    New-Item -Path "HKCU:\Software\Classes\$progId\DefaultIcon" -Force | Out-Null
-    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\DefaultIcon" `
-        -Name '(Default)' -Value ('"' + $exe + '",0') -Force
-    New-Item -Path "HKCU:\Software\Classes\$progId\shell\open\command" -Force | Out-Null
-    Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\shell\open\command" `
-        -Name '(Default)' -Value ('"' + $exe + '" "%1"') -Force
+    # 구버전 UserChoice가 DenoPlayer.exe를 가리켜도 현재 실행 파일로 연결한다.
+    New-Item -Path $LegacyAppRegKey -Force | Out-Null
+    Set-ItemProperty -Path $LegacyAppRegKey -Name 'FriendlyAppName' -Value 'Deno Video Player' -Force
+    New-Item -Path "$LegacyAppRegKey\shell\open\command" -Force | Out-Null
+    Set-ItemProperty -Path "$LegacyAppRegKey\shell\open\command" -Name '(Default)' `
+        -Value ('"' + $exe + '" "%1"') -Force
+
+    # 2) ProgIDs — required to be selectable as real default apps.
+    # Split by media kind so Explorer fallback icons do not make audio look like video.
+    Register-ProgId `
+        -progId $VideoProgId `
+        -typeName 'Deno Video Player Video File' `
+        -friendlyTypeName 'Deno Video Player Video' `
+        -iconReference (Get-IconReference $exe 'Assets\Icons\file-video.ico') `
+        -exe $exe
+    Register-ProgId `
+        -progId $AudioProgId `
+        -typeName 'Deno Video Player Audio File' `
+        -friendlyTypeName 'Deno Video Player Audio' `
+        -iconReference (Get-IconReference $exe 'Assets\Icons\file-audio.ico') `
+        -exe $exe
+    Register-ProgId `
+        -progId $ImageProgId `
+        -typeName 'Deno Video Player Image File' `
+        -friendlyTypeName 'Deno Video Player Image' `
+        -iconReference (Get-IconReference $exe 'Assets\Icons\file-image.ico') `
+        -exe $exe
+    Register-ProgId `
+        -progId $CompatibilityProgId `
+        -typeName 'Deno Video Player Media File' `
+        -friendlyTypeName 'Deno Video Player Media' `
+        -iconReference ('"' + $exe + '",0') `
+        -exe $exe
+    Register-ProgId `
+        -progId $LegacyProgId `
+        -typeName 'Deno Video Player Media File' `
+        -friendlyTypeName 'Deno Video Player Media' `
+        -iconReference ('"' + $exe + '",0') `
+        -exe $exe
 
     # 3) Capabilities + RegisteredApplications — Settings "기본 앱"에 등장
     New-Item -Path "HKCU:\$capabilities" -Force | Out-Null
@@ -157,7 +244,7 @@ function Install-DenoVideoPlayer {
     New-Item -Path "HKCU:\$capabilities\FileAssociations" -Force | Out-Null
     foreach ($e in $DefaultExt) {
         Set-ItemProperty -Path "HKCU:\$capabilities\FileAssociations" `
-            -Name $e -Value $progId -Force
+            -Name $e -Value (Get-ProgIdForExtension $e) -Force
     }
     New-Item -Path 'HKCU:\Software\RegisteredApplications' -Force | Out-Null
     Remove-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' `
@@ -172,13 +259,16 @@ function Install-DenoVideoPlayer {
         try {
             $sub.DeleteValue($legacyProgId, $false)
             $sub.DeleteValue($legacyOpenWithProg, $false)
+            foreach ($progId in $CurrentProgIds) {
+                $sub.DeleteValue($progId, $false)
+            }
+            $sub.DeleteValue($CompatibilityProgId, $false)
             if ($DefaultExtLookup.ContainsKey($e.ToLowerInvariant())) {
-                $sub.SetValue($progId, [byte[]]@(),
+                $sub.SetValue((Get-ProgIdForExtension $e), [byte[]]@(),
                               [Microsoft.Win32.RegistryValueKind]::None)
                 $sub.SetValue($openWithProg, [byte[]]@(),
                               [Microsoft.Win32.RegistryValueKind]::None)
             } else {
-                $sub.DeleteValue($progId, $false)
                 $sub.DeleteValue($openWithProg, $false)
             }
         } finally { $sub.Close() }
@@ -196,6 +286,8 @@ function Install-DenoVideoPlayer {
         Write-Host "    start menu: $StartMenuLnk" -ForegroundColor DarkGray
     }
 
+    Notify-AssociationChanged
+
     Write-Host ">>> Done." -ForegroundColor Green
     Write-Host ""
     Write-Host "How to use:" -ForegroundColor Yellow
@@ -208,8 +300,7 @@ function Install-DenoVideoPlayer {
 
 function Uninstall-DenoVideoPlayer {
     Write-Host ">>> Removing Deno Video Player registrations" -ForegroundColor Cyan
-    $progId = 'DenoVideoPlayer.Media'
-    $legacyProgId = 'DenoPlayer.Media'
+    $legacyProgId = $LegacyProgId
     $legacyOpenWithProg = 'Applications\DenoPlayer.exe'
     if (Test-Path $AppRegKey) {
         Remove-Item -Path $AppRegKey -Recurse -Force
@@ -219,9 +310,11 @@ function Uninstall-DenoVideoPlayer {
         Remove-Item -Path $LegacyAppRegKey -Recurse -Force
         Write-Host "    removed $LegacyAppRegKey" -ForegroundColor DarkGray
     }
-    if (Test-Path "HKCU:\Software\Classes\$progId") {
-        Remove-Item -Path "HKCU:\Software\Classes\$progId" -Recurse -Force
-        Write-Host "    removed ProgID $progId" -ForegroundColor DarkGray
+    foreach ($progId in ($CurrentProgIds + $CompatibilityProgId)) {
+        if (Test-Path "HKCU:\Software\Classes\$progId") {
+            Remove-Item -Path "HKCU:\Software\Classes\$progId" -Recurse -Force
+            Write-Host "    removed ProgID $progId" -ForegroundColor DarkGray
+        }
     }
     if (Test-Path "HKCU:\Software\Classes\$legacyProgId") {
         Remove-Item -Path "HKCU:\Software\Classes\$legacyProgId" -Recurse -Force
@@ -245,7 +338,9 @@ function Uninstall-DenoVideoPlayer {
         $extKey = "HKCU:\Software\Classes\$e\OpenWithProgids"
         if (Test-Path $extKey) {
             Remove-ItemProperty -Path $extKey -Name 'Applications\DenoVideoPlayer.exe' -ErrorAction SilentlyContinue
-            Remove-ItemProperty -Path $extKey -Name $progId -ErrorAction SilentlyContinue
+            foreach ($progId in ($CurrentProgIds + $CompatibilityProgId)) {
+                Remove-ItemProperty -Path $extKey -Name $progId -ErrorAction SilentlyContinue
+            }
             Remove-ItemProperty -Path $extKey -Name $legacyOpenWithProg -ErrorAction SilentlyContinue
             Remove-ItemProperty -Path $extKey -Name $legacyProgId -ErrorAction SilentlyContinue
         }
@@ -254,6 +349,7 @@ function Uninstall-DenoVideoPlayer {
     if (Test-Path $StartMenuLnk) { Remove-Item $StartMenuLnk -Force }
     if (Test-Path $LegacyDesktopLnk)   { Remove-Item $LegacyDesktopLnk -Force }
     if (Test-Path $LegacyStartMenuLnk) { Remove-Item $LegacyStartMenuLnk -Force }
+    Notify-AssociationChanged
     Write-Host ">>> Done." -ForegroundColor Green
     Write-Host "Note: file associations that were explicitly set as 'Always use this app'"
     Write-Host "      live under HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\<ext>\\UserChoice"

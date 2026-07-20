@@ -109,6 +109,16 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="TrimActionButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BrushAccent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
@@ -162,7 +172,6 @@
 
     <Grid x:Name="Root" Focusable="True" FocusVisualStyle="{x:Null}"
           MouseMove="OnRootMouseMove"
-          MouseLeave="OnRootMouseLeave"
           PreviewMouseDown="OnRootPreviewMouseDown"
           MouseWheel="OnRootMouseWheel"
           Background="{StaticResource BrushBgBase}">
@@ -354,22 +363,6 @@
                                    HorizontalAlignment="Center"
                                    Margin="0,20,0,0"/>
                     </StackPanel>
-                    <Grid.Triggers>
-                        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                    <DoubleAnimation Storyboard.TargetName="AudioBounce"
-                                                     Storyboard.TargetProperty="Y"
-                                                     From="0" To="-22"
-                                                     Duration="0:0:0.55">
-                                        <DoubleAnimation.EasingFunction>
-                                            <SineEase EasingMode="EaseInOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Grid.Triggers>
                 </Grid>
 
                 <!-- NoFile / Dragging — 영상 hidden일 때만 표시되는 카드 -->
@@ -481,22 +474,6 @@
                                     <Ellipse.RenderTransform>
                                         <ScaleTransform x:Name="LoadingDotScale" ScaleX="1" ScaleY="1"/>
                                     </Ellipse.RenderTransform>
-                                    <Ellipse.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                    <DoubleAnimation Storyboard.TargetName="LoadingDotScale"
-                                                                     Storyboard.TargetProperty="ScaleX"
-                                                                     From="0.82" To="1.18"
-                                                                     Duration="0:0:0.72"/>
-                                                    <DoubleAnimation Storyboard.TargetName="LoadingDotScale"
-                                                                     Storyboard.TargetProperty="ScaleY"
-                                                                     From="0.82" To="1.18"
-                                                                     Duration="0:0:0.72"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Ellipse.Triggers>
                                 </Ellipse>
                             </Grid>
 
@@ -529,22 +506,6 @@
                                     <Border.RenderTransform>
                                         <TranslateTransform x:Name="LoadingTx" X="-110"/>
                                     </Border.RenderTransform>
-                                    <Border.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever">
-                                                    <DoubleAnimation Storyboard.TargetName="LoadingTx"
-                                                                     Storyboard.TargetProperty="X"
-                                                                     From="-110" To="320"
-                                                                     Duration="0:0:1.35">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <SineEase EasingMode="EaseInOut"/>
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Border.Triggers>
                                 </Border>
                             </Border>
 
@@ -809,8 +770,20 @@
                         <Border Width="1" Height="18"
                                 Background="{StaticResource BrushBorderStrong}" Margin="4,0"/>
 
-                        <Button Style="{StaticResource IconButton}"
+                        <Button x:Name="ImmersiveFullscreenBtn"
+                                Style="{StaticResource IconButton}"
+                                Content="&#xE740;"
+                                Foreground="{StaticResource BrushAccent}"
+                                Margin="2,0,0,0"
+                                Visibility="{Binding IsFullscreen, Converter={StaticResource BoolVis}}"
+                                ToolTip="{DynamicResource TooltipImmersiveFullscreen}"
+                                Click="OnImmersiveFullscreenButtonClick"/>
+
+                        <Button x:Name="BottomFullscreenBtn"
+                                Style="{StaticResource IconButton}"
                                 Content="{Binding IsFullscreen, Converter={StaticResource FsIcon}}"
+                                Foreground="{StaticResource BrushAccent}"
+                                Margin="2,0,0,0"
                                 ToolTip="{DynamicResource TooltipFullscreen}"
                                 Click="OnFullscreenButtonClick"/>
                     </StackPanel>
@@ -830,29 +803,32 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   FontFamily="{StaticResource FontMono}"
-                                   FontSize="{StaticResource FontSizeSm}"
-                                   Foreground="{StaticResource BrushAccent}">
+                                    VerticalAlignment="Center"
+                                    FontFamily="{StaticResource FontMono}"
+                                    FontSize="{StaticResource FontSizeSm}"
+                                    Foreground="{StaticResource BrushAccent}"
+                                    TextTrimming="CharacterEllipsis"
+                                    Margin="0,0,12,0">
                             <Run Text="✂ "/>
                             <Run Text="{DynamicResource TrimEditingPrefix}"/>
                             <Run Text="{Binding TrimRangeDisplay, Mode=OneWay}"/>
                             <Run Text="{DynamicResource TrimEditingSuffix}"/>
                         </TextBlock>
-                        <!-- 명시적 Save 버튼 — 클릭하면 SaveFileDialog 열고 저장 -->
-                        <Button Grid.Column="1"
-                                Content="💾  Save"
-                                Command="{Binding ExecuteTrimCommand}"
-                                FontFamily="{StaticResource FontUi}"
-                                FontSize="{StaticResource FontSizeMd}"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource BrushAccent}"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource BrushAccent}"
-                                BorderThickness="1"
-                                Padding="14,4"
-                                Cursor="Hand"
-                                ToolTip="{DynamicResource TooltipSaveTrim}"/>
+                        <!-- 명시적 export 버튼 — 클릭하면 SaveFileDialog 열고 저장 -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Style="{StaticResource TrimActionButton}"
+                                    Content="{DynamicResource TrimSaveClipButton}"
+                                    Command="{Binding ExecuteTrimCommand}"
+                                    ToolTip="{DynamicResource TooltipSaveTrim}"/>
+                            <Button Style="{StaticResource TrimActionButton}"
+                                    Content="{DynamicResource TrimExtractAudioButton}"
+                                    Command="{Binding ExtractAudioOnlyCommand}"
+                                    ToolTip="{DynamicResource TooltipExtractAudio}"/>
+                            <Button Style="{StaticResource TrimActionButton}"
+                                    Content="{DynamicResource TrimExtractVideoButton}"
+                                    Command="{Binding ExtractVideoOnlyCommand}"
+                                    ToolTip="{DynamicResource TooltipExtractVideo}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </Grid>

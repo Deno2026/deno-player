@@ -13,7 +13,8 @@ namespace DenoVideoPlayer.Services;
 internal sealed class SingleInstance : IDisposable
 {
     private const string MutexName = @"Local\DenoVideoPlayer.SingleInstance.Mutex";
-    private const string PipeName  =          "DenoVideoPlayer.SingleInstance.Pipe";
+    private static readonly string PipeName =
+        $"DenoVideoPlayer.SingleInstance.Pipe.Session{GetCurrentSessionId()}";
 
     private Mutex? _mutex;
     private bool _ownsMutex;
@@ -28,22 +29,29 @@ internal sealed class SingleInstance : IDisposable
     {
         add
         {
+            string[][] backlog;
             lock (_sync)
             {
                 _argsReceived += value;
-                if (value is not null && _pending.Count > 0)
-                {
-                    var backlog = _pending.ToArray();
-                    _pending.Clear();
-                    foreach (var a in backlog) { try { value(a); } catch { } }
-                }
+                backlog = value is not null && _pending.Count > 0
+                    ? _pending.ToArray()
+                    : Array.Empty<string[]>();
+                if (backlog.Length > 0) _pending.Clear();
             }
+            if (value is not null)
+                foreach (var args in backlog) { try { value(args); } catch { } }
         }
         remove { lock (_sync) { _argsReceived -= value; } }
     }
     private Action<string[]>? _argsReceived;
     private readonly object _sync = new();
     private readonly List<string[]> _pending = new();
+
+    private static int GetCurrentSessionId()
+    {
+        try { return System.Diagnostics.Process.GetCurrentProcess().SessionId; }
+        catch { return 0; }
+    }
 
     /// <returns>true면 우리가 첫 인스턴스(서버 시작 OK). false면 인자 전달 후 종료해야 함.</returns>
     public bool TryClaim(string[] args)
@@ -84,7 +92,8 @@ internal sealed class SingleInstance : IDisposable
             {
                 server = new NamedPipeServerStream(
                     PipeName, PipeDirection.In, 1,
-                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await server.WaitForConnectionAsync(ct).ConfigureAwait(false);
 
                 using var reader = new StreamReader(server, new UTF8Encoding(false));
@@ -93,7 +102,7 @@ internal sealed class SingleInstance : IDisposable
                 {
                     string[]? args = null;
                     try { args = JsonSerializer.Deserialize<string[]>(line); } catch { }
-                    if (args is { Length: > 0 })
+                    if (args is not null)
                     {
                         Action<string[]>? handler;
                         lock (_sync)
@@ -116,7 +125,8 @@ internal sealed class SingleInstance : IDisposable
 
     private static void SendArgs(string[] args)
     {
-        using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.None);
+        using var client = new NamedPipeClientStream(
+            ".", PipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
         client.Connect(2000);
         using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
         writer.WriteLine(JsonSerializer.Serialize(args));

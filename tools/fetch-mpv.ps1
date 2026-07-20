@@ -60,11 +60,72 @@ function Find-7Zip {
     return $candidates | Select-Object -First 1
 }
 
+function Install-FileAtomically([string]$Source, [string]$Destination) {
+    $dir = Split-Path $Destination -Parent
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $temp = Join-Path $dir ('.' + [IO.Path]::GetFileName($Destination) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    $backup = $temp + '.bak'
+    try {
+        Copy-Item -LiteralPath $Source -Destination $temp -Force
+        if (Test-Path -LiteralPath $Destination) {
+            [IO.File]::Replace($temp, $Destination, $backup, $true)
+            Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+        } else {
+            Move-Item -LiteralPath $temp -Destination $Destination
+        }
+    } finally {
+        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Assert-GitHubAssetDigest($Asset, [string]$Path) {
+    $digest = [string]$Asset.digest
+    if ([string]::IsNullOrWhiteSpace($digest) -or -not $digest.StartsWith('sha256:')) {
+        throw "GitHub did not provide a SHA-256 digest for $($Asset.name). Existing runtime was left unchanged."
+    }
+    $expected = $digest.Substring('sha256:'.Length).ToUpperInvariant()
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($actual -ne $expected) {
+        throw "SHA-256 verification failed for $($Asset.name). Existing runtime was left unchanged."
+    }
+    Write-Host ">>> SHA-256 verified." -ForegroundColor DarkGreen
+}
+
+function Test-MpvExecutable([string]$Path) {
+    $process = New-Object System.Diagnostics.Process
+    try {
+        $process.StartInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $process.StartInfo.FileName = $Path
+        $process.StartInfo.Arguments = '--version'
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        if (-not $process.Start()) { return $false }
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(5000)) {
+            try { $process.Kill() } catch {}
+            return $false
+        }
+        $text = ([string]$stdout.Result + [string]$stderr.Result).Trim()
+        if ($text.Length -gt 0) { Write-Host (($text -split '\r?\n')[0]) }
+        return $process.ExitCode -eq 0
+    } catch {
+        return $false
+    } finally {
+        $process.Dispose()
+    }
+}
+
 $existingMpv = Join-Path $Dest "mpv.exe"
 if ($SkipIfExists -and (Test-Path $existingMpv)) {
-    Write-Host ">>> mpv.exe already at $existingMpv - skipping download (-SkipIfExists)." -ForegroundColor Yellow
-    & $existingMpv --version | Select-Object -First 1
-    exit 0
+    if (Test-MpvExecutable $existingMpv) {
+        Write-Host ">>> Valid mpv.exe already at $existingMpv - skipping download." -ForegroundColor Yellow
+        exit 0
+    }
+    Write-Warning "Existing mpv.exe failed validation. Downloading a clean replacement."
 }
 
 Write-Host ">>> Resolving latest mpv release from $Owner/$Repo ..." -ForegroundColor Cyan
@@ -78,39 +139,49 @@ if (-not $asset) {
     exit 1
 }
 
-$tmp7z = Join-Path $env:TEMP $asset.name
+$tmp7z = Join-Path $env:TEMP (([Guid]::NewGuid().ToString("N")) + "-" + $asset.name)
+$extractDir = $null
+try {
 Write-Host ">>> Downloading $($asset.name) ..." -ForegroundColor Cyan
 Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $tmp7z
+Assert-GitHubAssetDigest $asset $tmp7z
 
 $sz = Find-7Zip
 if (-not $sz) {
-    Write-Warning "7-Zip not found (bundled 7zr.exe missing too?). Extract manually and copy mpv.exe to: $Dest"
-    Write-Host    "   Downloaded archive: $tmp7z" -ForegroundColor Yellow
-    exit 1
+    throw "7-Zip not found (bundled tools\7zr.exe is missing). Existing runtime was left unchanged."
 }
 
 $extractDir = Join-Path $env:TEMP ("mpv-extract-" + [Guid]::NewGuid().ToString("N").Substring(0,8))
 New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 Write-Host ">>> Extracting with 7-Zip ..." -ForegroundColor Cyan
 & $sz x -y "-o$extractDir" $tmp7z | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "7-Zip extraction failed with exit code $LASTEXITCODE" }
 
 $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "mpv.exe" | Select-Object -First 1
 if (-not $exe) {
-    Write-Error "mpv.exe not found inside extracted archive: $extractDir"
-    exit 1
+    throw "mpv.exe not found inside extracted archive. Existing runtime was left unchanged."
 }
 
-Copy-Item -Path $exe.FullName -Destination (Join-Path $Dest "mpv.exe") -Force
+if (-not (Test-MpvExecutable $exe.FullName)) {
+    throw "Downloaded mpv.exe failed its version check. Existing runtime was left unchanged."
+}
 
-# Sibling DLLs / locale resources if present.
+# Sibling DLLs first, executable last. A valid final mpv.exe is the ready marker.
 $exeDir = Split-Path $exe.FullName -Parent
 Get-ChildItem $exeDir -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-    Copy-Item $_.FullName -Destination $Dest -Force
+    Install-FileAtomically $_.FullName (Join-Path $Dest $_.Name)
 }
-
-Remove-Item $tmp7z -Force -ErrorAction SilentlyContinue
-Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+Install-FileAtomically $exe.FullName (Join-Path $Dest "mpv.exe")
 
 Write-Host ""
 Write-Host ">>> Done. Installed at: $Dest\mpv.exe" -ForegroundColor Green
-& (Join-Path $Dest "mpv.exe") --version | Select-Object -First 1
+if (-not (Test-MpvExecutable (Join-Path $Dest "mpv.exe"))) {
+    throw "Installed mpv.exe failed its version check."
+}
+}
+finally {
+    Remove-Item -LiteralPath $tmp7z -Force -ErrorAction SilentlyContinue
+    if ($extractDir) {
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

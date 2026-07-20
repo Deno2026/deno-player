@@ -19,37 +19,42 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly PlaylistService _playlistSvc = new();
     private readonly SettingsService _settingsSvc = new();
     private readonly System.Windows.Threading.Dispatcher _ui;
+    private readonly CancellationTokenSource _lifetimeCts = new();
 
     public AppSettings Settings { get; private set; }
     public ObservableCollection<MediaItem> Playlist { get; } = new();
     public ObservableCollection<RecentItem> Recents { get; } = new();
     private const int MaxRecents = 30;
+    private const int TrimLoopSeekCooldownMs = 80;
+    private const double TrimLoopInToleranceSec = 0.05;
+    private const double TrimLoopOutEarlySec = 0.01;
 
     // (MouseActivity / MpvMousePos events 폐기 — 이제 MainWindow가 GetCursorPos polling으로 직접 처리.)
 
     /// <summary>잠깐 띄울 OSD toast. 스크린샷 저장 같은 짧은 confirm용.</summary>
     public event Action<string>? Toast;
     public event Action<UpdatePromptRequest>? UpdatePromptRequested;
+    public event Action? PlaylistToggleRequested;
 
-    public MainViewModel(MpvProcessService mpvProc)
+    public MainViewModel(MpvProcessService mpvProc, AppSettings? startupSettings = null)
     {
         _mpvProc = mpvProc;
         _ui = Application.Current.Dispatcher;
-        Settings = _settingsSvc.Load();
+        Settings = (startupSettings ?? _settingsSvc.Load()).Normalize();
         _volume = Settings.Volume;
         _muted = Settings.Muted;
         _speed = Settings.PlaybackRate;
-        _isPlaylistOpen = Settings.PlaylistPanelEnabled;
+        _isPlaylistOpen = false;
         _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
         _shuffle = Settings.Shuffle;
         LocalizationService.LanguageChanged += OnLanguageChanged;
 
-        // 최근 재생 목록 복원. 사라진 파일은 초보 사용자에게 실패 항목으로 보이지 않게 정리한다.
+        // 최근 재생 목록은 우선 메모리에 복원한다. 파일 존재 확인은 첫 render 뒤
+        // background에서 수행해 느린 외장/네트워크 경로가 시작 UI를 막지 않게 한다.
         if (Settings.RecentFiles is { Count: > 0 })
         {
             foreach (var p in Settings.RecentFiles)
                 Recents.Add(new RecentItem(p));
-            PruneMissingRecents(save: true);
         }
 
         PlayPauseCommand = new RelayCommand(TogglePlayPause);
@@ -67,7 +72,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         });
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
-        TogglePlaylistCommand = new RelayCommand(() => IsPlaylistOpen = !IsPlaylistOpen);
+        TogglePlaylistCommand = new RelayCommand(() => PlaylistToggleRequested?.Invoke());
         CycleRepeatCommand = new RelayCommand(() => Repeat = Repeat switch
         {
             RepeatMode.None      => RepeatMode.RepeatAll,
@@ -138,17 +143,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ClearTrimCommand = new RelayCommand(() =>
         {
             TrimInSec = null; TrimOutSec = null;
+            _ = _ipc.ClearAbLoop();
             Toast?.Invoke(L("TrimPointsCleared"));
         });
         ExecuteTrimCommand = new RelayCommand(async _ =>
         {
-            var saved = await ExecuteTrimAsync();
+            var saved = await ExecuteTrimAsync(TrimOutputMode.Clip);
             if (saved)
-            {
-                IsTrimMode = false;
-                _ = _ipc.ClearAbLoop();
-            }
+                ExitTrimModeAfterSave();
         }, _ => CanExecuteTrim());
+        ExtractAudioOnlyCommand = new RelayCommand(async _ =>
+        {
+            var saved = await ExecuteTrimAsync(TrimOutputMode.AudioOnly);
+            if (saved)
+                ExitTrimModeAfterSave();
+        }, _ => CanExecuteTrimOutput(TrimOutputMode.AudioOnly));
+        ExtractVideoOnlyCommand = new RelayCommand(async _ =>
+        {
+            var saved = await ExecuteTrimAsync(TrimOutputMode.VideoOnly);
+            if (saved)
+                ExitTrimModeAfterSave();
+        }, _ => CanExecuteTrimOutput(TrimOutputMode.VideoOnly));
 
         // 가위 버튼 = 편집 모드 토글. !IsTrimMode면 진입 (IN=0, OUT=Duration 기본),
         // IsTrimMode && HasTrimRange면 실행 후 exit, IsTrimMode && !HasTrimRange면 cancel.
@@ -190,33 +205,45 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ipc.PropertyChanged += OnMpvPropertyChanged;
         _ipc.EndFile        += OnEndFile;
         _ipc.FileLoaded     += OnFileLoaded;
-        _ipc.Connected      += OnIpcConnected;
         _ipc.Disconnected   += () => OnUi(() =>
         {
+            if (_ipc.IsConnected) return;
             // Failed 상태(예: mpv crash 메시지)는 보존. 그 외엔 NoFile로.
             if (State != PlayerState.Failed) State = PlayerState.NoFile;
         });
     }
 
-    public async Task ConnectIpcAsync()
+    public async Task<bool> ConnectIpcAsync()
     {
         Services.AppLog.Info($"IPC connect attempt pipe={_mpvProc.PipeName}");
-        var ok = await _ipc.ConnectAsync(_mpvProc.PipeName, TimeSpan.FromSeconds(5));
+        var ok = await _ipc.ConnectAsync(
+            _mpvProc.PipeName,
+            TimeSpan.FromSeconds(5),
+            _lifetimeCts.Token);
+        if (_lifetimeCts.IsCancellationRequested) return false;
         if (!ok)
         {
             Services.AppLog.Error("IPC connect failed (timeout)");
             StatusMessage = L("MpvIpcFailed");
             State = PlayerState.Failed;
-            return;
+            return false;
         }
         Services.AppLog.Info("IPC connected");
+        if (await InitializeIpcAsync()) return true;
+
+        Services.AppLog.Error("IPC initialization failed");
+        StatusMessage = L("MpvIpcFailed");
+        State = PlayerState.Failed;
+        return false;
     }
 
-    private async void OnIpcConnected()
+    private async Task<bool> InitializeIpcAsync()
     {
         // 초기 상태 적용 + 관찰 등록
         try
         {
+            InvalidateRendererVideoTransformCache();
+            SetRendererVideoTransform(1.0, 0.0, 0.0);
             await _ipc.SetVolume(Volume);
             await _ipc.SetMute(IsMuted);
             await _ipc.SetSpeed(Speed);
@@ -231,13 +258,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             await _ipc.ObserveProperty("mute");
             await _ipc.ObserveProperty("speed");
             await _ipc.ObserveProperty("filename");
+            await _ipc.ObserveProperty("path");
             await _ipc.ObserveProperty("media-title");
             await _ipc.ObserveProperty("eof-reached");
             await _ipc.ObserveProperty("file-format");
             await _ipc.ObserveProperty("seekable");
+            await _ipc.ObserveProperty("dwidth");
+            await _ipc.ObserveProperty("dheight");
             // mouse-pos는 더 이상 observe 안 함 — GetCursorPos polling으로 우회
+            return _ipc.IsConnected && !_lifetimeCts.IsCancellationRequested;
         }
-        catch { /* IPC 일찍 끊겨도 앱 계속 */ }
+        catch (Exception ex)
+        {
+            Services.AppLog.Warn($"IPC initialization incomplete: {ex.Message}");
+            return false;
+        }
     }
 
     // ============================================================
@@ -254,9 +289,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(IsAudioPlayback));
             Raise(nameof(IsVideoSurfaceVisible));
             Raise(nameof(IsFirstRunPreparing));
+            Raise(nameof(IsLoading));
             Raise(nameof(IsBottomBarVisible));
             Raise(nameof(LoadingTitle));
             Raise(nameof(LoadingHint));
+            RaiseTrimExportCommands();
         }
     }
 
@@ -276,9 +313,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (!Set(ref _currentMedia, value)) return;
+            ResetVideoDisplaySize();
             Raise(nameof(HasMedia));
             Raise(nameof(HasNext));
             Raise(nameof(HasPrev));
+            Raise(nameof(CanZoomVideo));
             Raise(nameof(IsAudioPlayback));
             Raise(nameof(IsVideoSurfaceVisible));
             Raise(nameof(IsFirstRunPreparing));
@@ -298,6 +337,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CurrentMedia?.Kind is MediaKind.Video or MediaKind.Image &&
         State is PlayerState.Playing or PlayerState.Paused or PlayerState.Ready or PlayerState.Loading;
     public bool IsFirstRunPreparing => State == PlayerState.Loading && CurrentMedia is null;
+    public bool IsLoading => State == PlayerState.Loading;
     public bool IsBottomBarVisible => !IsFirstRunPreparing;
     public string LoadingTitle =>
         IsFirstRunPreparing
@@ -395,6 +435,125 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
     public string SpeedDisplay => _speed == 1.0 ? "1.0x" : _speed.ToString("0.00") + "x";
+
+    public bool CanZoomVideo => CurrentMedia?.Kind is MediaKind.Video or MediaKind.Image;
+
+    private double _videoDisplayWidth;
+    private double _videoDisplayHeight;
+    private readonly object _rendererTransformLock = new();
+    private bool _rendererTransformFlushRunning;
+    private double _pendingRendererZoom = double.NaN;
+    private double _pendingRendererPanX = double.NaN;
+    private double _pendingRendererPanY = double.NaN;
+    private double _lastRendererZoom = double.NaN;
+    private double _lastRendererPanX = double.NaN;
+    private double _lastRendererPanY = double.NaN;
+    private const double RendererTransformEpsilon = 0.0001;
+    private const int RendererTransformFrameIntervalMs = 16;
+    public double VideoDisplayAspectRatio =>
+        _videoDisplayWidth > 0 && _videoDisplayHeight > 0
+            ? _videoDisplayWidth / _videoDisplayHeight
+            : 0;
+
+    public void SetRendererVideoTransform(double scale, double panX, double panY)
+    {
+        var safeScale = Math.Clamp(scale, 1.0, 8.0);
+        var zoom = safeScale <= 1.0001 ? 0.0 : Math.Log(safeScale, 2.0);
+        var safePanX = safeScale <= 1.0001 ? 0.0 : Math.Clamp(panX, -1.0, 1.0);
+        var safePanY = safeScale <= 1.0001 ? 0.0 : Math.Clamp(panY, -1.0, 1.0);
+
+        var shouldStartFlush = false;
+        lock (_rendererTransformLock)
+        {
+            _pendingRendererZoom = zoom;
+            _pendingRendererPanX = safePanX;
+            _pendingRendererPanY = safePanY;
+            if (!_rendererTransformFlushRunning)
+            {
+                _rendererTransformFlushRunning = true;
+                shouldStartFlush = true;
+            }
+        }
+
+        if (shouldStartFlush)
+            _ = FlushRendererVideoTransformAsync();
+    }
+
+    private async Task FlushRendererVideoTransformAsync()
+    {
+        while (true)
+        {
+            // wheel/pan 이벤트가 renderer보다 빠르게 들어와도 한 display frame 동안
+            // 최신 목표값만 남긴다. mpv pipe에 오래된 방향의 transform이 쌓이지 않는다.
+            await Task.Delay(RendererTransformFrameIntervalMs).ConfigureAwait(false);
+
+            double zoom;
+            double panX;
+            double panY;
+            lock (_rendererTransformLock)
+            {
+                zoom = _pendingRendererZoom;
+                panX = _pendingRendererPanX;
+                panY = _pendingRendererPanY;
+            }
+
+            await SendRendererVideoTransformIfChangedAsync(zoom, panX, panY).ConfigureAwait(false);
+
+            lock (_rendererTransformLock)
+            {
+                if (NearlyEqual(_pendingRendererZoom, zoom) &&
+                    NearlyEqual(_pendingRendererPanX, panX) &&
+                    NearlyEqual(_pendingRendererPanY, panY))
+                {
+                    _rendererTransformFlushRunning = false;
+                    return;
+                }
+            }
+        }
+    }
+
+    private async Task SendRendererVideoTransformIfChangedAsync(double zoom, double panX, double panY)
+    {
+        if (!_ipc.IsConnected)
+        {
+            InvalidateRendererVideoTransformCache();
+            return;
+        }
+
+        var exactReset = zoom == 0.0 && panX == 0.0 && panY == 0.0;
+        var sendZoom = double.IsNaN(_lastRendererZoom) ||
+                       (exactReset ? _lastRendererZoom != 0.0 : !NearlyEqual(_lastRendererZoom, zoom));
+        var sendPanX = double.IsNaN(_lastRendererPanX) ||
+                       (exactReset ? _lastRendererPanX != 0.0 : !NearlyEqual(_lastRendererPanX, panX));
+        var sendPanY = double.IsNaN(_lastRendererPanY) ||
+                       (exactReset ? _lastRendererPanY != 0.0 : !NearlyEqual(_lastRendererPanY, panY));
+        var commands = new List<object[]>(3);
+        if (sendZoom) commands.Add(["set_property", "video-zoom", zoom]);
+        if (sendPanX) commands.Add(["set_property", "video-pan-x", panX]);
+        if (sendPanY) commands.Add(["set_property", "video-pan-y", panY]);
+        if (commands.Count == 0)
+            return;
+
+        if (!await _ipc.TrySendBatchAsync(commands.ToArray()).ConfigureAwait(false))
+        {
+            InvalidateRendererVideoTransformCache();
+            return;
+        }
+
+        if (sendZoom) _lastRendererZoom = zoom;
+        if (sendPanX) _lastRendererPanX = panX;
+        if (sendPanY) _lastRendererPanY = panY;
+    }
+
+    private void InvalidateRendererVideoTransformCache()
+    {
+        _lastRendererZoom = double.NaN;
+        _lastRendererPanX = double.NaN;
+        _lastRendererPanY = double.NaN;
+    }
+
+    private static bool NearlyEqual(double a, double b) =>
+        Math.Abs(a - b) <= RendererTransformEpsilon;
 
     /// <summary>
     /// 메뉴 preset / reset 버튼 전용. 일반 Speed setter는 동일값이면 early-return이라
@@ -506,19 +665,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (Set(ref _isAlwaysOnTop, value)) Settings.AlwaysOnTop = value; }
     }
 
-    private bool _isPlaylistOpen = true;
+    private bool _isPlaylistOpen;
     public bool IsPlaylistOpen
     {
         get => _isPlaylistOpen;
-        set
-        {
-            if (!Set(ref _isPlaylistOpen, value)) return;
-            Settings.PlaylistPanelEnabled = value;
-            Raise(nameof(PlaylistColumnWidth));
-        }
+        private set => Set(ref _isPlaylistOpen, value);
     }
-    public System.Windows.GridLength PlaylistColumnWidth =>
-        _isPlaylistOpen ? new System.Windows.GridLength(320) : new System.Windows.GridLength(0);
+    public void SetPlaylistOpen(bool open) => IsPlaylistOpen = open;
 
     // ────────────────────────────────────────────────────────
     // Repeat / Shuffle
@@ -657,6 +810,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand SetTrimOutCommand { get; }
     public RelayCommand ClearTrimCommand { get; }
     public RelayCommand ExecuteTrimCommand { get; }
+    public RelayCommand ExtractAudioOnlyCommand { get; }
+    public RelayCommand ExtractVideoOnlyCommand { get; }
     public RelayCommand ToggleTrimModeCommand { get; }
     public RelayCommand CancelTrimModeCommand { get; }
     public RelayCommand OpenFolderCommand { get; }
@@ -698,8 +853,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// mpv가 자동으로 a~b 구간 재생 후 a로 점프 → 사용자가 그 구간만 미리듣기.</summary>
     private void ApplyTrimLoop()
     {
-        if (!HasTrimRange) return;
-        _ = _ipc.SetAbLoop(_trimInSec!.Value, _trimOutSec!.Value);
+        if (!HasTrimRange)
+        {
+            _ = _ipc.ClearAbLoop();
+            return;
+        }
+        var inS = _trimInSec!.Value;
+        var outS = _trimOutSec!.Value;
+        _lastTrimLoopSeekAt = DateTime.MinValue;
+        _ = _ipc.SetAbLoop(inS, outS);
+        if (TimePos < inS || TimePos >= outS)
+            SeekTrimPreviewToIn(force: true);
     }
     public bool HasTrimRange =>
         _trimInSec is double i && _trimOutSec is double o && o > i;
@@ -708,74 +872,200 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : "";
 
     private bool _trimBusy;
+    private DateTime _lastTrimLoopSeekAt = DateTime.MinValue;
     // 버튼 IsEnabled — HasTrimRange는 검사 안 함 (disabled되면 클릭 시 toast 안내 못 함).
     // 사용자가 가위 버튼 그냥 누르면 ExecuteTrimAsync 안에서 "IN/OUT 먼저" 안내 toast.
-    private bool CanExecuteTrim() =>
-        !_trimBusy
-        && CurrentMedia is not null
-        && CurrentMedia.Kind != MediaKind.Image;
+    private bool CanExecuteTrim() => CanExecuteTrimOutput(TrimOutputMode.Clip);
 
-    private async Task<bool> ExecuteTrimAsync()
+    private bool CanExecuteTrimOutput(TrimOutputMode outputMode)
+    {
+        if (_trimBusy || CurrentMedia is null || CurrentMedia.Kind == MediaKind.Image)
+            return false;
+        return outputMode != TrimOutputMode.VideoOnly || CurrentMedia.Kind == MediaKind.Video;
+    }
+
+    private void RaiseTrimExportCommands()
+    {
+        ExecuteTrimCommand.RaiseCanExecuteChanged();
+        ExtractAudioOnlyCommand.RaiseCanExecuteChanged();
+        ExtractVideoOnlyCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ExitTrimModeAfterSave()
+    {
+        IsTrimMode = false;
+        TrimInSec = null;
+        TrimOutSec = null;
+        _ = _ipc.ClearAbLoop();
+    }
+
+    private bool ShouldRewindTrimPreview(double seconds)
+    {
+        if (!IsTrimMode || !HasTrimRange) return false;
+        var inS = _trimInSec!.Value;
+        var outS = _trimOutSec!.Value;
+        return seconds < inS - TrimLoopInToleranceSec ||
+               seconds >= outS - TrimLoopOutEarlySec;
+    }
+
+    private void SeekTrimPreviewToIn(bool force = false)
+    {
+        if (!HasTrimRange) return;
+        var now = DateTime.UtcNow;
+        if (!force && now - _lastTrimLoopSeekAt < TimeSpan.FromMilliseconds(TrimLoopSeekCooldownMs))
+            return;
+
+        _lastTrimLoopSeekAt = now;
+        var inS = _trimInSec!.Value;
+        TimePos = inS;
+        _ = _ipc.SeekAbsolute(inS);
+    }
+
+    private async Task<bool> ExecuteTrimAsync(TrimOutputMode outputMode)
     {
         if (_trimBusy) return false;
         if (CurrentMedia is null)
         { Toast?.Invoke(L("NoPlayingMedia")); return false; }
         if (CurrentMedia.Kind == MediaKind.Image)
         { Toast?.Invoke(L("ImageCannotTrim")); return false; }
+        if (outputMode == TrimOutputMode.VideoOnly && CurrentMedia.Kind != MediaKind.Video)
+        { Toast?.Invoke(L("VideoOnlyNeedsVideo")); return false; }
         if (!HasTrimRange)
         { Toast?.Invoke(L("TrimNeedInOut")); return false; }
 
-        var src = CurrentMedia!.FullPath;
+        var media = CurrentMedia;
+        var src = media.FullPath;
         var inS = _trimInSec!.Value;
         var outS = _trimOutSec!.Value;
-        var srcDir  = System.IO.Path.GetDirectoryName(src) ?? Environment.CurrentDirectory;
-        var srcName = System.IO.Path.GetFileNameWithoutExtension(src);
-        var ext = System.IO.Path.GetExtension(src);
-        var defaultName = $"{srcName}_clip{ext}";
-
-        // 사용자가 직접 저장 위치 + 이름 지정
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = L("TrimSaveDialogTitle"),
-            FileName = defaultName,
-            InitialDirectory = srcDir,
-            Filter = LF("SameFormatFilter", ext),
-            AddExtension = true,
-            DefaultExt = ext,
-            OverwritePrompt = true,
-        };
-        if (dlg.ShowDialog() != true)
-        {
-            // 사용자 취소 — 편집 모드 유지, 아무것도 변경 안 함
-            return false;
-        }
-        var outputPath = dlg.FileName;
-
         _trimBusy = true;
-        ExecuteTrimCommand.RaiseCanExecuteChanged();
+        RaiseTrimExportCommands();
         try
         {
-            Toast?.Invoke(L("TrimInProgress"));
-            var res = await Services.TrimService.TrimAsync(src, inS, outS, outputPath).ConfigureAwait(true);
+            if (Services.TrimService.FindFfmpeg() is null)
+            {
+                Toast?.Invoke(L("FfmpegPreparing"));
+                var prepared = await Services.RuntimeDependencyService
+                    .EnsureFfmpegAsync(UpdateFfmpegPrepareStatus, _lifetimeCts.Token)
+                    .ConfigureAwait(true);
+                if (_lifetimeCts.IsCancellationRequested) return false;
+                if (!prepared.Success || Services.TrimService.FindFfmpeg() is null)
+                {
+                    Toast?.Invoke(LF("FfmpegPrepareFailed", prepared.Error));
+                    return false;
+                }
+            }
+
+            // 준비 중 다른 파일로 이동했다면 이전 파일의 trim 대화상자를 뒤늦게 열지 않는다.
+            if (!ReferenceEquals(CurrentMedia, media) ||
+                _trimInSec != inS || _trimOutSec != outS)
+                return false;
+
+            var srcDir = System.IO.Path.GetDirectoryName(src) ?? Environment.CurrentDirectory;
+            var srcName = System.IO.Path.GetFileNameWithoutExtension(src);
+            var srcExt = System.IO.Path.GetExtension(src);
+            string outputExt;
+            try
+            {
+                outputExt = outputMode == TrimOutputMode.AudioOnly
+                    ? await Services.TrimService.RecommendAudioExtensionAsync(src, _lifetimeCts.Token)
+                        .ConfigureAwait(true)
+                    : srcExt;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(CurrentMedia, media) ||
+                _trimInSec != inS || _trimOutSec != outS)
+                return false;
+
+            var suffix = outputMode switch
+            {
+                TrimOutputMode.AudioOnly => "audio",
+                TrimOutputMode.VideoOnly => "video",
+                _ => "clip"
+            };
+            var defaultName = $"{srcName}_{suffix}{outputExt}";
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = L(DialogTitleKey(outputMode)),
+                FileName = defaultName,
+                InitialDirectory = srcDir,
+                Filter = outputMode == TrimOutputMode.AudioOnly
+                    ? LF("AudioOutputFilter", outputExt)
+                    : LF("SameFormatFilter", outputExt),
+                AddExtension = true,
+                DefaultExt = outputExt,
+                OverwritePrompt = true,
+            };
+            if (dlg.ShowDialog() != true)
+                return false;
+
+            Toast?.Invoke(L(InProgressKey(outputMode)));
+            var res = await Services.TrimService.TrimAsync(
+                src, inS, outS, dlg.FileName, outputMode, _lifetimeCts.Token).ConfigureAwait(true);
+            if (_lifetimeCts.IsCancellationRequested) return false;
             if (res.Success && res.OutputPath is not null)
             {
                 var name = System.IO.Path.GetFileName(res.OutputPath);
-                Toast?.Invoke(LF("TrimSaved", name));
-                Services.AppLog.Info($"Trim saved: {res.OutputPath}");
+                Toast?.Invoke(LF(SavedKey(outputMode), name));
+                Services.AppLog.Info($"Trim[{outputMode}] saved: {res.OutputPath}");
                 return true;
             }
             else
             {
-                Toast?.Invoke(LF("TrimFailed", res.Error));
+                Toast?.Invoke(LF(FailedKey(outputMode), res.Error));
                 return false;
             }
         }
         finally
         {
             _trimBusy = false;
-            ExecuteTrimCommand.RaiseCanExecuteChanged();
+            RaiseTrimExportCommands();
         }
     }
+
+    private void UpdateFfmpegPrepareStatus(string line)
+    {
+        var lower = line.ToLowerInvariant();
+        var key = lower.Contains("downloading")
+            ? "FfmpegDownloading"
+            : lower.Contains("extracting")
+                ? "FfmpegInstalling"
+                : lower.Contains("already at") || lower.Contains("done")
+                    ? "FfmpegReady"
+                    : null;
+        if (key is not null) OnUi(() => Toast?.Invoke(L(key)));
+    }
+
+    private static string DialogTitleKey(TrimOutputMode outputMode) => outputMode switch
+    {
+        TrimOutputMode.AudioOnly => "ExtractAudioSaveDialogTitle",
+        TrimOutputMode.VideoOnly => "ExtractVideoSaveDialogTitle",
+        _ => "TrimSaveDialogTitle"
+    };
+
+    private static string InProgressKey(TrimOutputMode outputMode) => outputMode switch
+    {
+        TrimOutputMode.AudioOnly => "ExtractAudioInProgress",
+        TrimOutputMode.VideoOnly => "ExtractVideoInProgress",
+        _ => "TrimInProgress"
+    };
+
+    private static string SavedKey(TrimOutputMode outputMode) => outputMode switch
+    {
+        TrimOutputMode.AudioOnly => "ExtractAudioSaved",
+        TrimOutputMode.VideoOnly => "ExtractVideoSaved",
+        _ => "TrimSaved"
+    };
+
+    private static string FailedKey(TrimOutputMode outputMode) => outputMode switch
+    {
+        TrimOutputMode.AudioOnly => "ExtractAudioFailed",
+        TrimOutputMode.VideoOnly => "ExtractVideoFailed",
+        _ => "TrimFailed"
+    };
     public RelayCommand ApplyUpdateCommand { get; }
     public RelayCommand CycleSubtitleCommand { get; }
     public RelayCommand ToggleSubtitleVisibilityCommand { get; }
@@ -830,11 +1120,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             };
             if (dlg.ShowDialog() != true) return;
 
-            // 자연 정렬로 폴더 안 첫 지원 미디어 파일 찾기
-            var first = System.IO.Directory.EnumerateFiles(dlg.FolderName)
-                .Where(MediaKindExtensions.IsSupported)
-                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
+            // 생성시간 최신순으로 폴더 안 첫 지원 미디어 파일 찾기.
+            var first = _playlistSvc.FindFirstPlayableFile(dlg.FolderName);
 
             if (first is null)
                 Toast?.Invoke(L("NoPlayableMediaInFolder"));
@@ -903,6 +1190,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         Services.AppLog.Info($"PlayMedia: {media?.FileName ?? "(null)"}");
         if (media is null) return;
+        var mediaChanged = !ReferenceEquals(CurrentMedia, media);
+        if (mediaChanged) ResetPerMediaState();
         foreach (var m in Playlist) m.IsPlaying = false;
         media.IsPlaying = true;
         media.HasError = false;
@@ -921,6 +1210,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (_isPaused) IsPaused = false;
         NextCommand.RaiseCanExecuteChanged();
         PrevCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ResetPerMediaState()
+    {
+        IsTrimMode = false;
+        TrimInSec = null;
+        TrimOutSec = null;
+        _ = _ipc.ClearAbLoop();
+        TimePos = 0;
+        Duration = 0;
+        Seeking = false;
+        IsAtEnd = false;
+        _activeMpvPath = null;
+        _lastTrimLoopSeekAt = DateTime.MinValue;
     }
 
     private void ApplyVisualizer(MediaKind kind)
@@ -1027,7 +1330,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => Set(ref _isAtEnd, value);
     }
 
-    public void BeginSeek() => Seeking = true;
+    private int _seekRevision;
+    public void BeginSeek()
+    {
+        Interlocked.Increment(ref _seekRevision);
+        Seeking = true;
+    }
 
     /// <summary>
     /// 사용자가 새 위치로 seek 확정. mpv가 seek 명령을 적용하기 직전까지 이전 위치의
@@ -1036,6 +1344,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     public async void EndSeek(double seconds)
     {
+        var revision = Volatile.Read(ref _seekRevision);
         _ = _ipc.SeekAbsolute(seconds);
         if (IsAtEnd)
         {
@@ -1043,9 +1352,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             IsAtEnd = false;
         }
         // mpv가 새 위치를 반영한 time-pos를 보내기 충분한 시간 동안 Seeking 유지
-        try { await Task.Delay(250).ConfigureAwait(false); }
-        catch { /* 무해 */ }
-        OnUi(() => Seeking = false);
+        try { await Task.Delay(250, _lifetimeCts.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; }
+        OnUi(() =>
+        {
+            if (revision == Volatile.Read(ref _seekRevision))
+                Seeking = false;
+        });
     }
 
     /// <summary>드래그 중 live preview seek. UI(TimePos)를 즉시 갱신하고 mpv에도 명령.
@@ -1059,6 +1372,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     // mpv 이벤트가 매 frame (60Hz+) 옴 → UI 스레드 dispatch 폭주를 막아 키 입력 응답성 확보
     private DateTime _lastTimePosAt;
+    private string? _activeMpvPath;
 
     private void OnMpvPropertyChanged(string name, JsonElement? value)
     {
@@ -1066,7 +1380,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (name == "time-pos")
         {
             var now = DateTime.UtcNow;
-            if (now - _lastTimePosAt < TimeSpan.FromMilliseconds(120)) return;
+            var throttleMs = IsTrimMode && HasTrimRange ? 30 : 120;
+            if (now - _lastTimePosAt < TimeSpan.FromMilliseconds(throttleMs)) return;
             _lastTimePosAt = now;
         }
 
@@ -1075,7 +1390,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             switch (name)
             {
                 case "time-pos":
-                    if (!Seeking && TryGetDouble(value, out var t)) TimePos = t;
+                    if (!Seeking && TryGetDouble(value, out var t))
+                    {
+                        if (ShouldRewindTrimPreview(t))
+                            SeekTrimPreviewToIn();
+                        else
+                            TimePos = t;
+                    }
                     break;
                 case "duration":
                     if (TryGetDouble(value, out var d)) Duration = d;
@@ -1112,8 +1433,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     if (value is { ValueKind: JsonValueKind.String } se)
                         FileNameDisplay = se.GetString() ?? FileNameDisplay;
                     break;
+                case "path":
+                    if (value is { ValueKind: JsonValueKind.String } pathValue)
+                        _activeMpvPath = pathValue.GetString();
+                    break;
                 case "eof-reached":
                     if (TryGetBool(value, out var eof)) IsAtEnd = eof;
+                    break;
+                case "dwidth":
+                    if (TryGetDouble(value, out var dw)) SetVideoDisplayWidth(dw);
+                    break;
+                case "dheight":
+                    if (TryGetDouble(value, out var dh)) SetVideoDisplayHeight(dh);
                     break;
                 // mouse-pos observe 폐기 — MainWindow의 GetCursorPos polling이 mouse 활동
                 // 감지 + hot zone trigger 둘 다 담당. mpv 좌표계 신뢰 못 함.
@@ -1142,9 +1473,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Services.AppLog.Info($"OnEndFile reason={reason} repeat={Repeat} shuffle={Shuffle} hasNext={HasNext} idx={CurrentIndex} count={Playlist.Count}");
         OnUi(() =>
         {
+            if (CurrentMedia is null || !PathsEqual(_activeMpvPath, CurrentMedia.FullPath))
+            {
+                Services.AppLog.Info(
+                    $"  -> ignore stale end-file active={_activeMpvPath ?? "(none)"} current={CurrentMedia?.FullPath ?? "(none)"}");
+                return;
+            }
+
             var progress = reason is "eof" or "redirect" or "unknown" or null;
             if (progress)
             {
+                if (IsTrimMode && HasTrimRange && CurrentMedia is not null)
+                {
+                    Services.AppLog.Info("  -> Trim preview replay");
+                    SeekTrimPreviewToIn(force: true);
+                    _ = _ipc.SetPause(false);
+                    return;
+                }
+
                 if (Repeat == RepeatMode.RepeatOne && CurrentMedia is not null)
                 {
                     Services.AppLog.Info("  -> RepeatOne replay");
@@ -1248,6 +1594,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Recents.Insert(0, new RecentItem(path));
         while (Recents.Count > MaxRecents) Recents.RemoveAt(Recents.Count - 1);
         Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+        Interlocked.Increment(ref _recentsRevision);
     }
 
     public int PruneMissingRecents(bool save = true)
@@ -1263,11 +1610,87 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         if (removed > 0)
         {
+            Interlocked.Increment(ref _recentsRevision);
             Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
             if (save) SaveSettingsNow();
         }
 
         return removed;
+    }
+
+    private long _recentsRevision;
+    private int _recentPruneInFlight;
+
+    /// <summary>
+    /// 최근 파일의 존재 확인은 느린 volume에서도 UI를 멈추지 않게 worker에서 수행한다.
+    /// ObservableCollection과 설정 반영만 호출 UI context로 돌아온 뒤 처리한다.
+    /// </summary>
+    public async Task<int> PruneMissingRecentsAsync(bool save = true)
+    {
+        if (Interlocked.Exchange(ref _recentPruneInFlight, 1) != 0) return 0;
+
+        try
+        {
+            var revision = Volatile.Read(ref _recentsRevision);
+            var snapshot = Recents.Select(r => r.FullPath).ToArray();
+            if (snapshot.Length == 0) return 0;
+
+            var missing = await Task.Run(() =>
+            {
+                var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var path in snapshot)
+                {
+                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                        result.Add(path);
+                }
+
+                // 외장/네트워크 경로가 첫 probe 직후 복구되는 작은 경쟁 구간도
+                // UI를 막지 않는 worker 안에서 한 번 더 확인해 최대한 줄인다.
+                foreach (var path in result.ToArray())
+                {
+                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                        result.Remove(path);
+                }
+                return result;
+            }, _lifetimeCts.Token);
+
+            if (missing.Count == 0 || _lifetimeCts.IsCancellationRequested) return 0;
+            if (revision != Volatile.Read(ref _recentsRevision)) return 0;
+
+            var removed = 0;
+            for (var i = Recents.Count - 1; i >= 0; i--)
+            {
+                var path = Recents[i].FullPath;
+                if (!missing.Contains(path)) continue;
+                Recents.RemoveAt(i);
+                removed++;
+            }
+
+            if (removed > 0)
+            {
+                Interlocked.Increment(ref _recentsRevision);
+                Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
+                if (save)
+                {
+                    var lifetimeToken = _lifetimeCts.Token;
+                    _ = _ui.BeginInvoke(new Action(() =>
+                    {
+                        if (!lifetimeToken.IsCancellationRequested)
+                            SaveSettingsNow();
+                    }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                }
+            }
+
+            return removed;
+        }
+        catch (OperationCanceledException)
+        {
+            return 0;
+        }
+        finally
+        {
+            Volatile.Write(ref _recentPruneInFlight, 0);
+        }
     }
 
     public bool RemoveRecent(string path, bool save = true)
@@ -1282,11 +1705,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         if (removed)
         {
+            Interlocked.Increment(ref _recentsRevision);
             Settings.RecentFiles = Recents.Select(r => r.FullPath).ToList();
             if (save) SaveSettingsNow();
         }
 
         return removed;
+    }
+
+    public void ClearRecents()
+    {
+        if (Recents.Count == 0 && Settings.RecentFiles is not { Count: > 0 }) return;
+        Recents.Clear();
+        Settings.RecentFiles = new List<string>();
+        Interlocked.Increment(ref _recentsRevision);
+        SaveSettingsNow();
     }
 
     private MediaItem? PickRandomOfSameKind()
@@ -1316,10 +1749,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             {
                 if (Directory.Exists(f))
                 {
-                    media = Directory.EnumerateFiles(f)
-                        .Where(MediaKindExtensions.IsSupported)
-                        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-                        .FirstOrDefault();
+                    media = _playlistSvc.FindFirstPlayableFile(f);
                     if (media is not null) break;
                 }
             }
@@ -1386,6 +1816,49 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         return false;
     }
 
+    private static bool PathsEqual(string? first, string? second)
+    {
+        if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(second)) return false;
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(first),
+                Path.GetFullPath(second),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private void SetVideoDisplayWidth(double value)
+    {
+        var next = value > 0 ? value : 0;
+        if (Math.Abs(_videoDisplayWidth - next) < 0.5)
+            return;
+        _videoDisplayWidth = next;
+        Raise(nameof(VideoDisplayAspectRatio));
+    }
+
+    private void SetVideoDisplayHeight(double value)
+    {
+        var next = value > 0 ? value : 0;
+        if (Math.Abs(_videoDisplayHeight - next) < 0.5)
+            return;
+        _videoDisplayHeight = next;
+        Raise(nameof(VideoDisplayAspectRatio));
+    }
+
+    private void ResetVideoDisplaySize()
+    {
+        if (_videoDisplayWidth == 0 && _videoDisplayHeight == 0)
+            return;
+        _videoDisplayWidth = 0;
+        _videoDisplayHeight = 0;
+        Raise(nameof(VideoDisplayAspectRatio));
+    }
+
     private static string L(string key) => LocalizationService.T(key);
     private static string LF(string key, params object?[] args) => LocalizationService.F(key, args);
 
@@ -1435,7 +1908,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        try { _lifetimeCts.Cancel(); } catch { }
         LocalizationService.LanguageChanged -= OnLanguageChanged;
         _ipc.Dispose();
+        _lifetimeCts.Dispose();
     }
 }
