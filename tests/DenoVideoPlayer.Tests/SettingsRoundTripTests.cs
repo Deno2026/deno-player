@@ -75,6 +75,38 @@ public class SettingsRoundTripTests
         Assert.Equal("ko", back.Language);
     }
 
+    [Fact] public void NormalizeRepairsUnsafeOrCorruptValues()
+    {
+        var s = new AppSettings
+        {
+            WindowWidth = double.PositiveInfinity,
+            WindowHeight = -50,
+            WindowLeft = double.NaN,
+            Volume = 999,
+            PlaybackRate = -2,
+            Language = "unsupported",
+            ControlAutoHideMs = -1,
+            RepeatMode = 99,
+            RegisteredExtensions = new List<string> { "MP4", ".mp4", @"..\bad", "" },
+            RecentFiles = Enumerable.Repeat(@"C:\same.mp4", 40).Concat(
+                Enumerable.Range(0, 40).Select(i => $@"C:\file-{i}.mp4")).ToList(),
+            ScreenshotFolder = "   "
+        }.Normalize();
+
+        Assert.Equal(1280, s.WindowWidth);
+        Assert.Equal(320, s.WindowHeight);
+        Assert.Null(s.WindowLeft);
+        Assert.Equal(100, s.Volume);
+        Assert.Equal(0.25, s.PlaybackRate);
+        Assert.Equal("ko", s.Language);
+        Assert.Equal(250, s.ControlAutoHideMs);
+        Assert.Equal(2, s.RepeatMode);
+        Assert.Equal(new[] { ".mp4" }, s.RegisteredExtensions);
+        Assert.Equal(30, s.RecentFiles!.Count);
+        Assert.Equal(s.RecentFiles.Count, s.RecentFiles.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Null(s.ScreenshotFolder);
+    }
+
     [Fact] public void EnglishLocalizationCanBeSelected()
     {
         LocalizationService.Apply("en");

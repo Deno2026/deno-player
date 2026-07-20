@@ -18,4 +18,6 @@ public static class RuntimePaths
     public static string FfmpegDirectory => Path.Combine(RuntimeRoot, "ffmpeg");
 
     public static string FfmpegExe => Path.Combine(FfmpegDirectory, "ffmpeg.exe");
+
+    public static string FfprobeExe => Path.Combine(FfmpegDirectory, "ffprobe.exe");
 }

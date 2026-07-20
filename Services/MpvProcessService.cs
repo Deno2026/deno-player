@@ -9,6 +9,8 @@ namespace DenoVideoPlayer.Services;
 /// </summary>
 public sealed class MpvProcessService : IDisposable
 {
+    private long _processGeneration;
+
     public string PipeName { get; }
     public Process? Process { get; private set; }
     public string MpvPath => ResolveMpvPath();
@@ -39,7 +41,9 @@ public sealed class MpvProcessService : IDisposable
         return RuntimePaths.MpvExe; // 없어도 경로는 반환(에러는 호출자가 처리)
     }
 
-    public bool MpvAvailable => File.Exists(MpvPath);
+    // 정상 시작에서는 별도 mpv --version을 먼저 띄우지 않는다. 실제 player process 시작과
+    // IPC 연결이 동작 검증이며, download/promotion 단계의 정밀 검증은 그대로 유지된다.
+    public bool MpvAvailable => RuntimeExecutableValidator.HasPlausiblePortableExecutableHeader(MpvPath);
 
     public void Start(IntPtr videoHostHwnd)
     {
@@ -99,9 +103,10 @@ public sealed class MpvProcessService : IDisposable
         Arg($"--input-ipc-server={pipePath}");
         Arg($"--wid={videoHostHwnd.ToInt64()}");
 
+        var generation = Interlocked.Increment(ref _processGeneration);
         var proc = Process.Start(psi)
             ?? throw new InvalidOperationException("mpv 프로세스를 시작하지 못했습니다.");
-        proc.EnableRaisingEvents = true;
+        var pid = proc.Id;
 
         // mpv가 stderr/stdout으로 토해내는 마지막 메시지는 crash 진단에 결정적
         proc.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) AppLog.Info("mpv> " + e.Data); };
@@ -111,25 +116,38 @@ public sealed class MpvProcessService : IDisposable
 
         proc.Exited += (_, _) =>
         {
-            AppLog.Warn($"mpv exited (pid={proc.Id}, exit={proc.ExitCode})");
+            int? exitCode = null;
+            try { exitCode = proc.ExitCode; } catch { }
+            if (generation != Volatile.Read(ref _processGeneration))
+            {
+                AppLog.Debug($"mpv stopped intentionally/stale (pid={pid}, exit={exitCode?.ToString() ?? "unknown"})");
+                return;
+            }
+
+            AppLog.Warn($"mpv exited (pid={pid}, exit={exitCode?.ToString() ?? "unknown"})");
             Crashed?.Invoke();
         };
         Process = proc;
-        AppLog.Info($"mpv started pid={proc.Id} pipe={pipePath}");
+        proc.EnableRaisingEvents = true;
+        AppLog.Info($"mpv started pid={pid} pipe={pipePath}");
     }
 
     public void Dispose()
     {
+        // Invalidate the captured generation before stopping the process so a
+        // delayed Exited callback cannot be mistaken for an unexpected crash.
+        Interlocked.Increment(ref _processGeneration);
+        var process = Process;
+        Process = null;
         try
         {
-            if (Process is { HasExited: false })
+            if (process is { HasExited: false })
             {
-                Process.Kill(entireProcessTree: true);
-                Process.WaitForExit(1500);
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(1500);
             }
         }
         catch { /* 종료 단계의 예외는 무시 */ }
-        Process?.Dispose();
-        Process = null;
+        process?.Dispose();
     }
 }

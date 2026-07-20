@@ -22,6 +22,90 @@ internal static class VisualSearch
     }
 }
 
+internal sealed class SlidePanelMotion
+{
+    public const int ShowDurationMs = 125;
+    public const int HideDurationMs = 105;
+    private const int MinimumDurationMs = 28;
+
+    private readonly TranslateTransform _translation;
+    private readonly double _hiddenX;
+    private int _animationSerial;
+
+    public SlidePanelMotion(TranslateTransform translation, double hiddenX)
+    {
+        _translation = translation;
+        _hiddenX = hiddenX;
+    }
+
+    public void ResetHidden()
+    {
+        _animationSerial++;
+        _translation.BeginAnimation(TranslateTransform.XProperty, null);
+        _translation.X = _hiddenX;
+    }
+
+    public int Reveal(Action? completed = null) => AnimateTo(
+        targetX: 0,
+        durationMs: ShowDurationMs,
+        easing: new CubicEase { EasingMode = EasingMode.EaseOut },
+        completed);
+
+    public void Conceal(Action completed) => _ = AnimateTo(
+        targetX: _hiddenX,
+        durationMs: HideDurationMs,
+        easing: new CubicEase { EasingMode = EasingMode.EaseOut },
+        completed);
+
+    private int AnimateTo(
+        double targetX,
+        int durationMs,
+        IEasingFunction easing,
+        Action? completed = null)
+    {
+        // Read the effective animated values before replacing the animations.
+        // A quick edge re-entry then continues from the exact visible position
+        // instead of jumping back to a stale base value.
+        var currentX = _translation.X;
+        var serial = ++_animationSerial;
+        var remainingDistance = Math.Abs(targetX - currentX);
+
+        _translation.BeginAnimation(TranslateTransform.XProperty, null);
+        _translation.X = targetX;
+
+        if (remainingDistance <= 0.5)
+        {
+            completed?.Invoke();
+            return 0;
+        }
+
+        var fullDistance = Math.Max(1.0, Math.Abs(_hiddenX));
+        var distanceRatio = Math.Clamp(remainingDistance / fullDistance, 0.0, 1.0);
+        var adjustedDurationMs = (int)Math.Round(
+            Math.Max(MinimumDurationMs, durationMs * distanceRatio));
+
+        var slide = new DoubleAnimation
+        {
+            From = currentX,
+            To = targetX,
+            Duration = TimeSpan.FromMilliseconds(adjustedDurationMs),
+            EasingFunction = easing,
+            FillBehavior = FillBehavior.Stop
+        };
+        slide.Completed += (_, _) =>
+        {
+            if (serial == _animationSerial)
+                completed?.Invoke();
+        };
+
+        _translation.BeginAnimation(
+            TranslateTransform.XProperty,
+            slide,
+            HandoffBehavior.SnapshotAndReplace);
+        return adjustedDurationMs;
+    }
+}
+
 /// <summary>
 /// 메인 윈도우에 owned된 별도 child Window. WPF Popup과 달리 owner와 z-order가
 /// 묶이고 owner가 비활성/최소화/닫힘 시 같이 사라져서 다른 앱 위로 새는 문제가 없다.
@@ -29,9 +113,6 @@ internal static class VisualSearch
 /// </summary>
 public partial class PlaylistWindow : Window
 {
-    private const int ShowSlideMs = 120;
-    private const int HideSlideMs = 110;
-
     public bool IsShown { get; private set; }
     /// <summary>Show/Hide 시작 시점 통지 — MainWindow가 영상 host margin sync용.</summary>
     public event Action<bool>? ShownChanged;
@@ -45,11 +126,16 @@ public partial class PlaylistWindow : Window
     // popup window라 IsMouseOver=false 됨 → 메인 polling이 닫으려고 함. 그 사이에
     // 사용자가 메뉴 항목 클릭하려는데 패널이 사라져버림.
     private int _ctxMenuOpenCount;
+    private long _acceptItemClicksAfterTick;
+    private MediaItem? _pressedItem;
+    private readonly SlidePanelMotion _motion;
 
     public PlaylistWindow()
     {
         InitializeComponent();
         Width = 320;
+        _motion = new SlidePanelMotion(SlideTx, Width);
+        _motion.ResetHidden();
         // ContextMenuOpening/Closing은 bubble 라우티드 이벤트라 Window 레벨에서 catch 가능.
         AddHandler(FrameworkElement.ContextMenuOpeningEvent,
             new ContextMenuEventHandler((_, _) => _ctxMenuOpenCount++), true);
@@ -61,45 +147,40 @@ public partial class PlaylistWindow : Window
     public void ShowSlide()
     {
         if (IsShown) return;
+        _pressedItem = null;
         if (!IsVisible)
         {
-            SlideTx.BeginAnimation(TranslateTransform.XProperty, null);
-            SlideTx.X = Width;
+            _motion.ResetHidden();
             Show();
         }
         IsShown = true;
         ShownChanged?.Invoke(true);
-        var slide = new DoubleAnimation
+        var revealDurationMs = _motion.Reveal(() =>
         {
-            To = 0,
-            Duration = TimeSpan.FromMilliseconds(ShowSlideMs),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
-
-        if (DataContext?.CurrentMedia is { } cur)
-            Dispatcher.BeginInvoke(new Action(() => PlaylistListBox.ScrollIntoView(cur)),
-                DispatcherPriority.Background);
+            if (!IsShown || DataContext?.CurrentMedia is not { } cur) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!IsShown || !IsVisible) return;
+                if (!ReferenceEquals(DataContext?.CurrentMedia, cur)) return;
+                PlaylistListBox.ScrollIntoView(cur);
+            }),
+                DispatcherPriority.ContextIdle);
+        });
+        _acceptItemClicksAfterTick = Environment.TickCount64 + revealDurationMs + 40;
     }
 
     public void HideSlide()
     {
         if (!IsShown) return;
         if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
+        _pressedItem = null;
         IsShown = false;
         ShownChanged?.Invoke(false);
-        var slide = new DoubleAnimation
-        {
-            To = Width,
-            Duration = TimeSpan.FromMilliseconds(HideSlideMs),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        slide.Completed += (_, _) =>
+        _motion.Conceal(() =>
         {
             if (!IsShown)
                 Hide();
-        };
-        SlideTx.BeginAnimation(TranslateTransform.XProperty, slide);
+        });
     }
 
     // 닫힘 판정은 MainWindow의 통합 hot zone polling에서만 처리.
@@ -107,27 +188,38 @@ public partial class PlaylistWindow : Window
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
 
+    private void OnItemPressed(object sender, MouseButtonEventArgs e)
+    {
+        _pressedItem = null;
+        if (Environment.TickCount64 < _acceptItemClicksAfterTick) return;
+        if (e.OriginalSource is DependencyObject d)
+            _pressedItem = VisualSearch.FindAncestor<ListBoxItem>(d)?.Content as MediaItem;
+    }
+
     private void OnItemClicked(object sender, MouseButtonEventArgs e)
     {
+        // The panel can materialize underneath a click that started on the
+        // fullscreen edge. Ignore that release so it cannot switch media.
+        if (Environment.TickCount64 < _acceptItemClicksAfterTick)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        var pressedItem = _pressedItem;
+        _pressedItem = null;
+        if (pressedItem is null) return;
+
         if (e.OriginalSource is DependencyObject d)
         {
             var lbi = VisualSearch.FindAncestor<ListBoxItem>(d);
-            if (lbi?.Content is MediaItem mi && DataContext?.CurrentMedia != mi)
+            if (lbi?.Content is MediaItem mi && ReferenceEquals(pressedItem, mi) && DataContext?.CurrentMedia != mi)
             {
                 DataContext?.PlayMedia(mi);
                 e.Handled = true;
                 // 같은 폴더 안에서 곡 바꾸는 경우 panel은 그대로 둠 (사용자가 다른 곡 또
                 // 빠르게 고르기 편하게). Recent와 달리 흐름이 끊기지 않음.
             }
-        }
-    }
-
-    private void OnItemDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (PlaylistListBox.SelectedItem is MediaItem mi)
-        {
-            DataContext?.PlayMedia(mi);
-            e.Handled = true;
         }
     }
 

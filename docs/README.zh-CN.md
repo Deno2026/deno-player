@@ -14,8 +14,9 @@
 - 自动把同一文件夹中的媒体整理成简单播放列表
 - 鼠标移动到左右边缘即可打开播放列表和最近文件
 - 使用 `Ctrl + S` 保存截图
+- 使用 `Ctrl + 鼠标滚轮` 缩放视频，并按住中键拖动
 - 使用 `I` → `O` → `Ctrl + E` 快速无损裁剪片段
-- 全屏观看时控制栏会自动隐藏
+- 使用全屏专用按钮隐藏操作界面，只显示视频
 - 可在设置中选择英文或韩文界面
 - 更新会先提示，只有在你选择后才会安装
 
@@ -54,10 +55,13 @@
 
 裁剪使用 FFmpeg stream copy，因此速度快且不会重新编码。由于按关键帧处理，开始和结束位置可能会与画面中看到的精确帧略有不同。
 
+在编辑模式中，可以保存完整片段、仅提取音频或仅提取视频。
+首次导出时会按需准备 FFmpeg，下载文件可能较大。
+
 ## 🧩 支持的文件
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -79,6 +83,7 @@
 | 前后移动 5 秒 | `←` / `→` |
 | 前后移动 30 秒 | `Shift + ←` / `Shift + →` |
 | 音量 | `↑` / `↓` 或鼠标滚轮 |
+| 视频缩放 / 移动 | `Ctrl + 鼠标滚轮` / 按住中键拖动 |
 | 静音 | `M` |
 | 全屏 | `F` / `F11` / `Enter` / `Alt + Enter` / 双击 |
 | 退出全屏 | `Esc` |

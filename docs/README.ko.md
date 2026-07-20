@@ -14,8 +14,9 @@
 - 같은 폴더의 미디어를 자동으로 간단한 재생목록으로 구성
 - 화면 양쪽 가장자리 hover로 재생목록과 최근 파일 확인
 - `Ctrl + S`로 스크린샷 저장
+- `Ctrl + 마우스 휠`로 영상을 확대하고, 가운데 버튼 드래그로 이동
 - `I` → `O` → `Ctrl + E`로 간단한 무손실 구간 추출
-- 시청 중에는 전체화면 컨트롤이 깔끔하게 숨겨짐
+- 전체화면 전용 버튼으로 조작 UI를 숨겨 영상만 표시
 - 설정에서 영어/한국어 표시 언어 선택
 - 업데이트는 먼저 안내하고, 사용자가 선택할 때만 설치
 
@@ -54,10 +55,13 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 FFmpeg stream copy 방식이라 빠르고 화질 손실이 없습니다. 다만 키프레임 기준으로 저장되기 때문에 시작/끝 지점이 보이는 프레임과 조금 달라질 수 있습니다.
 
+편집 모드에서는 전체 구간 저장, 오디오만 추출, 비디오만 추출 중에서 선택할 수 있습니다.
+처음 내보낼 때 FFmpeg를 필요할 때만 준비하며, 다운로드 크기가 클 수 있습니다.
+
 ## 🧩 지원 파일
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -79,6 +83,7 @@ FFmpeg stream copy 방식이라 빠르고 화질 손실이 없습니다. 다만 
 | 5초 이동 | `←` / `→` |
 | 30초 이동 | `Shift + ←` / `Shift + →` |
 | 볼륨 | `↑` / `↓` 또는 마우스 휠 |
+| 영상 확대 / 이동 | `Ctrl + 마우스 휠` / 가운데 버튼 드래그 |
 | 음소거 | `M` |
 | 전체화면 | `F` / `F11` / `Enter` / `Alt + Enter` / 더블클릭 |
 | 전체화면 해제 | `Esc` |

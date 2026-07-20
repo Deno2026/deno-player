@@ -20,7 +20,7 @@ public static class MediaKindExtensions
 
     private static readonly HashSet<string> AudioExt = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".opus", ".wma", ".alac"
+        ".mp3", ".wav", ".flac", ".aac", ".m4a", ".mka", ".ogg", ".opus", ".wma", ".alac"
     };
 
     private static readonly HashSet<string> ImageExt = new(StringComparer.OrdinalIgnoreCase)

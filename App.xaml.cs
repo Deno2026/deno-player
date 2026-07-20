@@ -45,7 +45,9 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        _win = new MainWindow();
+        // 시작 설정은 언어 적용과 MainViewModel이 함께 사용한다. 같은 JSON을 첫 화면 전에
+        // 두 번 동기 읽지 않도록 한 번 읽은 인스턴스를 그대로 넘긴다.
+        _win = new MainWindow(startupSettings);
         MainWindow = _win;
         _win.Show();
 

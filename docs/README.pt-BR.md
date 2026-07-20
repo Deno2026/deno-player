@@ -14,8 +14,9 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 - Cria automaticamente uma lista simples com arquivos da mesma pasta
 - Painéis laterais por hover para playlist e arquivos recentes
 - Capturas de tela com `Ctrl + S`
+- Zoom do vídeo com `Ctrl + roda do mouse` e movimento arrastando o botão do meio
 - Corte simples e sem perda com `I` → `O` → `Ctrl + E`
-- Controles de tela cheia que somem de forma limpa enquanto você assiste
+- Um botão de tela cheia para deixar somente o vídeo visível
 - Interface do app em inglês e coreano nas configurações
 - Atualizações aparecem primeiro e só são instaladas quando você escolhe
 
@@ -54,10 +55,13 @@ Ao abrir um arquivo, o app pode usar outros arquivos de mídia da mesma pasta co
 
 O corte usa FFmpeg stream copy, então é rápido e não recodifica o vídeo. O início e o fim podem ficar próximos ao keyframe mais próximo.
 
+No modo de edição, você pode salvar o clipe completo, extrair apenas o áudio ou apenas o vídeo.
+O FFmpeg é preparado sob demanda na primeira exportação, e o download pode ser grande.
+
 ## 🧩 Arquivos compatíveis
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -79,6 +83,7 @@ Você pode mudar o idioma em **Settings**.
 | Avançar / voltar 5 segundos | `←` / `→` |
 | Avançar / voltar 30 segundos | `Shift + ←` / `Shift + →` |
 | Volume | `↑` / `↓` ou roda do mouse |
+| Zoom / movimento do vídeo | `Ctrl + roda do mouse` / arrastar com botão do meio |
 | Mudo | `M` |
 | Tela cheia | `F` / `F11` / `Enter` / `Alt + Enter` / duplo clique |
 | Sair da tela cheia | `Esc` |

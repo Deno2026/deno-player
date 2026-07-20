@@ -14,8 +14,9 @@ Sin anuncios. Sin cuenta. Sin sincronización en la nube. Sin telemetría. Abre 
 - Crea automáticamente una lista sencilla con los medios de la misma carpeta
 - Paneles laterales al pasar el mouse para lista de reproducción y archivos recientes
 - Capturas de pantalla con `Ctrl + S`
+- Zoom de video con `Ctrl + rueda del mouse` y desplazamiento arrastrando el botón central
 - Recorte simple y sin pérdida con `I` → `O` → `Ctrl + E`
-- Controles de pantalla completa que se ocultan de forma limpia mientras miras
+- Un botón de pantalla completa para dejar solo el video visible
 - Interfaz de la app en inglés y coreano desde Settings
 - Las actualizaciones se muestran primero y solo se instalan cuando tú lo decides
 
@@ -54,10 +55,13 @@ Al abrir un archivo, la app puede usar los otros medios cercanos de la misma car
 
 El recorte usa FFmpeg stream copy, así que es rápido y no recodifica el video. El inicio y el final pueden ajustarse al keyframe más cercano.
 
+En el modo de edición puedes guardar el clip completo, extraer solo el audio o extraer solo el video.
+FFmpeg se prepara bajo demanda en la primera exportación y la descarga puede ser grande.
+
 ## 🧩 Archivos compatibles
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -79,6 +83,7 @@ Puedes cambiar el idioma en **Settings**.
 | Avanzar / retroceder 5 segundos | `←` / `→` |
 | Avanzar / retroceder 30 segundos | `Shift + ←` / `Shift + →` |
 | Volumen | `↑` / `↓` o rueda del mouse |
+| Zoom / desplazamiento de video | `Ctrl + rueda del mouse` / arrastrar con botón central |
 | Silenciar | `M` |
 | Pantalla completa | `F` / `F11` / `Enter` / `Alt + Enter` / doble clic |
 | Salir de pantalla completa | `Esc` |

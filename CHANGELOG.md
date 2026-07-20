@@ -4,6 +4,75 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.5.0] - 2026-07-20
+
+### Player UX
+- Corrected video zoom and pan scaling, including pan limits after window resize
+  and aspect-ratio changes.
+- Ctrl+wheel zoom now coalesces rapid input once per display frame and sends the
+  zoom/pan properties as one ordered IPC batch, so direction changes and reset
+  no longer wait behind stale transforms.
+- Middle-button pan now follows explicit native/hook down, move, and up events
+  across the mpv surface and window boundary without being canceled by a
+  conflicting physical-button poll.
+- Improved precision-wheel volume handling and secondary-monitor side-panel
+  placement.
+- Side panels now continue smoothly from their current position when hover
+  direction changes, with faster distance-aware open and close motion and a
+  shorter edge-intent delay.
+- Side-panel windows are prepared only after the first frame, recent-file disk
+  checks no longer run while a panel is opening, and ordinary mouse movement is
+  filtered before it reaches the UI dispatcher.
+- Clicking the video surface now activates an inactive player, and launching the
+  app again restores the existing window even when no file was passed.
+- Playlist visibility now follows the panel that is actually shown, and a
+  double-click no longer reloads the same item twice.
+
+### Trim and reliability
+- Trim points, preview loops, duration, and seek state are cleared when moving to
+  another media file.
+- Exports are written to a temporary file and committed only after FFmpeg
+  succeeds, so a failed export does not truncate an existing destination.
+- Audio-only export now chooses an M4A-compatible output only when the source
+  codec supports it, with MKA as the safe fallback.
+- Closing or canceling an export now stops the FFmpeg process cleanly.
+
+### Runtime and settings
+- The main shell renders before cached-runtime startup work, normal launch no
+  longer probes FFmpeg, and hidden ambient animations stop consuming render
+  time while they are not visible or the player is inactive.
+- Cached mpv uses a cheap normal-start check while retaining one full
+  validation-and-repair attempt if process startup or IPC connection fails.
+- Downloaded playback tools are SHA-256 verified, staged, version-checked, and
+  promoted only after validation.
+- Invalid runtime executables are detected instead of being accepted because a
+  file merely exists.
+- Corrupt settings files are preserved for recovery before safe defaults are
+  loaded.
+- Saving ordinary settings no longer opens Windows Default Apps automatically;
+  that page remains available through its dedicated button.
+- Legacy file-association identifiers continue to redirect to Deno Video Player.
+- Portable builds can now detect a newer GitHub release and open its download
+  page instead of silently skipping update checks.
+
+### Packaging and licensing
+- Added dedicated video, audio, and image file-association icons to public
+  installer and portable packages.
+- Hardened the tagged-release workflow with coverage artifacts, pinned build
+  tooling, tag-format validation, and a main-branch ancestry gate.
+- Changed the project license to `GPL-3.0-only` and retained third-party license
+  and attribution details in `NOTICE.md`.
+
+## [0.4.9] - 2026-05-31
+
+### Fullscreen
+- Unified fullscreen buttons, keyboard shortcuts, double-click handling, and
+  restore behavior through one transition path.
+- Improved restoration of the previous maximized or windowed bounds after
+  leaving fullscreen.
+- Made recent-files and playlist edge panels easier to reach in fullscreen
+  while preserving a clean video-only view.
+
 ## [0.4.8] - 2026-05-30
 
 ### Updates

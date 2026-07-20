@@ -17,9 +17,10 @@
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Version>0.4.9</Version>
-    <FileVersion>0.4.9.0</FileVersion>
-    <InformationalVersion>0.4.9</InformationalVersion>
+    <Version>0.5.0</Version>
+    <FileVersion>0.5.0.0</FileVersion>
+    <InformationalVersion>0.5.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <NeutralLanguage>ko-KR</NeutralLanguage>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
@@ -42,11 +43,15 @@
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
     <!-- 사용자 설치용 파일들 — dotnet publish 시 output 폴더에 함께 복사 -->
-    <None Include="START_HERE.bat;UNINSTALL.bat;README.md;LICENSE;NOTICE.md">
+    <None Include="START_HERE.bat;UNINSTALL.bat;README.md;CHANGELOG.md;LICENSE;NOTICE.md;docs\README.*.md;docs\assets\preview.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
-    <None Include="tools\**">
+    <None Include="Assets\Icons\*.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Include="tools\7zr.exe;tools\fetch-mpv.ps1;tools\fetch-ffmpeg.ps1;tools\install.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
@@ -63,7 +68,33 @@
     <EmbeddedResource Remove="tests\**" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Velopack" Version="1.0.1" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
+
+  <!-- Self-contained 배포에 포함된 실제 .NET runtime pack의 권위 있는
+       license/third-party notice를 publish 결과에 동적으로 보존한다. -->
+  <Target Name="CopyDotNetRuntimeNotices"
+          AfterTargets="Publish"
+          DependsOnTargets="ResolveFrameworkReferences"
+          Condition="'$(SelfContained)' == 'true' and '@(ResolvedRuntimePack)' != ''">
+    <ItemGroup>
+      <_DotNetRuntimeLicenseTxt Include="@(ResolvedRuntimePack)"
+          Condition="Exists('%(ResolvedRuntimePack.PackageDirectory)\LICENSE.TXT')" />
+      <_DotNetRuntimeLicense Include="@(ResolvedRuntimePack)"
+          Condition="Exists('%(ResolvedRuntimePack.PackageDirectory)\LICENSE')" />
+      <_DotNetRuntimeThirdParty Include="@(ResolvedRuntimePack)"
+          Condition="Exists('%(ResolvedRuntimePack.PackageDirectory)\THIRD-PARTY-NOTICES.TXT')" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)licenses\dotnet" />
+    <Copy SourceFiles="@(_DotNetRuntimeLicenseTxt->'%(PackageDirectory)\LICENSE.TXT')"
+          DestinationFiles="@(_DotNetRuntimeLicenseTxt->'$(PublishDir)licenses\dotnet\%(NuGetPackageId)-LICENSE.TXT')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_DotNetRuntimeLicense->'%(PackageDirectory)\LICENSE')"
+          DestinationFiles="@(_DotNetRuntimeLicense->'$(PublishDir)licenses\dotnet\%(NuGetPackageId)-LICENSE.txt')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_DotNetRuntimeThirdParty->'%(PackageDirectory)\THIRD-PARTY-NOTICES.TXT')"
+          DestinationFiles="@(_DotNetRuntimeThirdParty->'$(PublishDir)licenses\dotnet\%(NuGetPackageId)-THIRD-PARTY-NOTICES.TXT')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

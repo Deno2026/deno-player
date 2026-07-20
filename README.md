@@ -14,8 +14,9 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 - Automatically builds a playlist from the same folder
 - Hover side panels for playlist and recent files
 - Screenshots with `Ctrl + S`
+- Video zoom with `Ctrl + mouse wheel`, then pan with middle-button drag
 - Simple lossless clip trimming with `I` → `O` → `Ctrl + E`
-- Fullscreen controls that hide cleanly while watching
+- An explicit fullscreen button for a clean video-only view
 - English and Korean app interface in Settings
 - Updates are shown first and installed only when you choose them
 
@@ -56,10 +57,13 @@ Use:
 
 The trim feature uses FFmpeg stream copy, so it is fast and does not re-encode the video. Start and end points may land near keyframes instead of the exact visible frame.
 
+From trim mode, you can save the full clip, extract audio only, or extract video only.
+FFmpeg is prepared on demand for the first export, and that download can be large.
+
 ## 🧩 Supported Files
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -81,6 +85,7 @@ You can change the display language in **Settings**.
 | Seek 5 seconds | `←` / `→` |
 | Seek 30 seconds | `Shift + ←` / `Shift + →` |
 | Volume | `↑` / `↓` or mouse wheel |
+| Video zoom / pan | `Ctrl + mouse wheel` / middle-button drag |
 | Mute | `M` |
 | Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click |
 | Exit fullscreen | `Esc` |

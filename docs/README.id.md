@@ -14,8 +14,9 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 - Otomatis membuat playlist sederhana dari folder yang sama
 - Panel samping dengan hover untuk playlist dan file terbaru
 - Simpan screenshot dengan `Ctrl + S`
+- Zoom video dengan `Ctrl + roda mouse`, lalu geser dengan drag tombol tengah
 - Potong klip secara sederhana dan lossless dengan `I` → `O` → `Ctrl + E`
-- Kontrol fullscreen otomatis tersembunyi saat menonton
+- Tombol fullscreen khusus untuk menampilkan video saja
 - Antarmuka aplikasi tersedia dalam bahasa Inggris dan Korea di Settings
 - Update ditampilkan lebih dulu dan hanya dipasang saat kamu memilihnya
 
@@ -54,10 +55,13 @@ Saat membuka satu file, aplikasi dapat memakai media lain di folder yang sama se
 
 Fitur trim memakai FFmpeg stream copy, jadi cepat dan tidak melakukan re-encode. Titik awal dan akhir bisa bergeser sedikit ke keyframe terdekat.
 
+Dalam mode edit, kamu dapat menyimpan klip penuh, mengekstrak audio saja, atau video saja.
+FFmpeg disiapkan saat ekspor pertama bila diperlukan, dan ukuran unduhannya bisa besar.
+
 ## 🧩 File yang Didukung
 
 - **Video:** `.mp4 .mkv .mov .webm .avi .m4v .ts .mts .m2ts .wmv .flv .3gp`
-- **Audio:** `.mp3 .wav .flac .aac .m4a .ogg .opus .wma .alac`
+- **Audio:** `.mp3 .wav .flac .aac .m4a .mka .ogg .opus .wma .alac`
 - **Image:** `.jpg .jpeg .png .webp .bmp .gif`
 - **Subtitles:** `.srt .ass .ssa .vtt .sub .idx .sup .smi`
 
@@ -79,6 +83,7 @@ Bahasa tampilan dapat diubah di **Settings**.
 | Maju / mundur 5 detik | `←` / `→` |
 | Maju / mundur 30 detik | `Shift + ←` / `Shift + →` |
 | Volume | `↑` / `↓` atau roda mouse |
+| Zoom / geser video | `Ctrl + roda mouse` / drag tombol tengah |
 | Mute | `M` |
 | Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click |
 | Keluar fullscreen | `Esc` |

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Http;
+using System.Text.Json;
 using Velopack;
 using Velopack.Sources;
 
@@ -19,6 +21,7 @@ public sealed record UpdateCheckResult(
 public static class UpdaterService
 {
     public const string DefaultChannelUrl = "https://github.com/Deno2026/deno-video-player";
+    private static readonly HttpClient Http = CreateHttpClient();
 
     public static async Task<(bool available, string? newVersion, UpdateInfo? info)> CheckAsync()
     {
@@ -35,8 +38,7 @@ public static class UpdaterService
             var (url, mgr) = CreateManager();
             if (!mgr.IsInstalled)
             {
-                AppLog.Info("Updater: portable/dev mode - automatic update check skipped");
-                return new UpdateCheckResult(false, null, null, false, true);
+                return await CheckPortableGitHubAsync(url, ct).ConfigureAwait(false);
             }
 
             var pending = mgr.UpdatePendingRestart;
@@ -198,5 +200,72 @@ public static class UpdaterService
             FileName = $"{url}/releases/latest",
             UseShellExecute = true
         });
+    }
+
+    private static async Task<UpdateCheckResult> CheckPortableGitHubAsync(
+        string url,
+        CancellationToken ct)
+    {
+        if (!TryGetGitHubRepository(url, out var owner, out var repository))
+        {
+            AppLog.Info("Updater: portable/dev mode with non-GitHub feed - check skipped");
+            return new UpdateCheckResult(false, null, null, false, true);
+        }
+
+        var apiUrl = $"https://api.github.com/repos/{owner}/{repository}/releases/latest";
+        AppLog.Info($"Updater: portable check {apiUrl}");
+        using var response = await Http.GetAsync(apiUrl, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var document = await JsonDocument.ParseAsync(body, cancellationToken: ct).ConfigureAwait(false);
+        var tag = document.RootElement.TryGetProperty("tag_name", out var tagValue)
+            ? tagValue.GetString()
+            : null;
+        if (!TryParseReleaseVersion(tag, out var latest))
+            return new UpdateCheckResult(false, null, null, false, true);
+
+        var current = typeof(UpdaterService).Assembly.GetName().Version ?? new Version(0, 0, 0);
+        if (latest <= current)
+        {
+            AppLog.Info($"Updater: portable is current ({current})");
+            return new UpdateCheckResult(false, null, null, false, true);
+        }
+
+        AppLog.Info($"Updater: portable update {latest} available");
+        return new UpdateCheckResult(true, latest.ToString(3), null, false, true);
+    }
+
+    private static bool TryGetGitHubRepository(string url, out string owner, out string repository)
+    {
+        owner = "";
+        repository = "";
+        if (!Uri.TryCreate(url.Trim().TrimEnd('/'), UriKind.Absolute, out var uri) ||
+            !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 2) return false;
+        owner = segments[0];
+        repository = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? segments[1][..^4]
+            : segments[1];
+        return owner.Length > 0 && repository.Length > 0;
+    }
+
+    private static bool TryParseReleaseVersion(string? tag, out Version version)
+    {
+        version = new Version(0, 0, 0);
+        if (string.IsNullOrWhiteSpace(tag)) return false;
+        var value = tag.Trim();
+        if (value.StartsWith('v') || value.StartsWith('V')) value = value[1..];
+        return Version.TryParse(value, out version!);
+    }
+
+    private static HttpClient CreateHttpClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("DenoVideoPlayer-Updater/1.0");
+        return client;
     }
 }
