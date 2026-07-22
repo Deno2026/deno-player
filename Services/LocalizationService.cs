@@ -93,6 +93,10 @@ public static class LocalizationService
         ["TooltipExtractVideo"] = "선택한 구간에서 영상만 저장 (소리 없음)",
 
         ["PlaylistCurrentFolder"] = "현재 폴더",
+        ["PlaylistSortTooltip"] = "재생목록 정렬",
+        ["PlaylistSortNameAscending"] = "이름순 ↑",
+        ["PlaylistSortNewestFirst"] = "최신순 ↓",
+        ["PlaylistSortOldestFirst"] = "오래된순 ↑",
         ["RecentPlayback"] = "최근 재생",
         ["ItemSuffix"] = " 항목",
         ["OpenInExplorer"] = "탐색기에서 열기",
@@ -264,6 +268,10 @@ public static class LocalizationService
         ["TooltipExtractVideo"] = "Save only the video from the selected range (no audio)",
 
         ["PlaylistCurrentFolder"] = "Current folder",
+        ["PlaylistSortTooltip"] = "Sort playlist",
+        ["PlaylistSortNameAscending"] = "Name ↑",
+        ["PlaylistSortNewestFirst"] = "Newest ↓",
+        ["PlaylistSortOldestFirst"] = "Oldest ↑",
         ["RecentPlayback"] = "Recent files",
         ["ItemSuffix"] = " items",
         ["OpenInExplorer"] = "Reveal in File Explorer",

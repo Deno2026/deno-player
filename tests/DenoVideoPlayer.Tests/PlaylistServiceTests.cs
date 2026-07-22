@@ -1,4 +1,5 @@
 using System.IO;
+using DenoVideoPlayer.Models;
 using DenoVideoPlayer.Services;
 
 namespace DenoVideoPlayer.Tests;
@@ -52,14 +53,40 @@ public class PlaylistServiceTests : IDisposable
         Assert.Equal("a.mp4", list[0].FileName);
     }
 
+    [Fact] public void DefaultsToNaturalNameAscendingWithoutDependingOnDates()
+    {
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("clip_1.mp4", baseTime.AddMinutes(3));
+        Touch("clip_2.mp4", baseTime.AddMinutes(1));
+        Touch("clip_10.mp4", baseTime.AddMinutes(2));
+        var list = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
+        Assert.Equal(new[] { "clip_1.mp4", "clip_2.mp4", "clip_10.mp4" },
+                     list.Select(m => m.FileName).ToArray());
+    }
+
     [Fact] public void SortsNewestCreationTimeFirst()
     {
         var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         Touch("clip_1.mp4", baseTime.AddMinutes(1));
         Touch("clip_2.mp4", baseTime.AddMinutes(3));
         Touch("clip_10.mp4", baseTime.AddMinutes(2));
-        var list = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
+        var list = _svc.BuildFromFile(
+            Path.Combine(_dir, "clip_1.mp4"),
+            PlaylistSortMode.CreatedDescending);
         Assert.Equal(new[] { "clip_2.mp4", "clip_10.mp4", "clip_1.mp4" },
+                     list.Select(m => m.FileName).ToArray());
+    }
+
+    [Fact] public void SortsOldestCreationTimeFirst()
+    {
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("clip_1.mp4", baseTime.AddMinutes(1));
+        Touch("clip_2.mp4", baseTime.AddMinutes(3));
+        Touch("clip_10.mp4", baseTime.AddMinutes(2));
+        var list = _svc.BuildFromFile(
+            Path.Combine(_dir, "clip_1.mp4"),
+            PlaylistSortMode.CreatedAscending);
+        Assert.Equal(new[] { "clip_1.mp4", "clip_10.mp4", "clip_2.mp4" },
                      list.Select(m => m.FileName).ToArray());
     }
 
@@ -69,9 +96,42 @@ public class PlaylistServiceTests : IDisposable
         Touch("clip_10.mp4", sameTime);
         Touch("clip_2.mp4", sameTime);
         Touch("clip_1.mp4", sameTime);
-        var list = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
+        var list = _svc.BuildFromFile(
+            Path.Combine(_dir, "clip_1.mp4"),
+            PlaylistSortMode.CreatedDescending);
         Assert.Equal(new[] { "clip_1.mp4", "clip_2.mp4", "clip_10.mp4" },
                      list.Select(m => m.FileName).ToArray());
+    }
+
+    [Fact] public void ResortingKeepsTheExistingMediaItemObjects()
+    {
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("clip_1.mp4", baseTime.AddMinutes(1));
+        Touch("clip_2.mp4", baseTime.AddMinutes(2));
+        var items = _svc.BuildFromFile(Path.Combine(_dir, "clip_1.mp4"));
+        var current = items.Single(item => item.FileName == "clip_1.mp4");
+
+        var ordered = _svc.SortItems(items, PlaylistSortMode.CreatedDescending);
+
+        Assert.Same(current, ordered[1]);
+        Assert.Equal(new[] { "clip_2.mp4", "clip_1.mp4" },
+            ordered.Select(item => item.FileName).ToArray());
+    }
+
+    [Fact] public void FolderBuildReturnsSortedSeedAndSameKindPlaylistFromOneSnapshot()
+    {
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Touch("video_old.mp4", baseTime.AddMinutes(1));
+        var newest = Touch("video_new.mp4", baseTime.AddMinutes(3));
+        Touch("audio_newer.mp3", baseTime.AddMinutes(4));
+
+        var result = _svc.BuildFromDirectory(_dir, PlaylistSortMode.CreatedDescending);
+
+        Assert.NotNull(result);
+        Assert.Equal(Path.Combine(_dir, "audio_newer.mp3"), result.SeedPath);
+        Assert.Single(result.Items);
+        Assert.Equal("audio_newer.mp3", result.Items[0].FileName);
+        Assert.NotEqual(newest, result.SeedPath);
     }
 
     [Fact] public void IndexOfFindsItem()

@@ -22,7 +22,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly CancellationTokenSource _lifetimeCts = new();
 
     public AppSettings Settings { get; private set; }
-    public ObservableCollection<MediaItem> Playlist { get; } = new();
+    private ObservableCollection<MediaItem> _playlist = new();
+    public ObservableCollection<MediaItem> Playlist
+    {
+        get => _playlist;
+        private set => Set(ref _playlist, value);
+    }
     public ObservableCollection<RecentItem> Recents { get; } = new();
     private const int MaxRecents = 30;
     private const int TrimLoopSeekCooldownMs = 80;
@@ -35,6 +40,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public event Action<string>? Toast;
     public event Action<UpdatePromptRequest>? UpdatePromptRequested;
     public event Action? PlaylistToggleRequested;
+    public event Action? PlaylistOrderChanged;
 
     public MainViewModel(MpvProcessService mpvProc, AppSettings? startupSettings = null)
     {
@@ -44,6 +50,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _volume = Settings.Volume;
         _muted = Settings.Muted;
         _speed = Settings.PlaybackRate;
+        _playlistSort = Settings.PlaylistSort;
         _isPlaylistOpen = false;
         _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
         _shuffle = Settings.Shuffle;
@@ -73,6 +80,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
         TogglePlaylistCommand = new RelayCommand(() => PlaylistToggleRequested?.Invoke());
+        SetPlaylistSortCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is PlaylistSortMode mode)
+                _ = SetPlaylistSortAsync(mode);
+        });
         CycleRepeatCommand = new RelayCommand(() => Repeat = Repeat switch
         {
             RepeatMode.None      => RepeatMode.RepeatAll,
@@ -305,6 +317,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private string _folderDisplay = "";
     public string FolderDisplay { get => _folderDisplay; private set => Set(ref _folderDisplay, value); }
+
+    private PlaylistSortMode _playlistSort;
+    private int _playlistRevision;
+    private int _playlistSortRequestRevision;
+    private int _openRequestRevision;
+    private System.Windows.Threading.DispatcherOperation? _playlistSortSaveOperation;
+
+    public PlaylistSortMode PlaylistSort => _playlistSort;
+    public string PlaylistSortDisplay => _playlistSort switch
+    {
+        PlaylistSortMode.CreatedDescending => L("PlaylistSortNewestFirst"),
+        PlaylistSortMode.CreatedAscending => L("PlaylistSortOldestFirst"),
+        _ => L("PlaylistSortNameAscending")
+    };
 
     private MediaItem? _currentMedia;
     public MediaItem? CurrentMedia
@@ -789,6 +815,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand ScreenshotCommand { get; }
     public RelayCommand AlwaysOnTopCommand { get; }
     public RelayCommand TogglePlaylistCommand { get; }
+    public RelayCommand SetPlaylistSortCommand { get; }
     public RelayCommand CycleRepeatCommand { get; }
     public RelayCommand SetRepeatNoneCommand { get; }
     public RelayCommand SetRepeatAllCommand  { get; }
@@ -1119,14 +1146,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 InitialDirectory = Settings.LastOpenedFolder ?? ""
             };
             if (dlg.ShowDialog() != true) return;
-
-            // 생성시간 최신순으로 폴더 안 첫 지원 미디어 파일 찾기.
-            var first = _playlistSvc.FindFirstPlayableFile(dlg.FolderName);
-
-            if (first is null)
-                Toast?.Invoke(L("NoPlayableMediaInFolder"));
-            else
-                OpenPath(first);
+            OpenFirstPlayableFolder(new[] { dlg.FolderName });
         }
         catch (Exception ex)
         {
@@ -1149,8 +1169,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void OpenPath(string path)
     {
+        StartOpenPath(path, subtitles: null);
+    }
+
+    private void StartOpenPath(string path, IReadOnlyList<string>? subtitles)
+    {
+        var requestRevision = Interlocked.Increment(ref _openRequestRevision);
         Services.AppLog.Info($"OpenPath: '{path}' state={State} ipcConn={_ipc.IsConnected}");
         if (string.IsNullOrWhiteSpace(path)) { Services.AppLog.Warn("OpenPath: empty path"); return; }
+        try { path = Path.GetFullPath(path); } catch { /* 아래 validation에서 안전하게 거절 */ }
         if (!File.Exists(path))
         {
             RemoveRecent(path, save: true);
@@ -1171,19 +1198,256 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
+        var sortMode = PlaylistSort;
+        _ = BuildAndOpenPathAsync(path, sortMode, requestRevision, subtitles);
+    }
+
+    private async Task BuildAndOpenPathAsync(
+        string path,
+        PlaylistSortMode sortMode,
+        int requestRevision,
+        IReadOnlyList<string>? subtitles)
+    {
+        IReadOnlyList<MediaItem> items;
+        try
+        {
+            items = await Task.Run(
+                () => (IReadOnlyList<MediaItem>)_playlistSvc.BuildFromFile(path, sortMode),
+                _lifetimeCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (_lifetimeCts.IsCancellationRequested) return;
+            Services.AppLog.Error("Playlist build failed", ex);
+            OnUi(() =>
+            {
+                if (_lifetimeCts.IsCancellationRequested) return;
+                if (requestRevision != Volatile.Read(ref _openRequestRevision)) return;
+                State = PlayerState.Failed;
+                StatusMessage = LF("OpenFolderFailed", ex.Message);
+            });
+            return;
+        }
+
+        if (_lifetimeCts.IsCancellationRequested) return;
+        OnUi(() => CompletePreparedOpen(
+            path,
+            items,
+            sortMode,
+            requestRevision,
+            subtitles));
+    }
+
+    private void OpenFirstPlayableFolder(
+        IReadOnlyList<string> directories,
+        IReadOnlyList<string>? subtitles = null)
+    {
+        var validDirectories = directories
+            .Where(Directory.Exists)
+            .Select(path =>
+            {
+                try { return Path.GetFullPath(path); }
+                catch { return path; }
+            })
+            .ToArray();
+        if (validDirectories.Length == 0) return;
+
+        var requestRevision = Interlocked.Increment(ref _openRequestRevision);
+        var sortMode = PlaylistSort;
+        _ = BuildAndOpenFirstFolderAsync(
+            validDirectories,
+            sortMode,
+            requestRevision,
+            subtitles);
+    }
+
+    private async Task BuildAndOpenFirstFolderAsync(
+        IReadOnlyList<string> directories,
+        PlaylistSortMode sortMode,
+        int requestRevision,
+        IReadOnlyList<string>? subtitles)
+    {
+        PlaylistBuildResult? result;
+        try
+        {
+            result = await Task.Run(() =>
+            {
+                foreach (var directory in directories)
+                {
+                    var candidate = _playlistSvc.BuildFromDirectory(directory, sortMode);
+                    if (candidate is not null) return candidate;
+                }
+                return null;
+            }, _lifetimeCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (_lifetimeCts.IsCancellationRequested) return;
+            Services.AppLog.Error("Folder playlist build failed", ex);
+            OnUi(() =>
+            {
+                if (_lifetimeCts.IsCancellationRequested) return;
+                if (requestRevision != Volatile.Read(ref _openRequestRevision)) return;
+                Toast?.Invoke(LF("OpenFolderFailed", ex.Message));
+            });
+            return;
+        }
+
+        if (_lifetimeCts.IsCancellationRequested) return;
+        OnUi(() =>
+        {
+            if (_lifetimeCts.IsCancellationRequested) return;
+            if (requestRevision != Volatile.Read(ref _openRequestRevision)) return;
+            if (PlaylistSort != sortMode)
+            {
+                OpenFirstPlayableFolder(directories, subtitles);
+                return;
+            }
+            if (result is null)
+            {
+                Toast?.Invoke(L("NoPlayableMediaInFolder"));
+                return;
+            }
+
+            CompletePreparedOpen(
+                result.SeedPath,
+                result.Items,
+                sortMode,
+                requestRevision,
+                subtitles);
+        });
+    }
+
+    private void CompletePreparedOpen(
+        string path,
+        IReadOnlyList<MediaItem> items,
+        PlaylistSortMode sortMode,
+        int requestRevision,
+        IReadOnlyList<string>? subtitles)
+    {
+        if (_lifetimeCts.IsCancellationRequested) return;
+        if (requestRevision != Volatile.Read(ref _openRequestRevision)) return;
+        if (PlaylistSort != sortMode)
+        {
+            StartOpenPath(path, subtitles);
+            return;
+        }
+        if (!File.Exists(path))
+        {
+            RemoveRecent(path, save: true);
+            State = PlayerState.Failed;
+            StatusMessage = LF("FileNotFound", path);
+            return;
+        }
+        if (!_ipc.IsConnected)
+        {
+            State = PlayerState.Failed;
+            StatusMessage = L("MpvDisconnectedRestart");
+            return;
+        }
+
         var folder = Path.GetDirectoryName(path);
         Settings.LastOpenedFolder = folder;
         TouchRecent(path);
-
-        var list = _playlistSvc.BuildFromFile(path);
-        Playlist.Clear();
-        foreach (var m in list) Playlist.Add(m);
+        Playlist = new ObservableCollection<MediaItem>(items);
+        Interlocked.Increment(ref _playlistRevision);
         var media = Playlist.FirstOrDefault(m =>
             string.Equals(m.FullPath, path, StringComparison.OrdinalIgnoreCase));
         if (media is null && Playlist.Count > 0) media = Playlist[0];
 
         FolderDisplay = folder ?? "";
         PlayMedia(media);
+        if (subtitles is not null)
+        {
+            foreach (var subtitle in subtitles)
+                _ = _ipc.LoadSubtitle(subtitle);
+        }
+    }
+
+    private async Task SetPlaylistSortAsync(PlaylistSortMode sortMode)
+    {
+        if (!Enum.IsDefined(sortMode)) return;
+
+        // 현재 모드 재선택도 먼저 request revision을 올린다. 느린 날짜 정렬 중 사용자가
+        // 원래 모드를 다시 누르면 진행 중 결과를 확실히 폐기할 수 있다.
+        var requestRevision = Interlocked.Increment(ref _playlistSortRequestRevision);
+        if (_playlistSort == sortMode) return;
+
+        // 날짜 metadata는 느린 외장/네트워크 폴더에서 UI를 막을 수 있으므로 worker에서 읽는다.
+        // 정렬 결과는 기존 MediaItem 객체를 그대로 담은 새 collection으로 한 번에 교체해
+        // 현재 영상 재로드와 항목별 collection animation/layout churn을 모두 피한다.
+        var items = Playlist.ToArray();
+        var playlistRevision = Volatile.Read(ref _playlistRevision);
+
+        IReadOnlyList<MediaItem> ordered;
+        try
+        {
+            ordered = await Task.Run(
+                () => _playlistSvc.SortItems(items, sortMode),
+                _lifetimeCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (_lifetimeCts.IsCancellationRequested ||
+            requestRevision != Volatile.Read(ref _playlistSortRequestRevision))
+        {
+            return;
+        }
+        if (playlistRevision != Volatile.Read(ref _playlistRevision))
+        {
+            // 파일 열기가 먼저 끝나 목록이 교체됐으면 사용자의 마지막 정렬 선택을
+            // 새 목록에 다시 적용한다. 오래된 목록의 결과를 덮어쓰지는 않는다.
+            _ = SetPlaylistSortAsync(sortMode);
+            return;
+        }
+
+        if (!items.SequenceEqual(ordered))
+        {
+            Playlist = new ObservableCollection<MediaItem>(ordered);
+            Interlocked.Increment(ref _playlistRevision);
+        }
+
+        // 목록, 버튼 표시, 저장값, 다음/이전 계약을 한 UI turn에서 함께 전환한다.
+        _playlistSort = sortMode;
+        Settings.PlaylistSort = sortMode;
+        Raise(nameof(PlaylistSort));
+        Raise(nameof(PlaylistSortDisplay));
+        Raise(nameof(CurrentIndex));
+        Raise(nameof(HasNext));
+        Raise(nameof(HasPrev));
+        NextCommand.RaiseCanExecuteChanged();
+        PrevCommand.RaiseCanExecuteChanged();
+        SchedulePlaylistSortSave();
+
+        PlaylistOrderChanged?.Invoke();
+    }
+
+    private void SchedulePlaylistSortSave()
+    {
+        if (_playlistSortSaveOperation?.Status ==
+            System.Windows.Threading.DispatcherOperationStatus.Pending)
+        {
+            return;
+        }
+
+        var lifetimeToken = _lifetimeCts.Token;
+        _playlistSortSaveOperation = _ui.BeginInvoke(new Action(() =>
+        {
+            _playlistSortSaveOperation = null;
+            if (!lifetimeToken.IsCancellationRequested)
+                SaveSettingsNow();
+        }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     public void PlayMedia(MediaItem? media)
@@ -1742,27 +2006,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var media = files.FirstOrDefault(f => File.Exists(f) && MediaKindExtensions.IsSupported(f));
         var subs  = files.Where(f => File.Exists(f) && MediaKindExtensions.IsSubtitle(f)).ToList();
 
-        // 폴더 드롭: 첫 미디어 파일 사용
-        if (media is null)
-        {
-            foreach (var f in files)
-            {
-                if (Directory.Exists(f))
-                {
-                    media = _playlistSvc.FindFirstPlayableFile(f);
-                    if (media is not null) break;
-                }
-            }
-        }
-
         if (media is not null)
         {
-            OpenPath(media);
-            // 자막도 같이 떨어졌으면 add-sub. mpv는 동일 파일명+다른 ext도 자동 로드하지만 명시적 add가 신뢰성↑
-            foreach (var s in subs)
-            {
-                _ = _ipc.LoadSubtitle(s);
-            }
+            // 목록 스캔이 background에서 끝난 뒤 파일 로드와 자막 추가를 순서대로 보낸다.
+            StartOpenPath(media, subs);
+            return true;
+        }
+
+        // 폴더 드롭도 UI thread에서 파일 metadata를 읽지 않는다. 여러 폴더면 첫 playable 폴더 사용.
+        var directories = files.Where(Directory.Exists).ToArray();
+        if (directories.Length > 0)
+        {
+            OpenFirstPlayableFolder(directories, subs);
             return true;
         }
 
@@ -1869,6 +2124,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(UpdateTooltip));
             Raise(nameof(RepeatTooltip));
             Raise(nameof(ShuffleTooltip));
+            Raise(nameof(PlaylistSortDisplay));
             Raise(nameof(LoadingTitle));
             Raise(nameof(LoadingHint));
         });

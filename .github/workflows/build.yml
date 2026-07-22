@@ -190,10 +190,10 @@ jobs:
 
             ### What's new
 
-            - Faster first-window rendering and lower-latency side panels.
-            - Smooth batched Ctrl+wheel zoom, reliable reverse/reset, and cross-window middle-button pan.
-            - Safer runtime preparation, IPC recovery, settings handling, and lossless trim export.
-            - Dedicated media file icons and stronger installer, portable-package, and CI validation.
+            - Added a compact playlist menu for natural name, newest-first, and oldest-first ordering.
+            - The selected order persists and is shared by the visible list, previous/next navigation, folder open, and folder drop.
+            - Playlist scans and file-date reads now run away from the UI thread, with one-pass folder snapshots for faster interaction.
+            - Current-media selection, rapid sort changes, overlapping open requests, subtitle drops, and shutdown races are handled safely.
 
             See the full user-facing details in [CHANGELOG.md](https://github.com/Deno2026/deno-video-player/blob/${{ github.ref_name }}/CHANGELOG.md).
 
