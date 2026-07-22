@@ -25,6 +25,7 @@ public sealed class AppSettings
 
     public string? LastOpenedFolder { get; set; }
     public bool AutoPlayNext { get; set; } = true;
+    public PlaylistSortMode PlaylistSort { get; set; } = PlaylistSortMode.NameAscending;
 
     // 표시 언어: "ko" 또는 "en".
     public string Language { get; set; } = "ko";
@@ -65,6 +66,7 @@ public sealed class AppSettings
         Language = string.Equals(Language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "ko";
         ControlAutoHideMs = Math.Clamp(ControlAutoHideMs, MinControlAutoHideMs, MaxControlAutoHideMs);
         RepeatMode = Math.Clamp(RepeatMode, 0, 2);
+        if (!Enum.IsDefined(PlaylistSort)) PlaylistSort = defaults.PlaylistSort;
 
         RegisteredExtensions = NormalizeExtensions(RegisteredExtensions);
         RecentFiles = NormalizeRecentFiles(RecentFiles);

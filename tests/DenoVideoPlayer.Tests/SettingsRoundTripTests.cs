@@ -22,6 +22,7 @@ public class SettingsRoundTripTests
         Assert.True(s.ControlAutoHideMs > 0);
         Assert.Equal(1.0, s.PlaybackRate);
         Assert.Equal("ko", s.Language);
+        Assert.Equal(PlaylistSortMode.NameAscending, s.PlaylistSort);
     }
 
     [Fact] public void JsonRoundTripPreservesAllValues()
@@ -41,7 +42,8 @@ public class SettingsRoundTripTests
             Language = "en",
             ControlAutoHideMs = 4000,
             PlaylistPanelEnabled = false,
-            AlwaysOnTop = true
+            AlwaysOnTop = true,
+            PlaylistSort = PlaylistSortMode.CreatedAscending
         };
 
         var json = JsonSerializer.Serialize(s, Opts);
@@ -61,6 +63,7 @@ public class SettingsRoundTripTests
         Assert.Equal(s.ControlAutoHideMs, back.ControlAutoHideMs);
         Assert.Equal(s.PlaylistPanelEnabled, back.PlaylistPanelEnabled);
         Assert.Equal(s.AlwaysOnTop, back.AlwaysOnTop);
+        Assert.Equal(s.PlaylistSort, back.PlaylistSort);
     }
 
     [Fact] public void NewPropertyDoesNotBreakOldFile()
@@ -73,6 +76,7 @@ public class SettingsRoundTripTests
         Assert.Equal(1.0, back.PlaybackRate);
         Assert.True(back.AutoPlayNext);
         Assert.Equal("ko", back.Language);
+        Assert.Equal(PlaylistSortMode.NameAscending, back.PlaylistSort);
     }
 
     [Fact] public void NormalizeRepairsUnsafeOrCorruptValues()
@@ -87,6 +91,7 @@ public class SettingsRoundTripTests
             Language = "unsupported",
             ControlAutoHideMs = -1,
             RepeatMode = 99,
+            PlaylistSort = (PlaylistSortMode)99,
             RegisteredExtensions = new List<string> { "MP4", ".mp4", @"..\bad", "" },
             RecentFiles = Enumerable.Repeat(@"C:\same.mp4", 40).Concat(
                 Enumerable.Range(0, 40).Select(i => $@"C:\file-{i}.mp4")).ToList(),
@@ -101,6 +106,7 @@ public class SettingsRoundTripTests
         Assert.Equal("ko", s.Language);
         Assert.Equal(250, s.ControlAutoHideMs);
         Assert.Equal(2, s.RepeatMode);
+        Assert.Equal(PlaylistSortMode.NameAscending, s.PlaylistSort);
         Assert.Equal(new[] { ".mp4" }, s.RegisteredExtensions);
         Assert.Equal(30, s.RecentFiles!.Count);
         Assert.Equal(s.RecentFiles.Count, s.RecentFiles.Distinct(StringComparer.OrdinalIgnoreCase).Count());

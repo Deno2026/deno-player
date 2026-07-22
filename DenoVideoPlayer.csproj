@@ -17,9 +17,9 @@
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Version>0.5.0</Version>
-    <FileVersion>0.5.0.0</FileVersion>
-    <InformationalVersion>0.5.0</InformationalVersion>
+    <Version>0.5.1</Version>
+    <FileVersion>0.5.1.0</FileVersion>
+    <InformationalVersion>0.5.1</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <NeutralLanguage>ko-KR</NeutralLanguage>
     <Platforms>x64</Platforms>

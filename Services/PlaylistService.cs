@@ -4,18 +4,20 @@ using DenoVideoPlayer.Models;
 
 namespace DenoVideoPlayer.Services;
 
+public sealed record PlaylistBuildResult(string SeedPath, IReadOnlyList<MediaItem> Items);
+
 /// <summary>
 /// "현재 파일이 있는 폴더만 스캔". DB/썸네일/색인 금지.
-/// 생성시간 최신순으로 같은 폴더의 지원 미디어 모음.
+/// 사용자가 선택한 기준으로 같은 폴더의 지원 미디어 모음.
 /// </summary>
 public sealed class PlaylistService
 {
     private sealed record FileSnapshot(string Path, DateTime CreationTimeUtc);
+    private sealed record MediaSnapshot(MediaItem Item, DateTime CreationTimeUtc);
 
-    public static IComparer<string> CreationTimeDescendingPathComparer { get; } =
-        Comparer<string>.Create(ComparePathsByCreationTimeDescending);
-
-    public List<MediaItem> BuildFromFile(string filePath)
+    public List<MediaItem> BuildFromFile(
+        string filePath,
+        PlaylistSortMode sortMode = PlaylistSortMode.NameAscending)
     {
         var list = new List<MediaItem>();
         if (string.IsNullOrWhiteSpace(filePath)) return list;
@@ -34,7 +36,7 @@ public sealed class PlaylistService
         // 이미지 → 이미지만. ComfyUI 폴더처럼 같은 이름의 .mp4 옆에 .png 미리보기가
         // 섞여있어도 깔끔하게 영상만 보임.
         var seedKind = MediaKindExtensions.FromPath(filePath);
-        foreach (var p in GetPlayableFilesSorted(folder))
+        foreach (var p in GetPlayableFilesSorted(folder, sortMode))
         {
             if (MediaKindExtensions.FromPath(p) == seedKind)
                 list.Add(new MediaItem(p));
@@ -49,7 +51,9 @@ public sealed class PlaylistService
         return list;
     }
 
-    public IReadOnlyList<string> GetPlayableFilesSorted(string directory)
+    public IReadOnlyList<string> GetPlayableFilesSorted(
+        string directory,
+        PlaylistSortMode sortMode = PlaylistSortMode.NameAscending)
     {
         if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             return Array.Empty<string>();
@@ -62,7 +66,11 @@ public sealed class PlaylistService
             foreach (var path in Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly))
             {
                 if (!MediaKindExtensions.IsSupported(path)) continue;
-                files.Add(new FileSnapshot(path, GetCreationTimeUtc(path)));
+                files.Add(new FileSnapshot(
+                    path,
+                    sortMode == PlaylistSortMode.NameAscending
+                        ? DateTime.MinValue
+                        : GetCreationTimeUtc(path)));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -70,40 +78,96 @@ public sealed class PlaylistService
             AppLog.Warn($"Playlist enumeration stopped: {directory}: {ex.Message}");
         }
 
-        // creation time은 항목당 한 번만 읽고 메모리 snapshot을 정렬한다.
-        files.Sort(CompareSnapshotsByCreationTimeDescending);
+        // 기본 이름순은 추가 metadata I/O 없이 정렬한다. 날짜순을 고른 경우에도
+        // 생성 시각은 항목당 한 번만 읽고 메모리 snapshot을 정렬한다.
+        files.Sort((left, right) => CompareSnapshots(left, right, sortMode));
         return files.Select(file => file.Path).ToArray();
     }
 
-    public string? FindFirstPlayableFile(string directory)
-        => GetPlayableFilesSorted(directory).FirstOrDefault();
+    /// <summary>
+    /// 폴더를 한 번만 스캔해 정렬상 첫 파일과 그 파일과 같은 kind의 목록을 함께 만든다.
+    /// 폴더 열기에서 FindFirst + BuildFromFile로 같은 metadata를 두 번 읽지 않게 한다.
+    /// </summary>
+    public PlaylistBuildResult? BuildFromDirectory(
+        string directory,
+        PlaylistSortMode sortMode = PlaylistSortMode.NameAscending)
+    {
+        var sortedPaths = GetPlayableFilesSorted(directory, sortMode);
+        var seedPath = sortedPaths.FirstOrDefault();
+        if (seedPath is null) return null;
 
-    private static int CompareSnapshotsByCreationTimeDescending(FileSnapshot? left, FileSnapshot? right)
+        var seedKind = MediaKindExtensions.FromPath(seedPath);
+        var items = sortedPaths
+            .Where(path => MediaKindExtensions.FromPath(path) == seedKind)
+            .Select(path => new MediaItem(path))
+            .ToArray();
+        return new PlaylistBuildResult(seedPath, items);
+    }
+
+    public string? FindFirstPlayableFile(
+        string directory,
+        PlaylistSortMode sortMode = PlaylistSortMode.NameAscending)
+        => GetPlayableFilesSorted(directory, sortMode).FirstOrDefault();
+
+    /// <summary>
+    /// 이미 재생 중인 MediaItem 객체는 교체하지 않고 순서만 계산한다.
+    /// 날짜 metadata 읽기는 호출자가 UI thread 밖에서 실행할 수 있게 동기 API로 둔다.
+    /// </summary>
+    public IReadOnlyList<MediaItem> SortItems(
+        IEnumerable<MediaItem> items,
+        PlaylistSortMode sortMode)
+    {
+        var snapshots = items.Select(item => new MediaSnapshot(
+            item,
+            sortMode == PlaylistSortMode.NameAscending
+                ? DateTime.MinValue
+                : GetCreationTimeUtc(item.FullPath))).ToList();
+
+        snapshots.Sort((left, right) => Compare(
+            left.Item.FullPath,
+            left.CreationTimeUtc,
+            right.Item.FullPath,
+            right.CreationTimeUtc,
+            sortMode));
+        return snapshots.Select(snapshot => snapshot.Item).ToArray();
+    }
+
+    private static int CompareSnapshots(
+        FileSnapshot? left,
+        FileSnapshot? right,
+        PlaylistSortMode sortMode)
     {
         if (ReferenceEquals(left, right)) return 0;
         if (left is null) return 1;
         if (right is null) return -1;
 
-        var timeCompare = right.CreationTimeUtc.CompareTo(left.CreationTimeUtc);
-        if (timeCompare != 0) return timeCompare;
-
-        var nameCompare = NaturalStringComparer.Instance.Compare(
-            Path.GetFileName(left.Path), Path.GetFileName(right.Path));
-        if (nameCompare != 0) return nameCompare;
-        return string.Compare(left.Path, right.Path, StringComparison.OrdinalIgnoreCase);
+        return Compare(
+            left.Path,
+            left.CreationTimeUtc,
+            right.Path,
+            right.CreationTimeUtc,
+            sortMode);
     }
 
-    private static int ComparePathsByCreationTimeDescending(string? left, string? right)
+    private static int Compare(
+        string leftPath,
+        DateTime leftCreationUtc,
+        string rightPath,
+        DateTime rightCreationUtc,
+        PlaylistSortMode sortMode)
     {
-        var timeCompare = GetCreationTimeUtc(right).CompareTo(GetCreationTimeUtc(left));
+        var timeCompare = sortMode switch
+        {
+            PlaylistSortMode.CreatedDescending => rightCreationUtc.CompareTo(leftCreationUtc),
+            PlaylistSortMode.CreatedAscending => leftCreationUtc.CompareTo(rightCreationUtc),
+            _ => 0
+        };
         if (timeCompare != 0) return timeCompare;
 
         var nameCompare = NaturalStringComparer.Instance.Compare(
-            Path.GetFileName(left ?? ""),
-            Path.GetFileName(right ?? ""));
+            Path.GetFileName(leftPath), Path.GetFileName(rightPath));
         if (nameCompare != 0) return nameCompare;
-
-        return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+        return string.Compare(leftPath, rightPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private static DateTime GetCreationTimeUtc(string? path)

@@ -4,6 +4,26 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.5.1] - 2026-07-22
+
+### Playlist UX
+- Added a compact playlist sort menu with natural name, newest-first, and
+  oldest-first ordering. Natural name order is the default.
+- The selected order is restored on the next launch and is shared by playlist
+  display, previous/next navigation, folder open, and folder drop.
+- Reordering keeps the currently playing item selected and scrolls it back into
+  view without reloading the media.
+
+### Responsiveness and reliability
+- Playlist enumeration and file-date reads now run away from the UI thread, so
+  large, external, or network folders do not block panel interaction.
+- Opening a folder now builds the first playable item and its same-kind playlist
+  from one snapshot instead of scanning the folder twice.
+- Rapid sort changes, overlapping file-open requests, and shutdown now discard
+  stale background results instead of applying them to a newer playlist.
+- Media and subtitle files dropped together remain part of the same open request,
+  preventing a late subtitle command from attaching to the wrong media.
+
 ## [0.5.0] - 2026-07-20
 
 ### Player UX

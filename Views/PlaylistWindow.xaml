@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:h="clr-namespace:DenoVideoPlayer.Helpers"
+        xmlns:models="clr-namespace:DenoVideoPlayer.Models"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -36,13 +37,47 @@
 
             <Border Grid.Row="0" Padding="14,12"
                     BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
-                <StackPanel>
-                    <TextBlock Text="{DynamicResource PlaylistCurrentFolder}" Style="{StaticResource TextMono}"/>
-                    <TextBlock Text="{Binding FolderDisplay}"
-                               Style="{StaticResource TextBody}"
-                               FontSize="{StaticResource FontSizeSm}"
-                               TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,8,0">
+                        <TextBlock Text="{DynamicResource PlaylistCurrentFolder}" Style="{StaticResource TextMono}"/>
+                        <TextBlock Text="{Binding FolderDisplay}"
+                                   Style="{StaticResource TextBody}"
+                                   FontSize="{StaticResource FontSizeSm}"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <Button x:Name="PlaylistSortButton"
+                            Grid.Column="1"
+                            Style="{StaticResource GhostButton}"
+                            MinWidth="0"
+                            Height="26"
+                            Padding="8,0"
+                            VerticalAlignment="Center"
+                            Content="{Binding PlaylistSortDisplay}"
+                            ToolTip="{DynamicResource PlaylistSortTooltip}"
+                            Click="OnSortButtonClicked">
+                        <Button.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                         Opened="OnSortMenuOpened">
+                                <MenuItem Header="{DynamicResource PlaylistSortNameAscending}"
+                                          Command="{Binding SetPlaylistSortCommand}"
+                                          CommandParameter="{x:Static models:PlaylistSortMode.NameAscending}"
+                                          IsCheckable="True"/>
+                                <MenuItem Header="{DynamicResource PlaylistSortNewestFirst}"
+                                          Command="{Binding SetPlaylistSortCommand}"
+                                          CommandParameter="{x:Static models:PlaylistSortMode.CreatedDescending}"
+                                          IsCheckable="True"/>
+                                <MenuItem Header="{DynamicResource PlaylistSortOldestFirst}"
+                                          Command="{Binding SetPlaylistSortCommand}"
+                                          CommandParameter="{x:Static models:PlaylistSortMode.CreatedAscending}"
+                                          IsCheckable="True"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </Grid>
             </Border>
 
             <ListBox Grid.Row="1"

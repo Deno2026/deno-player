@@ -119,7 +119,15 @@ public partial class PlaylistWindow : Window
     public new MainViewModel? DataContext
     {
         get => base.DataContext as MainViewModel;
-        set => base.DataContext = value;
+        set
+        {
+            if (ReferenceEquals(base.DataContext, value)) return;
+            if (base.DataContext is MainViewModel previous)
+                previous.PlaylistOrderChanged -= OnPlaylistOrderChanged;
+            base.DataContext = value;
+            if (value is not null)
+                value.PlaylistOrderChanged += OnPlaylistOrderChanged;
+        }
     }
 
     // ContextMenu open count — 메뉴 열린 동안 HideSlide 무시. ContextMenu는 별도
@@ -172,7 +180,8 @@ public partial class PlaylistWindow : Window
     public void HideSlide()
     {
         if (!IsShown) return;
-        if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
+        if (_ctxMenuOpenCount > 0 || PlaylistSortButton.ContextMenu?.IsOpen == true)
+            return; // 메뉴 열린 동안은 닫지 않음
         _pressedItem = null;
         IsShown = false;
         ShownChanged?.Invoke(false);
@@ -187,6 +196,32 @@ public partial class PlaylistWindow : Window
     // HideSlide는 즉시 시작하되 짧은 slide-out으로 자연스럽게 숨긴다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
+
+    private void OnSortButtonClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button) return;
+        menu.PlacementTarget = button;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void OnSortMenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu || DataContext is not { } viewModel) return;
+        foreach (var item in menu.Items.OfType<MenuItem>())
+            item.IsChecked = item.CommandParameter is PlaylistSortMode mode && mode == viewModel.PlaylistSort;
+    }
+
+    private void OnPlaylistOrderChanged()
+    {
+        if (!IsShown || !IsVisible || DataContext?.CurrentMedia is not { } current) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!IsShown || !IsVisible || !ReferenceEquals(DataContext?.CurrentMedia, current)) return;
+            PlaylistListBox.ScrollIntoView(current);
+        }), DispatcherPriority.ContextIdle);
+    }
 
     private void OnItemPressed(object sender, MouseButtonEventArgs e)
     {
@@ -247,5 +282,12 @@ public partial class PlaylistWindow : Window
                 System.Diagnostics.Process.Start("explorer.exe", $"\"{path}\"");
         }
         catch { /* explorer 못 띄워도 무해 */ }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (DataContext is { } viewModel)
+            viewModel.PlaylistOrderChanged -= OnPlaylistOrderChanged;
+        base.OnClosed(e);
     }
 }
