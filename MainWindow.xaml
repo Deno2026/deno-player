@@ -51,6 +51,18 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="HelpIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="IsTabStop" Value="True"/>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource BrushAccent}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="Background" Value="{StaticResource BrushAccentTint}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="RepeatToggleButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsRepeatActive}" Value="True">
@@ -253,6 +265,11 @@
                             Content="&#xE8E5;"
                             ToolTip="{DynamicResource TooltipOpenFile}"
                             Command="{Binding OpenCommand}"/>
+                    <Button Style="{StaticResource HelpIconButton}"
+                            Content="&#xE897;"
+                            ToolTip="{DynamicResource TooltipHelp}"
+                            AutomationProperties.Name="{DynamicResource TooltipHelp}"
+                            Click="OnHelpClicked"/>
                     <Button Style="{StaticResource IconButton}"
                             Content="&#xE713;"
                             ToolTip="{DynamicResource TooltipSettings}"
@@ -396,11 +413,11 @@
                                 <StackPanel Orientation="Horizontal"
                                             HorizontalAlignment="Center">
                                     <Button Content="{DynamicResource OpenFile}"
-                                            Style="{StaticResource GhostButton}"
+                                            Style="{StaticResource KeyboardActionButton}"
                                             Command="{Binding OpenCommand}"
                                             Margin="0,0,8,0"/>
                                     <Button Content="{DynamicResource OpenFolder}"
-                                            Style="{StaticResource GhostButton}"
+                                            Style="{StaticResource KeyboardActionButton}"
                                             Command="{Binding OpenFolderCommand}"/>
                                 </StackPanel>
                             </StackPanel>
@@ -408,6 +425,13 @@
                         <TextBlock HorizontalAlignment="Center" Margin="0,16,0,0"
                                    Style="{StaticResource TextMono}"
                                    Text="{DynamicResource SupportedFormats}"/>
+                        <Button HorizontalAlignment="Center"
+                                Margin="0,10,0,0"
+                                Style="{StaticResource KeyboardActionButton}"
+                                Foreground="{StaticResource BrushAccent}"
+                                Content="{DynamicResource HelpFirstUse}"
+                                AutomationProperties.Name="{DynamicResource HelpFirstUse}"
+                                Click="OnHelpClicked"/>
                     </StackPanel>
 
                     <!-- Drop highlight -->
@@ -422,7 +446,7 @@
                 <Grid Visibility="{Binding State, Converter={StaticResource ShowOnFailed}}"
                       Background="{StaticResource BrushBgBase}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="540">
-                        <TextBlock Text="{DynamicResource PlaybackFailed}"
+                        <TextBlock Text="{Binding FailureTitle}"
                                    Style="{StaticResource TextBody}"
                                    FontSize="{StaticResource FontSizeLg}"
                                    Foreground="{StaticResource BrushDanger}"
@@ -435,12 +459,26 @@
                                    TextAlignment="Center"
                                    Margin="0,0,0,18"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button Content="{DynamicResource OpenOtherFile}"
-                                    Style="{StaticResource GhostButton}"
-                                    Command="{Binding OpenCommand}"
+                            <Button Content="{DynamicResource RetryPlaybackEngine}"
+                                    Style="{StaticResource KeyboardActionButton}"
+                                    Visibility="{Binding CanRetryBackend, Converter={StaticResource BoolVis}}"
+                                    AutomationProperties.Name="{DynamicResource RetryPlaybackEngine}"
+                                    Click="OnRetryPlaybackEngineClicked"
                                     Margin="0,0,8,0"/>
-                            <Button Content="{DynamicResource NextFile}" Style="{StaticResource GhostButton}"
-                                    Command="{Binding NextCommand}"/>
+                            <Button Content="{DynamicResource OpenOtherFile}"
+                                    Style="{StaticResource KeyboardActionButton}"
+                                    Command="{Binding OpenCommand}"
+                                    Visibility="{Binding CanOpenAnotherFileOnFailure, Converter={StaticResource BoolVis}}"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{DynamicResource NextFile}" Style="{StaticResource KeyboardActionButton}"
+                                    Command="{Binding NextCommand}"
+                                    Visibility="{Binding CanGoNextOnFailure, Converter={StaticResource BoolVis}}"
+                                    Margin="0,0,8,0"/>
+                            <Button Content="{DynamicResource Troubleshooting}"
+                                    Style="{StaticResource KeyboardActionButton}"
+                                    Foreground="{StaticResource BrushAccent}"
+                                    AutomationProperties.Name="{DynamicResource Troubleshooting}"
+                                    Click="OnTroubleshootingClicked"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>

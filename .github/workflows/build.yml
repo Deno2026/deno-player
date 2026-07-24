@@ -99,11 +99,73 @@ jobs:
             throw "DenoVideoPlayer.csproj version $projectVersion does not match tag ${{ github.ref_name }}."
           }
 
+      - name: Prepare release notes from changelog
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $lines = [System.IO.File]::ReadAllLines(
+            (Join-Path $env:GITHUB_WORKSPACE "CHANGELOG.md"),
+            [System.Text.Encoding]::UTF8)
+          $header = "^## \[$([regex]::Escape($version))\](?:\s+-\s+.*)?$"
+          $start = -1
+          for ($i = 0; $i -lt $lines.Length; $i++) {
+            if ($lines[$i] -match $header) {
+              $start = $i
+              break
+            }
+          }
+          if ($start -lt 0) {
+            throw "CHANGELOG.md is missing a release section for $version."
+          }
+
+          $end = $lines.Length
+          for ($i = $start + 1; $i -lt $lines.Length; $i++) {
+            if ($lines[$i] -match '^## \[') {
+              $end = $i
+              break
+            }
+          }
+
+          $notes = [System.Collections.Generic.List[string]]::new()
+          $notes.Add("## Deno Video Player ${{ github.ref_name }}")
+          $notes.Add("")
+          $notes.Add("A small Windows media player for opening local videos, audio, and images quickly.")
+          $notes.Add("")
+          for ($i = $start + 1; $i -lt $end; $i++) {
+            $notes.Add($lines[$i])
+          }
+          $notes.Add("")
+          $notes.Add("See the full user-facing history in [CHANGELOG.md](https://github.com/Deno2026/deno-video-player/blob/${{ github.ref_name }}/CHANGELOG.md).")
+          $notes.Add("")
+          $notes.Add("### Download")
+          $notes.Add("")
+          $notes.Add("**Recommended:** download ``DenoVideoPlayer-win-Setup.exe``, run it, and start using the app.")
+          $notes.Add("")
+          $notes.Add("The first launch prepares the playback backend automatically. No account, no cloud sync, no telemetry.")
+          $notes.Add("")
+          $notes.Add("### Portable option")
+          $notes.Add("")
+          $notes.Add("Download ``DenoVideoPlayer-${{ github.ref_name }}-portable-win-x64.zip``, unzip it, and run ``DenoVideoPlayer.exe``.")
+          $notes.Add("")
+          $notes.Add("### Notes")
+          $notes.Add("")
+          $notes.Add('Windows SmartScreen may warn on early releases while the app builds reputation. Choose "More info" -> "Run anyway" only for a file downloaded from this GitHub release.')
+          $notes.Add("")
+          $notes.Add("Deno Video Player is released under ``GPL-3.0-only``. Bundled notices for third-party components are included in ``NOTICE.md``.")
+
+          [System.IO.File]::WriteAllLines(
+            (Join-Path $env:GITHUB_WORKSPACE "release-notes.md"),
+            $notes,
+            [System.Text.UTF8Encoding]::new($false))
+
       - name: Restore
         run: dotnet restore DenoVideoPlayer.csproj
 
       - name: Install Velopack CLI
         run: dotnet tool install --global vpk --version 1.2.0
+
+      - name: Clean release intermediates
+        run: dotnet clean DenoVideoPlayer.csproj -c Release -r win-x64
 
       - name: Publish portable build
         shell: pwsh
@@ -119,6 +181,24 @@ jobs:
             -p:DebugType=none `
             -p:DebugSymbols=false `
             -o $out
+
+      - name: Verify portable release hygiene
+        shell: pwsh
+        run: |
+          $out = "publish\DenoVideoPlayer-${{ github.ref_name }}-portable-win-x64"
+          $pdbs = @(Get-ChildItem -LiteralPath $out -Recurse -File -Filter *.pdb)
+          if ($pdbs.Count -gt 0) {
+            throw "Release publish unexpectedly contains PDB files."
+          }
+
+          $assembly = Join-Path $out "DenoVideoPlayer.dll"
+          $binaryText = [System.Text.Encoding]::UTF8.GetString(
+            [System.IO.File]::ReadAllBytes($assembly))
+          if ($binaryText.Contains(
+              $env:GITHUB_WORKSPACE,
+              [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Release assembly contains the build workspace path."
+          }
 
       - name: Zip portable build
         shell: pwsh
@@ -176,6 +256,7 @@ jobs:
         with:
           name: Deno Video Player ${{ github.ref_name }}
           generate_release_notes: false
+          body_path: release-notes.md
           fail_on_unmatched_files: true
           files: |
             Releases/DenoVideoPlayer-win-Setup.exe
@@ -183,32 +264,3 @@ jobs:
             Releases/RELEASES
             Releases/releases.win.json
             DenoVideoPlayer-${{ github.ref_name }}-portable-win-x64.zip
-          body: |
-            ## Deno Video Player ${{ github.ref_name }}
-
-            A small Windows media player for opening local videos, audio, and images quickly.
-
-            ### What's new
-
-            - Added a compact playlist menu for natural name, newest-first, and oldest-first ordering.
-            - The selected order persists and is shared by the visible list, previous/next navigation, folder open, and folder drop.
-            - Playlist scans and file-date reads now run away from the UI thread, with one-pass folder snapshots for faster interaction.
-            - Current-media selection, rapid sort changes, overlapping open requests, subtitle drops, and shutdown races are handled safely.
-
-            See the full user-facing details in [CHANGELOG.md](https://github.com/Deno2026/deno-video-player/blob/${{ github.ref_name }}/CHANGELOG.md).
-
-            ### Download
-
-            **Recommended:** download `DenoVideoPlayer-win-Setup.exe`, run it, and start using the app.
-
-            The first launch prepares the playback backend automatically. No account, no cloud sync, no telemetry.
-
-            ### Portable option
-
-            Advanced users can download `DenoVideoPlayer-${{ github.ref_name }}-portable-win-x64.zip`, unzip it, and run `DenoVideoPlayer.exe`.
-
-            ### Notes
-
-            Windows SmartScreen may warn on early releases while the app builds reputation. Choose "More info" -> "Run anyway" only if you downloaded it from this GitHub release.
-
-            Deno Video Player is released under `GPL-3.0-only`. Bundled notices for third-party components are included in `NOTICE.md`.

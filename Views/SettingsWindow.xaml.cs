@@ -54,7 +54,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            var selected = SaveSettings();
+            if (!TrySaveSettings(out var selected)) return;
             SyncFileAssociations(selected);
             Close();
         }
@@ -70,7 +70,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            var selected = SaveSettings();
+            if (!TrySaveSettings(out var selected)) return;
             SyncFileAssociations(selected);
             FileAssociationService.OpenDefaultAppsSettings();
         }
@@ -82,17 +82,35 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private List<string> SaveSettings()
+    private bool TrySaveSettings(out List<string> selected)
     {
-        var selected = _vm.SelectedExtensions.ToList();
+        selected = _vm.SelectedExtensions.ToList();
+        var previousExtensions = _settings.RegisteredExtensions?.ToList();
+        var previousScreenshotFolder = _settings.ScreenshotFolder;
+        var previousLanguage = _settings.Language;
+
         _settings.RegisteredExtensions = selected;
         _settings.ScreenshotFolder = string.IsNullOrWhiteSpace(_vm.ScreenshotFolder)
             ? null
             : _vm.ScreenshotFolder;
         _settings.Language = LocalizationService.Normalize(_vm.SelectedLanguage);
-        _svc.Save(_settings);
+
+        if (!_svc.TrySave(_settings, out var error))
+        {
+            _settings.RegisteredExtensions = previousExtensions;
+            _settings.ScreenshotFolder = previousScreenshotFolder;
+            _settings.Language = previousLanguage;
+            MessageBox.Show(this,
+                LocalizationService.F("SettingsSaveError", error ?? "unknown"),
+                "Deno Video Player",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+
         LocalizationService.Apply(_settings.Language);
-        return selected;
+        _vm.RefreshLocalizedText();
+        return true;
     }
 
     private void SyncFileAssociations(IReadOnlyCollection<string> selected)

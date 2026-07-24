@@ -66,21 +66,21 @@ public static class FileAssociationService
             hkcu,
             VideoProgId,
             "Deno Video Player Video File",
-            "Deno Video Player 비디오",
+            "Deno Video Player Video",
             IconReferenceForKind(exePath, MediaKind.Video),
             exePath);
         RegisterProgId(
             hkcu,
             AudioProgId,
             "Deno Video Player Audio File",
-            "Deno Video Player 오디오",
+            "Deno Video Player Audio",
             IconReferenceForKind(exePath, MediaKind.Audio),
             exePath);
         RegisterProgId(
             hkcu,
             ImageProgId,
             "Deno Video Player Image File",
-            "Deno Video Player 이미지",
+            "Deno Video Player Image",
             IconReferenceForKind(exePath, MediaKind.Image),
             exePath);
 
@@ -90,14 +90,14 @@ public static class FileAssociationService
             hkcu,
             CompatibilityProgId,
             "Deno Video Player Media File",
-            "Deno Video Player 미디어",
+            "Deno Video Player Media",
             $"\"{exePath}\",0",
             exePath);
         RegisterProgId(
             hkcu,
             LegacyProgId,
             "Deno Video Player Media File",
-            "Deno Video Player 미디어",
+            "Deno Video Player Media",
             $"\"{exePath}\",0",
             exePath);
 
@@ -106,7 +106,7 @@ public static class FileAssociationService
         {
             caps!.SetValue("ApplicationName", friendlyName, RegistryValueKind.String);
             caps.SetValue("ApplicationDescription",
-                "로컬 미디어를 빠르게 여는 가벼운 mpv 셸 플레이어",
+                "A lightweight local media player powered by mpv",
                 RegistryValueKind.String);
             caps.SetValue("ApplicationIcon", $"\"{exePath}\",0", RegistryValueKind.String);
         }

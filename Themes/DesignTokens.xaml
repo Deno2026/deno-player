@@ -25,7 +25,8 @@
     <!-- ▣ Foreground (글자) -->
     <Color x:Key="ColorFgPrimary">#FFE6EDE3</Color>
     <Color x:Key="ColorFgSecondary">#FF9BA89A</Color>
-    <Color x:Key="ColorFgMuted">#FF5E6A5C</Color>
+    <!-- 12px 보조/복구 문구도 Raised surface에서 WCAG 4.5:1 이상 유지 -->
+    <Color x:Key="ColorFgMuted">#FF758273</Color>
     <Color x:Key="ColorFgInverse">#FF0B0E0C</Color>
 
     <!-- ▣ DENO accent green — 활성/선택/Ready/Focus 전용 -->
@@ -202,6 +203,22 @@
         <Setter Property="MinWidth" Value="64"/>
         <Setter Property="Height" Value="30"/>
         <Setter Property="Padding" Value="10,0"/>
+    </Style>
+
+    <!-- Dialog/context actions participate in Tab navigation. Main transport
+         controls keep their existing focus contract so Space remains play/pause. -->
+    <Style x:Key="KeyboardActionButton"
+           TargetType="Button"
+           BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="IsTabStop" Value="True"/>
+        <Style.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource BrushAccent}"/>
+                <Setter Property="BorderThickness" Value="2"/>
+                <Setter Property="Background" Value="{StaticResource BrushAccentTint}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ============================================================

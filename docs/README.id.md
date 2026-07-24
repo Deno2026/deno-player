@@ -8,6 +8,8 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 
 ![Deno Video Player preview](assets/preview.png)
 
+*Tangkapan layar ditampilkan dalam bahasa Korea. Antarmuka aplikasi tersedia dalam bahasa Inggris dan Korea.*
+
 ## ✨ Kenapa Berguna
 
 - Putar media lokal dengan drag-and-drop
@@ -17,6 +19,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 - Zoom video dengan `Ctrl + roda mouse`, lalu geser dengan drag tombol tengah
 - Potong klip secara sederhana dan lossless dengan `I` → `O` → `Ctrl + E`
 - Tombol fullscreen khusus untuk menampilkan video saja
+- Panduan singkat bawaan dan referensi shortcut praktis dengan `F1`
 - Antarmuka aplikasi tersedia dalam bahasa Inggris dan Korea di Settings
 - Update ditampilkan lebih dulu dan hanya dipasang saat kamu memilihnya
 
@@ -31,9 +34,28 @@ Pada peluncuran pertama, aplikasi menyiapkan playback engine yang dibutuhkan. Bi
 
 Jika Windows SmartScreen muncul, pastikan file berasal dari halaman resmi GitHub Releases, lalu pilih **More info** → **Run anyway**.
 
+### Persyaratan sistem
+
+- Windows 10 atau Windows 11, x64
+- Akses internet pada peluncuran pertama untuk menyiapkan playback engine mpv
+- Akses internet pada ekspor klip, audio, atau video pertama untuk menyiapkan FFmpeg
+
+## ❓ Panduan bawaan
+
+Klik tombol `?` di sebelah Settings atau tekan `F1` kapan saja. Panduan ini menjelaskan:
+
+- lokasi panel file terbaru dan playlist folder saat ini
+- tool utama di bar atas dan kontrol playback
+- shortcut keyboard dan mouse
+- subtitle, track audio, screenshot, zoom, dan geser
+- ekspor klip, audio saja, dan video saja
+- pemecahan masalah peluncuran pertama dan playback
+
+Player yang kosong juga menyediakan link untuk mulai menggunakan aplikasi, dan kegagalan playback langsung mengarah ke bagian pemecahan masalah.
+
 ## 📦 Opsi Portable
 
-Jika tidak ingin menginstal, unduh `portable-win-x64.zip` terbaru dari [Releases](https://github.com/Deno2026/deno-video-player/releases), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
+Jika tidak ingin menginstal, unduh aset terbaru bernama `DenoVideoPlayer-<version>-portable-win-x64.zip` dari [Releases](https://github.com/Deno2026/deno-video-player/releases), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
 
 Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 
@@ -43,9 +65,15 @@ Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 
 Buka video, audio, gambar, atau video dengan subtitle tanpa manajemen library yang berat. Deno Video Player fokus pada pemeriksaan file lokal yang cepat.
 
+Klik dua kali media yang sedang dibuka untuk masuk atau keluar dari fullscreen. Saat player kosong, klik dua kali membuka pemilih file; selama media dimuat atau setelah playback gagal, tindakan ini tidak melakukan apa pun.
+
 ### Menjelajah Folder yang Sama
 
 Saat membuka satu file, aplikasi dapat memakai media lain di folder yang sama sebagai playlist sederhana. Ini berguna untuk memeriksa hasil render, export, referensi, dan klip unduhan.
+
+Buka playlist dari tepi kanan atau dengan `P` / `Ctrl + L`. Urutkan menurut urutan alami nama file, terbaru lebih dulu, atau terlama lebih dulu; urutan yang dipilih akan diingat dan juga mengatur navigasi file sebelumnya atau berikutnya. Arahkan penunjuk ke tepi kiri untuk membuka file terbaru.
+
+Kontrol bawah mencakup pengulangan nonaktif, ulangi semua, ulangi satu, shuffle, volume, kecepatan playback, dan fullscreen. Klik nilai kecepatan untuk membuka preset atau putar roda mouse di atasnya untuk perubahan 0,25x.
 
 ### Memotong Tanpa Re-encode
 
@@ -85,7 +113,7 @@ Bahasa tampilan dapat diubah di **Settings**.
 | Volume | `↑` / `↓` atau roda mouse |
 | Zoom / geser video | `Ctrl + roda mouse` / drag tombol tengah |
 | Mute | `M` |
-| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click |
+| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / klik dua kali pada media yang terbuka |
 | Keluar fullscreen | `Esc` |
 | File sebelumnya / berikutnya | `PageUp` / `PageDown` atau `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |
@@ -94,6 +122,7 @@ Bahasa tampilan dapat diubah di **Settings**.
 | Track subtitle | `V` / `Shift + V` |
 | Track audio | `Ctrl + J` |
 | Potong klip | `I` → `O` → `Ctrl + E` |
+| Panduan dan shortcut | `F1` |
 
 ## 🔒 Yang Tidak Dilakukan
 

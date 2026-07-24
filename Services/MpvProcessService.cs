@@ -21,37 +21,25 @@ public sealed class MpvProcessService : IDisposable
         PipeName = $"deno-video-player-{Environment.ProcessId}-{Guid.NewGuid():N}".Substring(0, 40);
     }
 
-    /// <summary>mpv.exe 위치: 1) 사용자 고정 cache → 2) 앱/개발 폴더 runtime\mpv\mpv.exe.</summary>
+    /// <summary>mpv.exe 위치: 1) 사용자 고정 cache → 2) 현재 앱 폴더의 legacy runtime.</summary>
     private static string ResolveMpvPath()
     {
         if (File.Exists(RuntimePaths.MpvExe)) return RuntimePaths.MpvExe;
 
-        var baseDir = AppContext.BaseDirectory;
-        var p1 = Path.Combine(baseDir, "runtime", "mpv", "mpv.exe");
-        if (File.Exists(p1)) return p1;
-
-        // dev 실행 시 bin\Debug\net8.0-windows\... 에서 프로젝트 루트 추적
-        var probe = baseDir;
-        for (var i = 0; i < 6 && probe is not null; i++)
-        {
-            var alt = Path.Combine(probe, "runtime", "mpv", "mpv.exe");
-            if (File.Exists(alt)) return alt;
-            probe = Path.GetDirectoryName(probe);
-        }
-        return RuntimePaths.MpvExe; // 없어도 경로는 반환(에러는 호출자가 처리)
+        var bundled = RuntimePaths.LegacyBundledMpvExe;
+        return File.Exists(bundled) ? bundled : RuntimePaths.MpvExe;
     }
 
-    // 정상 시작에서는 별도 mpv --version을 먼저 띄우지 않는다. 실제 player process 시작과
-    // IPC 연결이 동작 검증이며, download/promotion 단계의 정밀 검증은 그대로 유지된다.
-    public bool MpvAvailable => RuntimeExecutableValidator.HasPlausiblePortableExecutableHeader(MpvPath);
+    // RuntimeExecutableValidator는 file metadata가 바뀌지 않은 동안 결과를 cache하므로
+    // 매 접근마다 process를 띄우지 않으면서 실행 직전 신뢰 검증을 유지한다.
+    public bool MpvAvailable => RuntimeExecutableValidator.IsUsable(MpvPath, "--version");
 
     public void Start(IntPtr videoHostHwnd)
     {
         if (Process is { HasExited: false }) return;
         if (!MpvAvailable)
-            throw new FileNotFoundException(
-                $"mpv.exe를 찾을 수 없습니다.\n경로: {MpvPath}\nREADME의 'mpv 설치' 섹션을 참고하세요.",
-                MpvPath);
+            throw new LocalizedDetailException(
+                new LocalizedText("MpvExecutableMissing", MpvPath));
 
         var pipePath = $@"\\.\pipe\{PipeName}";
         var psi = new ProcessStartInfo
@@ -105,7 +93,8 @@ public sealed class MpvProcessService : IDisposable
 
         var generation = Interlocked.Increment(ref _processGeneration);
         var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("mpv 프로세스를 시작하지 못했습니다.");
+            ?? throw new LocalizedDetailException(
+                new LocalizedText("MpvProcessStartFailed"));
         var pid = proc.Id;
 
         // mpv가 stderr/stdout으로 토해내는 마지막 메시지는 crash 진단에 결정적

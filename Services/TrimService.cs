@@ -131,17 +131,18 @@ public static class TrimService
         CancellationToken ct = default)
     {
         if (!File.Exists(inputPath))
-            return new TrimResult(false, null, $"원본 파일을 찾을 수 없습니다: {inputPath}");
+            return new TrimResult(false, null,
+                LocalizationService.F("TrimInputMissing", inputPath));
         if (!double.IsFinite(startSec) || !double.IsFinite(endSec) || startSec < 0 || endSec <= startSec)
-            return new TrimResult(false, null, "OUT 지점이 IN 지점보다 뒤에 있어야 합니다.");
+            return new TrimResult(false, null, LocalizationService.T("TrimInvalidRange"));
         if (!Enum.IsDefined(outputMode))
-            return new TrimResult(false, null, "지원하지 않는 출력 방식입니다.");
+            return new TrimResult(false, null,
+                LocalizationService.T("TrimUnsupportedOutputMode"));
 
         var ffmpeg = FindFfmpeg();
         if (ffmpeg is null)
             return new TrimResult(false, null,
-                "ffmpeg.exe를 찾을 수 없습니다. runtime\\ffmpeg\\ffmpeg.exe를 두거나, " +
-                "START_HERE.bat를 다시 실행해 자동 다운로드하세요.");
+                LocalizationService.T("FfmpegExecutableMissing"));
 
         outputPath ??= MakeOutputPath(inputPath, startSec, endSec, outputMode);
         string fullInput;
@@ -153,18 +154,22 @@ public static class TrimService
         }
         catch (Exception ex)
         {
-            return new TrimResult(false, null, $"출력 경로가 올바르지 않습니다: {ex.Message}");
+            return new TrimResult(false, null,
+                LocalizationService.F("TrimInvalidOutputPath", ex.Message));
         }
 
         if (string.Equals(fullInput, fullOutput, StringComparison.OrdinalIgnoreCase))
-            return new TrimResult(false, null, "원본 파일과 같은 경로에는 저장할 수 없습니다.");
+            return new TrimResult(false, null,
+                LocalizationService.T("TrimSameInputOutputPath"));
 
         var outputDirectory = Path.GetDirectoryName(fullOutput);
         var outputExtension = Path.GetExtension(fullOutput);
         if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
-            return new TrimResult(false, null, "출력 폴더를 찾을 수 없습니다.");
+            return new TrimResult(false, null,
+                LocalizationService.T("TrimOutputDirectoryMissing"));
         if (string.IsNullOrWhiteSpace(outputExtension))
-            return new TrimResult(false, null, "출력 파일 확장자가 필요합니다.");
+            return new TrimResult(false, null,
+                LocalizationService.T("TrimOutputExtensionMissing"));
 
         var tempOutput = Path.Combine(
             outputDirectory,
@@ -188,7 +193,8 @@ public static class TrimService
             ct.ThrowIfCancellationRequested();
             proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
             if (!proc.Start())
-                return new TrimResult(false, null, "ffmpeg 프로세스 시작 실패");
+                return new TrimResult(false, null,
+                    LocalizationService.T("FfmpegProcessStartFailed"));
 
             var stderrTask = proc.StandardError.ReadToEndAsync();
             var stdoutTask = proc.StandardOutput.ReadToEndAsync();
@@ -201,7 +207,8 @@ public static class TrimService
             {
                 TryKillAndWait(proc);
                 await Task.WhenAll(stderrTask, stdoutTask).ConfigureAwait(false);
-                return new TrimResult(false, null, "작업이 취소되었습니다.");
+                return new TrimResult(false, null,
+                    LocalizationService.T("TrimOperationCanceled"));
             }
 
             var stderr = await stderrTask.ConfigureAwait(false);
@@ -211,10 +218,12 @@ public static class TrimService
             {
                 var tail = TailLines(stderr, 6);
                 AppLog.Warn($"Trim ffmpeg exit={proc.ExitCode}\n{tail}");
-                return new TrimResult(false, null, $"ffmpeg 종료 코드 {proc.ExitCode}\n{tail}");
+                return new TrimResult(false, null,
+                    LocalizationService.F("FfmpegExitFailed", proc.ExitCode, tail));
             }
             if (!File.Exists(tempOutput) || new FileInfo(tempOutput).Length == 0)
-                return new TrimResult(false, null, "출력 파일이 생성되지 않았습니다.");
+                return new TrimResult(false, null,
+                    LocalizationService.T("TrimOutputNotCreated"));
 
             CommitOutput(tempOutput, fullOutput);
             AppLog.Info($"Trim ok: {fullOutput} ({new FileInfo(fullOutput).Length:N0} bytes)");
@@ -223,7 +232,8 @@ public static class TrimService
         catch (OperationCanceledException)
         {
             if (proc is not null) TryKillAndWait(proc);
-            return new TrimResult(false, null, "작업이 취소되었습니다.");
+            return new TrimResult(false, null,
+                LocalizationService.T("TrimOperationCanceled"));
         }
         catch (Exception ex)
         {

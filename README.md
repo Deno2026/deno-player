@@ -8,6 +8,8 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 ![Deno Video Player preview](docs/assets/preview.png)
 
+*Screenshot shown in Korean. The app interface supports English and Korean.*
+
 ## ✨ Why It’s Useful
 
 - Fast drag-and-drop playback for local media files
@@ -17,6 +19,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 - Video zoom with `Ctrl + mouse wheel`, then pan with middle-button drag
 - Simple lossless clip trimming with `I` → `O` → `Ctrl + E`
 - An explicit fullscreen button for a clean video-only view
+- A built-in quick guide and practical shortcut reference with `F1`
 - English and Korean app interface in Settings
 - Updates are shown first and installed only when you choose them
 
@@ -31,9 +34,28 @@ On the first launch, the app prepares the playback engine it needs. This is norm
 
 If Windows SmartScreen appears, check that the file came from the official GitHub Releases page, then choose **More info** → **Run anyway**.
 
+### System requirements
+
+- Windows 10 or Windows 11, x64
+- Internet access on the first launch to prepare the mpv playback engine
+- Internet access on the first clip/audio/video export to prepare FFmpeg
+
+## ❓ Built-in Guide
+
+Click the `?` button beside Settings or press `F1` at any time. The guide explains:
+
+- where the Recent files and current-folder playlist panels are located
+- the main top-bar tools and playback controls
+- keyboard and mouse shortcuts
+- subtitles, audio tracks, screenshots, zoom, and pan
+- clip, audio-only, and video-only export
+- first-launch and playback troubleshooting
+
+The empty player also includes a **New here?** link, and playback failures link directly to the troubleshooting section.
+
 ## 📦 Portable Option
 
-Prefer not to install? Download the latest `portable-win-x64.zip` from [Releases](https://github.com/Deno2026/deno-video-player/releases), unzip it, and run `DenoVideoPlayer.exe`.
+Prefer not to install? Download the latest asset named `DenoVideoPlayer-<version>-portable-win-x64.zip` from [Releases](https://github.com/Deno2026/deno-video-player/releases), unzip it, and run `DenoVideoPlayer.exe`.
 
 For most beginners, the `Setup.exe` installer is the easier choice.
 
@@ -43,9 +65,15 @@ For most beginners, the `Setup.exe` installer is the easier choice.
 
 Drop a video, audio file, image, or subtitle-friendly video into the player. Deno Video Player focuses on fast local review, not library management.
 
+Double-click the open media to enter or exit fullscreen. When the player is empty, double-click opens the file picker; while media is loading or after playback fails, double-click does nothing.
+
 ### Browse the Same Folder
 
 When you open one file, the app can use nearby media files in the same folder as a simple playlist. This is useful for checking renders, exports, references, and downloaded clips.
+
+Open the playlist from the right edge or with `P` / `Ctrl + L`. Sort it by natural file name, newest first, or oldest first; the selected order is remembered and also controls previous/next navigation. Move to the left edge to open Recent files.
+
+The bottom controls include repeat off, repeat all, repeat one, shuffle, volume, playback speed, and fullscreen. Click the speed value for presets or use the mouse wheel over it for 0.25x changes.
 
 ### Trim a Clip Without Re-encoding
 
@@ -87,7 +115,7 @@ You can change the display language in **Settings**.
 | Volume | `↑` / `↓` or mouse wheel |
 | Video zoom / pan | `Ctrl + mouse wheel` / middle-button drag |
 | Mute | `M` |
-| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click |
+| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click the open media |
 | Exit fullscreen | `Esc` |
 | Previous / next file | `PageUp` / `PageDown` or `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |
@@ -96,6 +124,7 @@ You can change the display language in **Settings**.
 | Subtitle track | `V` / `Shift + V` |
 | Audio track | `Ctrl + J` |
 | Trim clip | `I` → `O` → `Ctrl + E` |
+| Help and shortcuts | `F1` |
 
 ## 🔒 What It Does Not Do
 

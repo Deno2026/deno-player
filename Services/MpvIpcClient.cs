@@ -30,15 +30,20 @@ public sealed class MpvIpcClient : IDisposable
         public required StreamReader Reader { get; init; }
         public required StreamWriter Writer { get; init; }
         public required CancellationTokenSource Cancellation { get; init; }
+        public required CancellationToken Token { get; init; }
         public Task? ReadLoop { get; set; }
         public int DisconnectNotified;
+        public int CloseStarted;
+        public int CancellationDisposed;
     }
 
     private sealed record PendingRequest(long Generation, TaskCompletionSource<JsonElement> Completion);
 
     private Connection? _connection;
+    private CancellationTokenSource? _connectAttemptCancellation;
     private long _nextConnectionGeneration;
     private int _disposed;
+    private readonly object _lifecycleGate = new();
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly SemaphoreSlim _connectGate = new(1, 1);
@@ -61,36 +66,79 @@ public sealed class MpvIpcClient : IDisposable
         await _connectGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
             await DisconnectCurrentAsync(suppressEvent: true).ConfigureAwait(false);
+            ThrowIfDisposed();
 
             var cancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var pipe = new NamedPipeClientStream(".", pipeName,
                 PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            var ownershipTransferred = false;
             try
             {
+                lock (_lifecycleGate)
+                {
+                    ThrowIfDisposed();
+                    _connectAttemptCancellation = cancellation;
+                }
+
                 await pipe.ConnectAsync((int)timeout.TotalMilliseconds, cancellation.Token)
                     .ConfigureAwait(false);
+
+                var connection = new Connection
+                {
+                    Generation = Interlocked.Increment(ref _nextConnectionGeneration),
+                    Pipe = pipe,
+                    Reader = new StreamReader(pipe, new UTF8Encoding(false)),
+                    Writer = new StreamWriter(pipe, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" },
+                    Cancellation = cancellation,
+                    Token = cancellation.Token,
+                };
+
+                lock (_lifecycleGate)
+                {
+                    ThrowIfDisposed();
+                    if (!ReferenceEquals(_connectAttemptCancellation, cancellation))
+                        throw new ObjectDisposedException(nameof(MpvIpcClient));
+
+                    ownershipTransferred = true;
+                    Volatile.Write(ref _connection, connection);
+                    connection.ReadLoop = Task.Run(() => ReadLoopAsync(connection));
+                    InvokeSafely(Connected);
+
+                    // A handler is allowed to dispose the client. Monitor locks are
+                    // re-entrant, so verify that callback did not end this lifecycle.
+                    ThrowIfDisposed();
+                    if (!ReferenceEquals(Volatile.Read(ref _connection), connection))
+                        throw new ObjectDisposedException(nameof(MpvIpcClient));
+                }
+
+                return true;
+            }
+            catch (ObjectDisposedException) when (Volatile.Read(ref _disposed) != 0)
+            {
+                throw;
             }
             catch
             {
-                cancellation.Dispose();
-                pipe.Dispose();
+                if (Volatile.Read(ref _disposed) != 0)
+                    throw new ObjectDisposedException(nameof(MpvIpcClient));
                 return false;
             }
-
-            var connection = new Connection
+            finally
             {
-                Generation = Interlocked.Increment(ref _nextConnectionGeneration),
-                Pipe = pipe,
-                Reader = new StreamReader(pipe, new UTF8Encoding(false)),
-                Writer = new StreamWriter(pipe, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" },
-                Cancellation = cancellation,
-            };
-            Volatile.Write(ref _connection, connection);
-            connection.ReadLoop = Task.Run(() => ReadLoopAsync(connection));
-
-            InvokeSafely(Connected);
-            return true;
+                lock (_lifecycleGate)
+                {
+                    if (ReferenceEquals(_connectAttemptCancellation, cancellation))
+                        _connectAttemptCancellation = null;
+                }
+                if (!ownershipTransferred)
+                {
+                    try { cancellation.Cancel(); } catch { }
+                    try { pipe.Dispose(); } catch { }
+                    cancellation.Dispose();
+                }
+            }
         }
         finally
         {
@@ -100,7 +148,7 @@ public sealed class MpvIpcClient : IDisposable
 
     private async Task ReadLoopAsync(Connection connection)
     {
-        var ct = connection.Cancellation.Token;
+        var ct = connection.Token;
         try
         {
             while (!ct.IsCancellationRequested && connection.Pipe.IsConnected)
@@ -176,7 +224,16 @@ public sealed class MpvIpcClient : IDisposable
         }
         finally
         {
-            if (ReferenceEquals(Interlocked.CompareExchange(ref _connection, null, connection), connection))
+            bool wasCurrent;
+            lock (_lifecycleGate)
+            {
+                wasCurrent = ReferenceEquals(_connection, connection);
+                if (wasCurrent)
+                    Volatile.Write(ref _connection, null);
+            }
+            CloseConnection(connection);
+            DisposeConnectionCancellation(connection);
+            if (wasCurrent)
             {
                 FailPending(connection.Generation, new IOException("mpv IPC disconnected"));
                 NotifyDisconnected(connection);
@@ -218,6 +275,10 @@ public sealed class MpvIpcClient : IDisposable
             _writeLock.Release();
             lockTaken = false;
             return await tcs.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException ex) when (Volatile.Read(ref _disposed) == 0)
+        {
+            throw new IOException("mpv IPC disconnected during command write", ex);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
@@ -353,14 +414,26 @@ public sealed class MpvIpcClient : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        var connection = Interlocked.Exchange(ref _connection, null);
+        CancellationTokenSource? connectAttempt;
+        Connection? connection;
+        lock (_lifecycleGate)
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            connectAttempt = _connectAttemptCancellation;
+            _connectAttemptCancellation = null;
+            connection = _connection;
+            Volatile.Write(ref _connection, null);
+            if (connection is not null)
+                Interlocked.Exchange(ref connection.DisconnectNotified, 1);
+        }
+
+        try { connectAttempt?.Cancel(); } catch { }
+
         if (connection is not null)
         {
-            Interlocked.Exchange(ref connection.DisconnectNotified, 1);
             CloseConnection(connection);
             FailPending(connection.Generation, new ObjectDisposedException(nameof(MpvIpcClient)));
-            connection.Cancellation.Dispose();
+            DisposeConnectionCancellation(connection);
         }
         foreach (var pair in _pending)
         {
@@ -371,7 +444,12 @@ public sealed class MpvIpcClient : IDisposable
 
     private async Task DisconnectCurrentAsync(bool suppressEvent)
     {
-        var connection = Interlocked.Exchange(ref _connection, null);
+        Connection? connection;
+        lock (_lifecycleGate)
+        {
+            connection = _connection;
+            Volatile.Write(ref _connection, null);
+        }
         if (connection is null) return;
         if (suppressEvent) Interlocked.Exchange(ref connection.DisconnectNotified, 1);
 
@@ -386,15 +464,28 @@ public sealed class MpvIpcClient : IDisposable
             catch { }
         }
         if (!suppressEvent) NotifyDisconnected(connection);
-        connection.Cancellation.Dispose();
+        DisposeConnectionCancellation(connection);
     }
 
     private static void CloseConnection(Connection connection)
     {
+        if (Interlocked.Exchange(ref connection.CloseStarted, 1) != 0) return;
         try { connection.Cancellation.Cancel(); } catch { }
         try { connection.Writer.Dispose(); } catch { }
         try { connection.Reader.Dispose(); } catch { }
         try { connection.Pipe.Dispose(); } catch { }
+    }
+
+    private static void DisposeConnectionCancellation(Connection connection)
+    {
+        if (Interlocked.Exchange(ref connection.CancellationDisposed, 1) != 0) return;
+        try { connection.Cancellation.Dispose(); } catch { }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            throw new ObjectDisposedException(nameof(MpvIpcClient));
     }
 
     private void FailPending(long generation, Exception error)

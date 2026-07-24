@@ -8,6 +8,8 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 
 ![Deno Video Player preview](assets/preview.png)
 
+*A captura de tela está em coreano. A interface do aplicativo está disponível em inglês e coreano.*
+
 ## ✨ Por que ele é útil
 
 - Reproduz mídia local com arrastar e soltar
@@ -17,6 +19,7 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 - Zoom do vídeo com `Ctrl + roda do mouse` e movimento arrastando o botão do meio
 - Corte simples e sem perda com `I` → `O` → `Ctrl + E`
 - Um botão de tela cheia para deixar somente o vídeo visível
+- Um guia rápido integrado e uma referência prática de atalhos com `F1`
 - Interface do app em inglês e coreano nas configurações
 - Atualizações aparecem primeiro e só são instaladas quando você escolhe
 
@@ -31,9 +34,28 @@ Na primeira abertura, o app prepara o mecanismo de reprodução necessário. Nor
 
 Se o Windows SmartScreen aparecer, confirme que o arquivo veio da página oficial do GitHub Releases e escolha **More info** → **Run anyway**.
 
+### Requisitos do sistema
+
+- Windows 10 ou Windows 11, x64
+- Acesso à internet na primeira abertura para preparar o mecanismo de reprodução mpv
+- Acesso à internet na primeira exportação de clipe, áudio ou vídeo para preparar o FFmpeg
+
+## ❓ Guia integrado
+
+Clique no botão `?` ao lado de Settings ou pressione `F1` a qualquer momento. O guia explica:
+
+- onde ficam os painéis de arquivos recentes e da playlist da pasta atual
+- as principais ferramentas da barra superior e os controles de reprodução
+- os atalhos de teclado e mouse
+- legendas, faixas de áudio, capturas de tela, zoom e movimento
+- a exportação de clipe, somente áudio e somente vídeo
+- a solução de problemas da primeira abertura e de reprodução
+
+O player vazio também inclui um link de primeiros passos, e as falhas de reprodução levam diretamente à seção de solução de problemas.
+
 ## 📦 Opção portátil
 
-Se você prefere não instalar, baixe o `portable-win-x64.zip` mais recente em [Releases](https://github.com/Deno2026/deno-video-player/releases), extraia o arquivo e execute `DenoVideoPlayer.exe`.
+Se você prefere não instalar, baixe o arquivo mais recente chamado `DenoVideoPlayer-<version>-portable-win-x64.zip` em [Releases](https://github.com/Deno2026/deno-video-player/releases), extraia o arquivo e execute `DenoVideoPlayer.exe`.
 
 Para a maioria dos iniciantes, o `Setup.exe` é a opção mais fácil.
 
@@ -43,9 +65,15 @@ Para a maioria dos iniciantes, o `Setup.exe` é a opção mais fácil.
 
 Abra vídeos, áudio, imagens ou vídeos com legenda sem criar uma biblioteca pesada. O Deno Video Player é focado em revisar arquivos locais com rapidez.
 
+Clique duas vezes na mídia aberta para entrar ou sair da tela cheia. Quando o player está vazio, o clique duplo abre o seletor de arquivos; enquanto a mídia está carregando ou após uma falha de reprodução, ele não faz nada.
+
 ### Navegar pela mesma pasta
 
 Ao abrir um arquivo, o app pode usar outros arquivos de mídia da mesma pasta como uma playlist simples. Isso ajuda a revisar renders, exportações, referências e clipes baixados.
+
+Abra a playlist pela borda direita ou com `P` / `Ctrl + L`. Ordene por nome de arquivo em ordem natural, mais recentes primeiro ou mais antigos primeiro; a ordem escolhida é lembrada e também controla a navegação para o arquivo anterior ou seguinte. Mova o ponteiro até a borda esquerda para abrir os arquivos recentes.
+
+Os controles inferiores incluem repetição desativada, repetir tudo, repetir um item, ordem aleatória, volume, velocidade de reprodução e tela cheia. Clique no valor da velocidade para abrir os ajustes predefinidos ou use a roda do mouse sobre ele para mudar em passos de 0,25x.
 
 ### Cortar sem recodificar
 
@@ -85,7 +113,7 @@ Você pode mudar o idioma em **Settings**.
 | Volume | `↑` / `↓` ou roda do mouse |
 | Zoom / movimento do vídeo | `Ctrl + roda do mouse` / arrastar com botão do meio |
 | Mudo | `M` |
-| Tela cheia | `F` / `F11` / `Enter` / `Alt + Enter` / duplo clique |
+| Tela cheia | `F` / `F11` / `Enter` / `Alt + Enter` / clique duplo na mídia aberta |
 | Sair da tela cheia | `Esc` |
 | Arquivo anterior / próximo | `PageUp` / `PageDown` ou `Ctrl + ←` / `Ctrl + →` |
 | Captura de tela | `Ctrl + S` |
@@ -94,6 +122,7 @@ Você pode mudar o idioma em **Settings**.
 | Faixa de legenda | `V` / `Shift + V` |
 | Faixa de áudio | `Ctrl + J` |
 | Cortar clipe | `I` → `O` → `Ctrl + E` |
+| Guia e atalhos | `F1` |
 
 ## 🔒 O que ele não faz
 

@@ -10,7 +10,14 @@ namespace DenoVideoPlayer.Services;
 /// </summary>
 public static class RuntimeDependencyService
 {
-    public sealed record EnsureResult(bool Success, string? Error = null);
+    public sealed record EnsureResult(
+        bool Success,
+        string? Error = null,
+        LocalizedText? LocalizedError = null)
+    {
+        public object? ErrorDetail =>
+            LocalizedError is not null ? LocalizedError : Error;
+    }
 
     public static Task<EnsureResult> EnsureMpvAsync(CancellationToken ct = default)
         => EnsureMpvAsync(null, ct);
@@ -67,7 +74,7 @@ public static class RuntimeDependencyService
         Action<string>? outputLine = null)
     {
         if (!File.Exists(scriptPath))
-            return new EnsureResult(false, $"필요한 준비 스크립트를 찾을 수 없습니다: {scriptPath}");
+            return LocalizedFailure("RuntimeScriptMissing", name, scriptPath);
 
         var psi = new ProcessStartInfo
         {
@@ -113,7 +120,7 @@ public static class RuntimeDependencyService
         try
         {
             if (!proc.Start())
-                return new EnsureResult(false, $"{name} 준비 프로세스를 시작하지 못했습니다.");
+                return LocalizedFailure("RuntimePrepareProcessStartFailed", name);
 
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();
@@ -130,7 +137,7 @@ public static class RuntimeDependencyService
                 if (!RuntimeExecutableValidator.IsUsable(expectedExecutable, versionArgument))
                 {
                     AppLog.Warn($"Runtime prepare produced invalid executable: {expectedExecutable}");
-                    return new EnsureResult(false, $"{name} 실행 파일 검증에 실패했습니다. 다시 시도해 주세요.");
+                    return LocalizedFailure("RuntimeExecutableValidationFailed", name);
                 }
                 AppLog.Info($"Runtime prepare ok: {name}");
                 return new EnsureResult(true);
@@ -138,7 +145,7 @@ public static class RuntimeDependencyService
 
             var details = TailLines(error.Length > 0 ? error.ToString() : output.ToString(), 8);
             AppLog.Warn($"Runtime prepare failed: {name} exit={proc.ExitCode}\n{details}");
-            return new EnsureResult(false, $"{name} 준비 실패\n{details}");
+            return LocalizedFailure("RuntimePrepareDetailFailed", name, details);
         }
         catch (OperationCanceledException)
         {
@@ -146,11 +153,11 @@ public static class RuntimeDependencyService
             if (ct.IsCancellationRequested)
             {
                 AppLog.Info($"Runtime prepare canceled: {name}");
-                return new EnsureResult(false, $"{name} 준비가 취소되었습니다.");
+                return LocalizedFailure("RuntimePrepareCanceled", name);
             }
 
             AppLog.Warn($"Runtime prepare timeout: {name}");
-            return new EnsureResult(false, $"{name} 다운로드 시간이 초과되었습니다. 인터넷 연결을 확인한 뒤 다시 실행하세요.");
+            return LocalizedFailure("RuntimePrepareTimeout", name);
         }
         catch (Exception ex)
         {
@@ -158,6 +165,17 @@ public static class RuntimeDependencyService
             AppLog.Error($"Runtime prepare crashed: {name}", ex);
             return new EnsureResult(false, ex.Message);
         }
+    }
+
+    private static EnsureResult LocalizedFailure(
+        string key,
+        params object?[] args)
+    {
+        var detail = new LocalizedText(key, args);
+        return new EnsureResult(
+            Success: false,
+            Error: detail.ToString(),
+            LocalizedError: detail);
     }
 
     private static string ResolvePowerShell()
@@ -231,23 +249,15 @@ public static class RuntimeDependencyService
 
     private static IEnumerable<string> RuntimeDirectoryCandidates(string name)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var baseDir = AppContext.BaseDirectory;
-        foreach (var dir in ParentRuntimeDirectories(baseDir, name))
-        {
-            if (!dir.StartsWith(RuntimePaths.RuntimeRoot, StringComparison.OrdinalIgnoreCase) && seen.Add(dir))
-                yield return dir;
-        }
-    }
-
-    private static IEnumerable<string> ParentRuntimeDirectories(string baseDir, string name)
-    {
-        var probe = baseDir;
-        for (var i = 0; i < 6 && probe is not null; i++)
-        {
-            yield return Path.Combine(probe, "runtime", name);
-            probe = Path.GetDirectoryName(probe);
-        }
+        // Legacy promotion is intentionally limited to the currently running app body.
+        // Ancestor probing can cross the app trust boundary and execute an unrelated PE.
+        var bundled = Path.GetFullPath(
+            string.Equals(name, "mpv", StringComparison.OrdinalIgnoreCase)
+                ? RuntimePaths.LegacyBundledMpvDirectory
+                : RuntimePaths.LegacyBundledFfmpegDirectory);
+        var destination = Path.GetFullPath(Path.Combine(RuntimePaths.RuntimeRoot, name));
+        if (!string.Equals(bundled, destination, StringComparison.OrdinalIgnoreCase))
+            yield return bundled;
     }
 
     private static void TryKill(Process proc)
