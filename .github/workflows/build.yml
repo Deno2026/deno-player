@@ -159,7 +159,7 @@ jobs:
             [System.Text.UTF8Encoding]::new($false))
 
       - name: Restore
-        run: dotnet restore DenoVideoPlayer.csproj
+        run: dotnet restore DenoVideoPlayer.csproj -r win-x64
 
       - name: Install Velopack CLI
         run: dotnet tool install --global vpk --version 1.2.0
