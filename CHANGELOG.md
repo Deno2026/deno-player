@@ -4,6 +4,55 @@ Dates are KST (UTC+9).
 
 ## Unreleased
 
+## [0.5.2] - 2026-07-24
+
+### In-app guide
+- Added an always-available `?` button and `F1` quick guide covering first use,
+  controls, edge panels, shortcuts, tracks, screenshots, zoom/pan, clip export,
+  and troubleshooting in Korean and English.
+- Added contextual guide entry points to the empty player and playback-failure
+  screen without interrupting first launch with a forced tour.
+- Made the new guide and recovery actions keyboard reachable without global
+  Space or Enter shortcuts intercepting focused buttons.
+
+### Player UX and reliability
+- Empty-player double-click now opens a file as advertised, while media
+  double-click continues to toggle fullscreen. Double-click is ignored while
+  media is loading, being dragged, or showing a playback failure.
+- Restored standard maximize/restore behavior to the title bar and window
+  button, leaving fullscreen to the media surface and playback control.
+- Outside trim editing, `Esc` now leaves fullscreen in one press even when
+  controls are hidden; during trim editing the first press safely cancels the edit.
+- Improved muted-text contrast and corrected file-association guidance.
+- Recent items on disconnected removable or network drives are retained instead
+  of being permanently removed during startup cleanup.
+- Rapid screenshots now reserve unique millisecond/suffix filenames instead of
+  colliding within the same second.
+- Restored the persisted `AutoPlayNext` behavior when repeat and shuffle are off.
+- Settings confirmation now reports a real save failure instead of closing as
+  if the change had been persisted.
+- Playback-engine failures now have a dedicated Retry path, stay protected from
+  stale play/next shortcuts, and reopen the current media after recovery.
+- Playback-engine recovery now preserves the latest file requested at startup
+  or through another app instance, and opens it after recovery instead of
+  dropping the request.
+- First-run, playback-engine, and export failures now keep their title, actions,
+  and technical detail consistent in both Korean and English. Localized loading
+  and failure details also refresh when the display language changes.
+
+### Runtime and release safety
+- Restricted legacy runtime discovery to app-owned locations and validates mpv
+  before launch instead of searching arbitrary ancestor directories.
+- Hardened IPC connect/disconnect cleanup so shutdown cannot publish a late
+  connection and natural disconnects release their resources.
+- Update packages are now downloaded only after the user accepts the update.
+- Release notes are generated from the matching version section in this
+  changelog, preventing a new release from reusing an older feature list.
+- Release publishing now rebuilds from clean intermediates and rejects PDB or
+  build-machine path leakage before packaging.
+- Corrected the Windows compatibility manifest to declare Windows 10/11
+  support; release packages remain win-x64.
+
 ## [0.5.1] - 2026-07-22
 
 ### Playlist UX

@@ -15,7 +15,7 @@ public sealed record UpdateCheckResult(
 
 /// <summary>
 /// GitHub Releases + Velopack 기반 업데이트.
-/// 설치판은 백그라운드에서 새 버전을 내려받아 준비하고, 사용자가 버튼을 누르면 재시작 적용한다.
+/// 설치판은 새 버전을 확인해 먼저 안내하고, 사용자가 동의하면 다운로드 후 재시작 적용한다.
 /// Portable/dev 실행은 자동 적용이 불가능하므로 최신 릴리스 페이지를 연다.
 /// </summary>
 public static class UpdaterService

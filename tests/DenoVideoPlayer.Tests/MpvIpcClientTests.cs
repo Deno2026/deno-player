@@ -126,6 +126,90 @@ public class MpvIpcClientTests
         }
     }
 
+    [Fact]
+    public async Task DisposeCancelsAnInFlightConnectAndPreventsLatePublication()
+    {
+        var pipeName = "deno-ipc-test-" + Guid.NewGuid().ToString("N");
+        var client = new MpvIpcClient();
+        var connect = client.ConnectAsync(
+            pipeName,
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        client.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => connect);
+        Assert.False(client.IsConnected);
+    }
+
+    [Fact]
+    public async Task ConnectAfterDisposeThrows()
+    {
+        var client = new MpvIpcClient();
+        client.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+            client.ConnectAsync(
+                "deno-ipc-test-" + Guid.NewGuid().ToString("N"),
+                TimeSpan.FromMilliseconds(100),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task DisposeIsSerializedAfterConnectedNotification()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pipeName = "deno-ipc-test-" + Guid.NewGuid().ToString("N");
+        await using var server = CreateServer(pipeName);
+        var client = new MpvIpcClient();
+        using var releaseNotification = new ManualResetEventSlim(false);
+        var notificationEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var sequence = 0;
+        var connectedSequence = 0;
+        var disposedSequence = 0;
+
+        client.Connected += () =>
+        {
+            connectedSequence = Interlocked.Increment(ref sequence);
+            notificationEntered.TrySetResult();
+            releaseNotification.Wait(cancellationToken);
+        };
+
+        var accept = server.WaitForConnectionAsync(cancellationToken);
+        var connect = client.ConnectAsync(
+            pipeName,
+            TimeSpan.FromSeconds(2),
+            cancellationToken);
+
+        try
+        {
+            await Task.WhenAll(accept, notificationEntered.Task.WaitAsync(cancellationToken));
+            var dispose = Task.Run(() =>
+            {
+                client.Dispose();
+                disposedSequence = Interlocked.Increment(ref sequence);
+            }, cancellationToken);
+
+            await Task.Delay(50, cancellationToken);
+            Assert.False(dispose.IsCompleted);
+
+            releaseNotification.Set();
+            Assert.True(await connect);
+            await dispose;
+
+            Assert.True(connectedSequence > 0);
+            Assert.True(disposedSequence > connectedSequence);
+            Assert.False(client.IsConnected);
+        }
+        finally
+        {
+            releaseNotification.Set();
+            client.Dispose();
+        }
+    }
+
     private static NamedPipeServerStream CreateServer(string pipeName) =>
         new(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);

@@ -1,0 +1,374 @@
+<Window x:Class="DenoVideoPlayer.Views.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource HelpTitle}"
+        Width="720" Height="680"
+        MinWidth="480" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource BrushBgBase}"
+        Foreground="{StaticResource BrushFgPrimary}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        PreviewKeyDown="OnPreviewKeyDown">
+
+    <Window.Resources>
+        <Style x:Key="HelpSectionTitle" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
+            <Setter Property="FontSize" Value="{StaticResource FontSizeLg}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource BrushFgPrimary}"/>
+            <Setter Property="Margin" Value="0,22,0,6"/>
+        </Style>
+
+        <Style x:Key="HelpRowTitle" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource BrushFgPrimary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="HelpBody" TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
+            <Setter Property="FontSize" Value="{StaticResource FontSizeMd}"/>
+            <Setter Property="LineHeight" Value="20"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="HelpKey" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource BrushBgElevated}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BrushBorderStrong}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+
+        <Style x:Key="HelpCloseButton" TargetType="Button" BasedOn="{StaticResource KeyboardActionButton}">
+            <Setter Property="MinWidth" Value="88"/>
+            <Setter Property="Height" Value="32"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24,20,24,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Width="34" Height="34"
+                    Background="{StaticResource BrushAccentTint}"
+                    BorderBrush="{StaticResource BrushAccent}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusMd}"
+                    Margin="0,0,12,0">
+                <TextBlock Text="?"
+                           FontFamily="{StaticResource FontUi}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource BrushAccent}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="{DynamicResource HelpHeader}"
+                           Style="{StaticResource TextBody}"
+                           FontSize="{StaticResource FontSizeXl}"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="{DynamicResource HelpDescription}"
+                           Style="{StaticResource HelpBody}"
+                           Margin="0,3,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <Separator Grid.Row="1"
+                   Background="{StaticResource BrushBorderSubtle}"
+                   Margin="0,14,0,0"/>
+
+        <ScrollViewer x:Name="GuideScroll"
+                      Grid.Row="2"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="0,0,-8,0"
+                      Padding="0,0,14,18">
+            <StackPanel>
+                <TextBlock Text="{DynamicResource HelpQuickStartHeader}"
+                           Style="{StaticResource HelpSectionTitle}"/>
+
+                <Border Background="{StaticResource BrushBgRaised}"
+                        BorderBrush="{StaticResource BrushBorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusMd}"
+                        Padding="16,12">
+                    <StackPanel>
+                        <Grid Margin="0,2,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="1"
+                                       FontFamily="{StaticResource FontMono}"
+                                       FontSize="{StaticResource FontSizeLg}"
+                                       Foreground="{StaticResource BrushAccent}"
+                                       VerticalAlignment="Top"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{DynamicResource HelpQuickOpenTitle}"
+                                           Style="{StaticResource HelpRowTitle}"/>
+                                <TextBlock Text="{DynamicResource HelpQuickOpenBody}"
+                                           Style="{StaticResource HelpBody}"
+                                           Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                        <Separator Background="{StaticResource BrushBorderSubtle}"/>
+                        <Grid Margin="0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="2"
+                                       FontFamily="{StaticResource FontMono}"
+                                       FontSize="{StaticResource FontSizeLg}"
+                                       Foreground="{StaticResource BrushAccent}"
+                                       VerticalAlignment="Top"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{DynamicResource HelpQuickPlayTitle}"
+                                           Style="{StaticResource HelpRowTitle}"/>
+                                <TextBlock Text="{DynamicResource HelpQuickPlayBody}"
+                                           Style="{StaticResource HelpBody}"
+                                           Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                        <Separator Background="{StaticResource BrushBorderSubtle}"/>
+                        <Grid Margin="0,10,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="34"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="3"
+                                       FontFamily="{StaticResource FontMono}"
+                                       FontSize="{StaticResource FontSizeLg}"
+                                       Foreground="{StaticResource BrushAccent}"
+                                       VerticalAlignment="Top"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{DynamicResource HelpQuickPanelsTitle}"
+                                           Style="{StaticResource HelpRowTitle}"/>
+                                <TextBlock Text="{DynamicResource HelpQuickPanelsBody}"
+                                           Style="{StaticResource HelpBody}"
+                                           Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="{DynamicResource HelpButtonsHeader}"
+                           Style="{StaticResource HelpSectionTitle}"/>
+                <TextBlock Text="{DynamicResource HelpButtonsIntro}"
+                           Style="{StaticResource HelpBody}"
+                           Margin="0,0,0,8"/>
+
+                <Grid Margin="0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource HelpButtonsLibraryLabel}"
+                               Style="{StaticResource HelpRowTitle}"
+                               Foreground="{StaticResource BrushAccent}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource HelpButtonsLibraryBody}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource HelpButtonsToolsLabel}"
+                               Style="{StaticResource HelpRowTitle}"
+                               Foreground="{StaticResource BrushAccent}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource HelpButtonsToolsBody}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{DynamicResource HelpButtonsPlaybackLabel}"
+                               Style="{StaticResource HelpRowTitle}"
+                               Foreground="{StaticResource BrushAccent}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource HelpButtonsPlaybackBody}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+
+                <TextBlock Text="{DynamicResource HelpShortcutsHeader}"
+                           Style="{StaticResource HelpSectionTitle}"/>
+
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="Space" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutPlay}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="← / →   ·   Shift + ← / →" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutSeek}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="wheel · ↑/↓ · M" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutVolume}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="PageUp / PageDown" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutFiles}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="F / F11 / Enter   ·   Esc" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutFullscreen}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="Ctrl + wheel" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutZoom}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="P / Ctrl + L" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutPlaylist}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="Ctrl + S   ·   Ctrl + T" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutCapturePin}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text="V / Shift + V   ·   Ctrl + J" Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutTracks}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource HelpKey}">
+                        <TextBlock Text=". / ,   ·   Shift + . / ," Style="{StaticResource TextMono}"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutSpeedFrames}"
+                               Style="{StaticResource HelpBody}"/>
+                </Grid>
+
+                <TextBlock Text="{DynamicResource HelpTrimHeader}"
+                           Style="{StaticResource HelpSectionTitle}"/>
+                <Border Background="{StaticResource BrushBgRaised}"
+                        BorderBrush="{StaticResource BrushBorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusMd}"
+                        Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource HelpTrimBody}"
+                                   Style="{StaticResource HelpBody}"/>
+                        <Border Style="{StaticResource HelpKey}" Margin="0,10,0,0">
+                            <TextBlock Text="I  →  O  →  Ctrl + E" Style="{StaticResource TextMono}"/>
+                        </Border>
+                        <TextBlock Text="{DynamicResource HelpTrimNote}"
+                                   Style="{StaticResource HelpBody}"
+                                   Foreground="{StaticResource BrushFgMuted}"
+                                   Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="TroubleshootingSection">
+                    <TextBlock Text="{DynamicResource HelpTroubleshootingHeader}"
+                               Style="{StaticResource HelpSectionTitle}"/>
+                    <TextBlock Text="{DynamicResource HelpTroubleshootingEngine}"
+                               Style="{StaticResource HelpBody}"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource HelpTroubleshootingPlayback}"
+                               Style="{StaticResource HelpBody}"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource HelpTroubleshootingExport}"
+                               Style="{StaticResource HelpBody}"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource HelpTroubleshootingRecent}"
+                               Style="{StaticResource HelpBody}"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Style="{StaticResource HelpCloseButton}"
+                    Content="{DynamicResource CloseHelp}"
+                    AutomationProperties.Name="{DynamicResource CloseHelp}"
+                    IsDefault="True"
+                    Click="OnCloseClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

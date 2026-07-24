@@ -1,6 +1,8 @@
 using System.Text.Json;
+using System.Reflection;
 using DenoVideoPlayer.Models;
 using DenoVideoPlayer.Services;
+using DenoVideoPlayer.ViewModels;
 
 namespace DenoVideoPlayer.Tests;
 
@@ -128,5 +130,147 @@ public class SettingsRoundTripTests
             LocalizationService.F("SettingsApplyError", "sample"));
 
         LocalizationService.Apply("ko");
+    }
+
+    [Fact]
+    public void KoreanAndEnglishLocalizationKeysStayInSync()
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Static;
+        var korean = Assert.IsType<Dictionary<string, string>>(
+            typeof(LocalizationService).GetField("KoreanStrings", flags)!.GetValue(null));
+        var english = Assert.IsType<Dictionary<string, string>>(
+            typeof(LocalizationService).GetField("EnglishStrings", flags)!.GetValue(null));
+
+        Assert.Equal(
+            korean.Keys.Order(StringComparer.Ordinal),
+            english.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void BuiltInHelpIsAvailableInBothLanguages()
+    {
+        try
+        {
+            LocalizationService.Apply("ko");
+            Assert.Equal("빠른 사용법", LocalizationService.T("HelpHeader"));
+            Assert.Contains("F1", LocalizationService.T("TooltipHelp"));
+            Assert.Contains("문제 해결", LocalizationService.T("HelpTroubleshootingHeader"));
+            Assert.Contains("FFmpeg", LocalizationService.T("HelpTroubleshootingExport"));
+            Assert.Equal("재생 엔진을 사용할 수 없습니다",
+                LocalizationService.T("PlaybackEngineFailed"));
+            Assert.Contains("재생 엔진을 다시 시도",
+                LocalizationService.T("MpvDisconnectedRestart"));
+
+            LocalizationService.Apply("en");
+            Assert.Equal("Quick guide", LocalizationService.T("HelpHeader"));
+            Assert.Contains("F1", LocalizationService.T("TooltipHelp"));
+            Assert.Equal("Troubleshooting",
+                LocalizationService.T("HelpTroubleshootingHeader"));
+            Assert.Contains("FFmpeg", LocalizationService.T("HelpTroubleshootingExport"));
+            Assert.Equal("The playback engine is unavailable",
+                LocalizationService.T("PlaybackEngineFailed"));
+            Assert.Contains("Retry the playback engine",
+                LocalizationService.T("MpvDisconnectedRestart"));
+        }
+        finally
+        {
+            LocalizationService.Apply("ko");
+        }
+    }
+
+    [Fact]
+    public void LocalizedStatusMessagesRefreshWhenLanguageChanges()
+    {
+        var originalLanguage = LocalizationService.CurrentLanguage;
+        MainViewModel? viewModel = null;
+        try
+        {
+            LocalizationService.Apply("ko");
+            viewModel = new MainViewModel(
+                new MpvProcessService(),
+                AppSettings.Defaults());
+
+            viewModel.SetLocalizedFailure(
+                PlayerFailureKind.Backend,
+                "MpvDisconnectedRestart");
+            Assert.Equal(
+                LocalizationService.T("MpvDisconnectedRestart"),
+                viewModel.StatusMessage);
+
+            LocalizationService.Apply("en");
+            Assert.Equal(
+                LocalizationService.T("MpvDisconnectedRestart"),
+                viewModel.StatusMessage);
+
+            viewModel.SetLocalizedFailure(
+                PlayerFailureKind.Media,
+                "FileNotFound",
+                @"C:\missing\sample.mp4");
+            Assert.Equal(
+                LocalizationService.F(
+                    "FileNotFound",
+                    @"C:\missing\sample.mp4"),
+                viewModel.StatusMessage);
+
+            LocalizationService.Apply("ko");
+            Assert.Equal(
+                LocalizationService.F(
+                    "FileNotFound",
+                    @"C:\missing\sample.mp4"),
+                viewModel.StatusMessage);
+
+            viewModel.SetLocalizedFailure(
+                PlayerFailureKind.Backend,
+                "MpvStartFailed",
+                new LocalizedText("MpvIpcFailed"));
+            Assert.Equal(
+                LocalizationService.F(
+                    "MpvStartFailed",
+                    new LocalizedText("MpvIpcFailed")),
+                viewModel.StatusMessage);
+
+            LocalizationService.Apply("en");
+            Assert.Equal(
+                LocalizationService.F(
+                    "MpvStartFailed",
+                    new LocalizedText("MpvIpcFailed")),
+                viewModel.StatusMessage);
+
+            LocalizationService.Apply("ko");
+            var localizedException = new LocalizedDetailException(
+                new LocalizedText(
+                    "MpvExecutableMissing",
+                    @"C:\runtime\mpv.exe"));
+            viewModel.SetLocalizedFailure(
+                PlayerFailureKind.Backend,
+                "MpvStartFailed",
+                localizedException.Detail);
+            Assert.Equal(
+                LocalizationService.F(
+                    "MpvStartFailed",
+                    new LocalizedText(
+                        "MpvExecutableMissing",
+                        @"C:\runtime\mpv.exe")),
+                viewModel.StatusMessage);
+
+            LocalizationService.Apply("en");
+            Assert.Equal(
+                LocalizationService.F(
+                    "MpvStartFailed",
+                    new LocalizedText(
+                        "MpvExecutableMissing",
+                        @"C:\runtime\mpv.exe")),
+                viewModel.StatusMessage);
+
+            viewModel.SetLocalizedStatus("LoadingStatus");
+            Assert.Equal(
+                LocalizationService.T("LoadingStatus"),
+                viewModel.StatusMessage);
+        }
+        finally
+        {
+            viewModel?.Dispose();
+            LocalizationService.Apply(originalLanguage);
+        }
     }
 }

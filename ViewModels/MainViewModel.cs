@@ -45,7 +45,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public MainViewModel(MpvProcessService mpvProc, AppSettings? startupSettings = null)
     {
         _mpvProc = mpvProc;
-        _ui = Application.Current.Dispatcher;
+        _ui = Application.Current?.Dispatcher
+            ?? System.Windows.Threading.Dispatcher.CurrentDispatcher;
         Settings = (startupSettings ?? _settingsSvc.Load()).Normalize();
         _volume = Settings.Volume;
         _muted = Settings.Muted;
@@ -236,16 +237,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (!ok)
         {
             Services.AppLog.Error("IPC connect failed (timeout)");
-            StatusMessage = L("MpvIpcFailed");
-            State = PlayerState.Failed;
+            SetLocalizedFailure(PlayerFailureKind.Backend, "MpvIpcFailed");
             return false;
         }
         Services.AppLog.Info("IPC connected");
         if (await InitializeIpcAsync()) return true;
 
         Services.AppLog.Error("IPC initialization failed");
-        StatusMessage = L("MpvIpcFailed");
-        State = PlayerState.Failed;
+        SetLocalizedFailure(PlayerFailureKind.Backend, "MpvIpcFailed");
         return false;
     }
 
@@ -298,6 +297,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (!Set(ref _state, value)) return;
+            if (value != PlayerState.Failed)
+                FailureKind = PlayerFailureKind.None;
             Raise(nameof(IsAudioPlayback));
             Raise(nameof(IsVideoSurfaceVisible));
             Raise(nameof(IsFirstRunPreparing));
@@ -310,7 +311,61 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     private string _statusMessage = "";
-    public string StatusMessage { get => _statusMessage; set => Set(ref _statusMessage, value); }
+    private string? _statusMessageKey;
+    private object?[] _statusMessageArgs = Array.Empty<object?>();
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set
+        {
+            _statusMessageKey = null;
+            _statusMessageArgs = Array.Empty<object?>();
+            Set(ref _statusMessage, value);
+        }
+    }
+
+    public void SetLocalizedStatus(string key, params object?[] args)
+    {
+        _statusMessageKey = key;
+        _statusMessageArgs = args.Length == 0
+            ? Array.Empty<object?>()
+            : args.ToArray();
+        Set(ref _statusMessage, LF(key, _statusMessageArgs), nameof(StatusMessage));
+    }
+
+    private PlayerFailureKind _failureKind;
+    public PlayerFailureKind FailureKind
+    {
+        get => _failureKind;
+        private set
+        {
+            if (!Set(ref _failureKind, value)) return;
+            Raise(nameof(FailureTitle));
+            Raise(nameof(CanRetryBackend));
+            Raise(nameof(CanOpenAnotherFileOnFailure));
+            Raise(nameof(CanGoNextOnFailure));
+        }
+    }
+
+    public string FailureTitle => L(FailureKind == PlayerFailureKind.Backend
+        ? "PlaybackEngineFailed"
+        : "PlaybackFailed");
+    public bool CanRetryBackend => PlayerFailurePolicy.CanRetryBackend(FailureKind);
+    public bool CanOpenAnotherFileOnFailure =>
+        PlayerFailurePolicy.CanOpenAnotherFile(FailureKind);
+    public bool CanGoNextOnFailure =>
+        PlayerFailurePolicy.CanGoNext(FailureKind, HasMedia);
+    public bool IsBackendConnected => _ipc.IsConnected;
+
+    public void SetLocalizedFailure(
+        PlayerFailureKind kind,
+        string key,
+        params object?[] args)
+    {
+        FailureKind = kind;
+        SetLocalizedStatus(key, args);
+        State = PlayerState.Failed;
+    }
 
     private string _fileNameDisplay = "";
     public string FileNameDisplay { get => _fileNameDisplay; private set => Set(ref _fileNameDisplay, value); }
@@ -341,6 +396,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (!Set(ref _currentMedia, value)) return;
             ResetVideoDisplaySize();
             Raise(nameof(HasMedia));
+            Raise(nameof(CanGoNextOnFailure));
             Raise(nameof(HasNext));
             Raise(nameof(HasPrev));
             Raise(nameof(CanZoomVideo));
@@ -669,8 +725,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            _applyingUpdate = false;
-            ApplyUpdateCommand.RaiseCanExecuteChanged();
+            OnUi(() =>
+            {
+                _applyingUpdate = false;
+                ApplyUpdateCommand.RaiseCanExecuteChanged();
+            });
         }
     }
 
@@ -1100,7 +1159,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void TogglePlayPause()
     {
+        if (State == PlayerState.Failed &&
+            FailureKind == PlayerFailureKind.Backend)
+        {
+            return;
+        }
         if (CurrentMedia is null) { OpenDialog(); return; }
+        if (!PlayerFailurePolicy.CanStartMediaPlayback(
+                State,
+                FailureKind,
+                _ipc.IsConnected))
+        {
+            SetLocalizedFailure(PlayerFailureKind.Backend, "MpvDisconnectedRestart");
+            return;
+        }
         if (CurrentMedia.Kind == MediaKind.Image) return; // 이미지는 토글 무의미
 
         // 영상 끝나서 멈춘 상태 → 처음부터 다시 재생 (사용자가 Space 누른 의도)
@@ -1180,21 +1252,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         try { path = Path.GetFullPath(path); } catch { /* 아래 validation에서 안전하게 거절 */ }
         if (!File.Exists(path))
         {
-            RemoveRecent(path, save: true);
-            State = PlayerState.Failed;
-            StatusMessage = LF("FileNotFound", path);
+            if (RecentPathService.IsConfirmedMissing(path))
+                RemoveRecent(path, save: true);
+            SetLocalizedFailure(PlayerFailureKind.Media, "FileNotFound", path);
             return;
         }
         if (!MediaKindExtensions.IsSupported(path))
         {
-            State = PlayerState.Failed;
-            StatusMessage = LF("UnsupportedFormat", Path.GetExtension(path));
+            SetLocalizedFailure(PlayerFailureKind.Media,
+                "UnsupportedFormat", Path.GetExtension(path));
             return;
         }
         if (!_ipc.IsConnected)
         {
-            State = PlayerState.Failed;
-            StatusMessage = L("MpvDisconnectedRestart");
+            SetLocalizedFailure(PlayerFailureKind.Backend, "MpvDisconnectedRestart");
             return;
         }
 
@@ -1227,8 +1298,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             {
                 if (_lifetimeCts.IsCancellationRequested) return;
                 if (requestRevision != Volatile.Read(ref _openRequestRevision)) return;
-                State = PlayerState.Failed;
-                StatusMessage = LF("OpenFolderFailed", ex.Message);
+                SetLocalizedFailure(PlayerFailureKind.Media,
+                    "OpenFolderFailed", ex.Message);
             });
             return;
         }
@@ -1342,15 +1413,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         if (!File.Exists(path))
         {
-            RemoveRecent(path, save: true);
-            State = PlayerState.Failed;
-            StatusMessage = LF("FileNotFound", path);
+            if (RecentPathService.IsConfirmedMissing(path))
+                RemoveRecent(path, save: true);
+            SetLocalizedFailure(PlayerFailureKind.Media, "FileNotFound", path);
             return;
         }
         if (!_ipc.IsConnected)
         {
-            State = PlayerState.Failed;
-            StatusMessage = L("MpvDisconnectedRestart");
+            SetLocalizedFailure(PlayerFailureKind.Backend, "MpvDisconnectedRestart");
             return;
         }
 
@@ -1454,6 +1524,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         Services.AppLog.Info($"PlayMedia: {media?.FileName ?? "(null)"}");
         if (media is null) return;
+        if (!PlayerFailurePolicy.CanStartMediaPlayback(
+                State,
+                FailureKind,
+                _ipc.IsConnected))
+        {
+            if (State != PlayerState.Failed ||
+                FailureKind != PlayerFailureKind.Backend)
+            {
+                SetLocalizedFailure(PlayerFailureKind.Backend, "MpvDisconnectedRestart");
+            }
+            return;
+        }
         var mediaChanged = !ReferenceEquals(CurrentMedia, media);
         if (mediaChanged) ResetPerMediaState();
         foreach (var m in Playlist) m.IsPlaying = false;
@@ -1463,7 +1545,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CurrentMedia = media;
         FileNameDisplay = media.FileName;
         State = PlayerState.Loading;
-        StatusMessage = L("LoadingStatus");
+        SetLocalizedStatus("LoadingStatus");
         IsAtEnd = false;
         _ = _ipc.LoadFile(media.FullPath);
         _ = _ipc.SetPause(false);
@@ -1546,6 +1628,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Toast?.Invoke(L("AudioCannotScreenshot"));
             return;
         }
+        string? reservedPath = null;
         try
         {
             // 사용자 지정 폴더 우선, 없으면 기본 Pictures\Deno Video Player\
@@ -1555,12 +1638,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
                     "Deno Video Player");
             Directory.CreateDirectory(dir);
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var raw  = Path.GetFileNameWithoutExtension(CurrentMedia.FileName);
-            // mpv가 일부 유니코드/특수문자 경로에서 실패하는 경우가 있어 file-name 안전화
-            var safe = string.Concat(raw.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
-            if (string.IsNullOrWhiteSpace(safe)) safe = "screenshot";
-            var path = Path.Combine(dir, $"{safe}_{stamp}.png");
+            // 밀리초와 process-local 예약을 함께 사용해 빠른 연속 캡처도 서로 다른 파일로 보존한다.
+            var path = ScreenshotPathService.ReserveUniquePngPath(
+                dir,
+                CurrentMedia.FileName,
+                DateTime.Now);
+            reservedPath = path;
             Services.AppLog.Info($"Screenshot -> {path}");
             // mpv 응답 받아서 실패면 정확히 알림. 성공이면 실제 파일 생성도 확인.
             var ok = await _ipc.ScreenshotChecked(path).ConfigureAwait(false);
@@ -1576,6 +1659,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             Services.AppLog.Error("Screenshot", ex);
             OnUi(() => Toast?.Invoke(LF("ScreenshotFailed", ex.Message)));
+        }
+        finally
+        {
+            ScreenshotPathService.ReleaseReservation(reservedPath);
         }
     }
 
@@ -1773,6 +1860,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     }
                 }
 
+                // AutoPlayNext는 일반 연속 재생을 제어한다. Repeat/Shuffle은 사용자가
+                // 명시적으로 켠 진행 모드이므로 이 legacy setting보다 우선한다.
+                if (!PlaybackEndPolicy.AllowsLinearAdvance(Settings.AutoPlayNext, Repeat))
+                {
+                    Services.AppLog.Info("  -> stop (AutoPlayNext disabled)");
+                    return;
+                }
+
                 // 자동 next는 같은 종류(영상↔영상, 음악↔음악)만 따라간다.
                 // ComfyUI 같은 폴더의 음악 옆에 .png 미리보기가 섞여있어도 음악 → 다음 음악으로 진행.
                 var nextSame = NextOfSameKind();
@@ -1803,8 +1898,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     CurrentMedia.HasError = true;
                     CurrentMedia.ErrorMessage = L("PlaybackFailedShort");
                 }
-                State = PlayerState.Failed;
-                StatusMessage = L("CannotPlayThisFile");
+                SetLocalizedFailure(PlayerFailureKind.Media, "CannotPlayThisFile");
             }
         });
     }
@@ -1867,7 +1961,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         for (var i = Recents.Count - 1; i >= 0; i--)
         {
             var path = Recents[i].FullPath;
-            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) continue;
+            if (!RecentPathService.IsConfirmedMissing(path)) continue;
             Recents.RemoveAt(i);
             removed++;
         }
@@ -1904,15 +1998,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var path in snapshot)
                 {
-                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                    if (RecentPathService.IsConfirmedMissing(path))
                         result.Add(path);
                 }
 
-                // 외장/네트워크 경로가 첫 probe 직후 복구되는 작은 경쟁 구간도
-                // UI를 막지 않는 worker 안에서 한 번 더 확인해 최대한 줄인다.
+                // 로컬 파일이 probe 직후 복구되는 작은 경쟁 구간도 worker 안에서
+                // 한 번 더 확인한다. 외장/네트워크의 불확실한 경로는 서비스가 보존한다.
                 foreach (var path in result.ToArray())
                 {
-                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                    if (!RecentPathService.IsConfirmedMissing(path))
                         result.Remove(path);
                 }
                 return result;
@@ -2127,6 +2221,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Raise(nameof(PlaylistSortDisplay));
             Raise(nameof(LoadingTitle));
             Raise(nameof(LoadingHint));
+            Raise(nameof(FailureTitle));
+            if (_statusMessageKey is { } statusKey)
+            {
+                Set(
+                    ref _statusMessage,
+                    LF(statusKey, _statusMessageArgs),
+                    nameof(StatusMessage));
+            }
         });
     }
 
@@ -2136,21 +2238,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         else _ui.BeginInvoke(a);
     }
 
-    public void PersistSettings(double windowW, double windowH, double? left, double? top, bool maximized)
+    public bool PersistSettings(double windowW, double windowH, double? left, double? top, bool maximized)
     {
         Settings.WindowWidth = windowW;
         Settings.WindowHeight = windowH;
         Settings.WindowLeft = left;
         Settings.WindowTop = top;
         Settings.WindowMaximized = maximized;
-        _settingsSvc.Save(Settings);
+        return _settingsSvc.TrySave(Settings, out _);
     }
 
     /// <summary>
     /// 사용자 명시 액션(Recent 항목 제거/모두 비우기) 직후 디스크 즉시 반영.
     /// Volume/Speed 같은 자주 변하는 값은 close 시 batch save로 두고, 사용자 인지 액션만 즉시.
     /// </summary>
-    public void SaveSettingsNow() => _settingsSvc.Save(Settings);
+    public bool SaveSettingsNow()
+    {
+        if (_settingsSvc.TrySave(Settings, out _))
+            return true;
+
+        Toast?.Invoke(L("SettingsSaveFailedToast"));
+        return false;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Raise([CallerMemberName] string? n = null)

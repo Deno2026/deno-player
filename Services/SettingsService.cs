@@ -38,9 +38,10 @@ public sealed class SettingsService
         }
     }
 
-    public void Save(AppSettings settings)
+    public bool TrySave(AppSettings settings, out string? error)
     {
         var tmp = FilePath + ".tmp";
+        error = null;
         try
         {
             settings.Normalize();
@@ -54,11 +55,13 @@ public sealed class SettingsService
                 File.Replace(tmp, FilePath, destinationBackupFileName: null, ignoreMetadataErrors: true);
             else
                 File.Move(tmp, FilePath);
+            return true;
         }
         catch (Exception ex)
         {
-            // 설정 저장 실패는 사용자 워크플로를 방해하지 않는다.
             AppLog.Error("Settings save failed.", ex);
+            error = ex.Message;
+            return false;
         }
         finally
         {

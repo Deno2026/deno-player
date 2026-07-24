@@ -90,7 +90,11 @@ public partial class App : Application
                 await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
                 while (!ct.IsCancellationRequested)
                 {
-                    var result = await UpdaterService.CheckAndPrepareAsync(ct).ConfigureAwait(false);
+                    // 확인 전에는 update package를 내려받지 않는다. 사용자가 prompt에서
+                    // 동의한 뒤 ApplyAsync가 다운로드와 적용을 진행한다.
+                    var result = await UpdaterService.CheckAndPrepareAsync(
+                        ct,
+                        autoDownload: false).ConfigureAwait(false);
                     if (result.Available && result.NewVersion is not null)
                     {
                         vm.SetPendingUpdate(

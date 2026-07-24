@@ -24,15 +24,17 @@ public partial class MainWindow : Window
     private ResizeMode _savedResize = ResizeMode.CanResize;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private bool _hasFullscreenRestoreBounds;
-    private bool _restoreNormalOnFullscreenExit;
     private bool _closing;
     private bool _mpvStartupOrRecovery;
+    private int _backendOperationInFlight;
+    private string? _pendingOpenPath;
     private int _mpvRestartCount;
     private DateTime _lastMpvRestartAt = DateTime.MinValue;
     private const int MaxMpvRestarts = 3;
     private PlaylistWindow? _playlistWin;
     private RecentWindow?   _recentWin;
     private ToastWindow?    _toastWin;
+    private HelpWindow?     _helpWin;
     private const int HotZoneWidth = 72;            // 창 모드 hover trigger. 넓으면 영상 위 mouse 이동만으로 panel이 튀어나와 산만함.
     private const int LeftHotZoneWidth = 72;        // 좌/우를 같은 폭으로 맞춰 의도치 않은 최근 파일 panel 열림을 줄임.
     private const int FullscreenHotZoneWidth = 96;  // fullscreen은 edge 접근성이 더 중요. 실제 화면 끝에서 놓치지 않게 넓힘.
@@ -110,8 +112,9 @@ public partial class MainWindow : Window
         EnsureCustomWindowStyle();
         _vm = new MainViewModel(_mpvProc, startupSettings);
         DataContext = _vm;
+        PreservePendingOpenPath(App.StartupArgs, "startup");
         _videoHost.DoubleClicked += () =>
-            Dispatcher.BeginInvoke(() => RequestFullscreenToggle("video-host", FullscreenRequestKind.DoubleClick));
+            Dispatcher.BeginInvoke(() => ExecutePlayerDoubleClick("video-host"));
         _videoHost.ActivationRequested += () => Dispatcher.BeginInvoke(() =>
         {
             Activate();
@@ -162,7 +165,8 @@ public partial class MainWindow : Window
 
         _mpvProc.Crashed += () => Dispatcher.BeginInvoke(() =>
         {
-            if (_closing || _mpvStartupOrRecovery) return;
+            if (_closing || _mpvStartupOrRecovery ||
+                Volatile.Read(ref _backendOperationInFlight) != 0) return;
             // 자동 재시작 — 한 세션에서 일정 한도까지만 (무한 루프 방지)
             if (_mpvRestartCount < MaxMpvRestarts &&
                 DateTime.UtcNow - _lastMpvRestartAt > TimeSpan.FromSeconds(5))
@@ -173,8 +177,9 @@ public partial class MainWindow : Window
             }
             else
             {
-                _vm.State = PlayerState.Failed;
-                _vm.StatusMessage = LocalizationService.T("MpvProcessRepeatedExit");
+                _vm.SetLocalizedFailure(
+                    PlayerFailureKind.Backend,
+                    "MpvProcessRepeatedExit");
             }
         });
 
@@ -276,31 +281,56 @@ public partial class MainWindow : Window
         await Dispatcher.Yield(DispatcherPriority.Background);
         if (_closing) return;
 
+        await InitializePlaybackBackendAsync();
+        // mouse hot zone polling은 첫 실행 준비 화면에서도 동작하도록 SourceInitialized에서 시작.
+    }
+
+    private async Task<bool> InitializePlaybackBackendAsync(MediaItem? mediaToResume = null)
+    {
+        if (_closing ||
+            Interlocked.CompareExchange(ref _backendOperationInFlight, 1, 0) != 0)
+            return false;
+
+        try
+        {
+            return await InitializePlaybackBackendCoreAsync(mediaToResume);
+        }
+        finally
+        {
+            Volatile.Write(ref _backendOperationInFlight, 0);
+        }
+    }
+
+    private async Task<bool> InitializePlaybackBackendCoreAsync(MediaItem? mediaToResume)
+    {
+        if (_closing || _mpvStartupOrRecovery) return false;
+
         // FFmpeg는 trim/export 시에만 필요하다. 시작 경로에서는 mpv cache만 확인한다.
         RuntimeDependencyService.PreserveExistingMpvCache();
 
         if (!_mpvProc.MpvAvailable)
         {
             _vm.State = PlayerState.Loading;
-            _vm.StatusMessage = LocalizationService.T("FirstRunStageChecking");
+            _vm.SetLocalizedStatus("FirstRunStageChecking");
 
             var prepared = await RuntimeDependencyService.EnsureMpvAsync(
                 UpdateFirstRunPrepareStatus,
                 _runtimePrepareCts.Token);
-            if (_closing) return;
+            if (_closing) return false;
             if (!prepared.Success || !_mpvProc.MpvAvailable)
             {
-                _vm.State = PlayerState.Failed;
-                _vm.StatusMessage = LocalizationService.F("FirstRunPrepareFailed", prepared.Error);
-                return;
+                _vm.SetLocalizedFailure(
+                    PlayerFailureKind.Backend,
+                    "FirstRunPrepareFailed",
+                    prepared.ErrorDetail ?? prepared.Error ?? "");
+                return false;
             }
         }
 
         if (_videoHost.Hwnd == IntPtr.Zero)
         {
-            _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = LocalizationService.T("VideoHostFailed");
-            return;
+            _vm.SetLocalizedFailure(PlayerFailureKind.Backend, "VideoHostFailed");
+            return false;
         }
         ResetNativeVideoTransform();
 
@@ -308,7 +338,7 @@ public partial class MainWindow : Window
         try
         {
             if (_vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
-                _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
+                _vm.SetLocalizedStatus("FirstRunStageStarting");
             try
             {
                 await StartMpvAndConnectAsync();
@@ -321,34 +351,44 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            if (_closing) return;
-            _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = LocalizationService.F("MpvStartFailed", ex.Message);
-            return;
+            if (_closing) return false;
+            _vm.SetLocalizedFailure(
+                PlayerFailureKind.Backend,
+                "MpvStartFailed",
+                FailureDetail(ex));
+            return false;
         }
         finally
         {
             _mpvStartupOrRecovery = false;
         }
 
-        if (_closing) return;
+        if (_closing) return false;
 
-        // 명령줄 인자 처리 — IPC 연결 직후. 이전 인스턴스가 보낸 인자도 여기로 라우팅.
-        var openedInitialPath = OpenInitialPathIfAny();
-        if (!openedInitialPath && _vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
+        // backend가 준비되는 동안 들어온 최신 파일 요청이 이전 media resume보다 우선한다.
+        var openedPendingPath = ConsumePendingOpenPath();
+        if (!openedPendingPath && mediaToResume is not null)
+        {
+            _vm.State = PlayerState.Loading;
+            _vm.PlayMedia(mediaToResume);
+        }
+        else if (!openedPendingPath &&
+                 _vm.State == PlayerState.Loading &&
+                 _vm.CurrentMedia is null)
         {
             _vm.StatusMessage = "";
             _vm.State = PlayerState.NoFile;
         }
 
-        // mouse hot zone polling은 첫 실행 준비 화면에서도 동작하도록 SourceInitialized에서 시작.
+        return true;
     }
 
     private async Task StartMpvAndConnectAsync()
     {
         _mpvProc.Start(_videoHost.Hwnd);
         if (!await _vm.ConnectIpcAsync())
-            throw new IOException(LocalizationService.T("MpvIpcFailed"));
+            throw new LocalizedDetailException(
+                new LocalizedText("MpvIpcFailed"));
     }
 
     private async Task<bool> TryRecoverMpvRuntimeAsync(Exception startFailure)
@@ -368,7 +408,7 @@ public partial class MainWindow : Window
         {
             Services.AppLog.Warn($"mpv fast start failed; retrying once with the verified runtime: {startFailure.Message}");
             _vm.State = PlayerState.Loading;
-            _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
+            _vm.SetLocalizedStatus("FirstRunStageStarting");
             await StartMpvAndConnectAsync();
             return true;
         }
@@ -376,31 +416,33 @@ public partial class MainWindow : Window
         Services.AppLog.Warn($"mpv fast start failed; one verified recovery will run: {startFailure.Message}");
         RuntimeExecutableValidator.Invalidate(mpvPath);
         _vm.State = PlayerState.Loading;
-        _vm.StatusMessage = LocalizationService.T("FirstRunStageChecking");
+        _vm.SetLocalizedStatus("FirstRunStageChecking");
 
         var prepared = await RuntimeDependencyService.EnsureMpvAsync(
             UpdateFirstRunPrepareStatus,
             _runtimePrepareCts.Token);
         if (_closing) return false;
         if (!prepared.Success || !_mpvProc.MpvAvailable)
-            throw new InvalidOperationException(
-                LocalizationService.F("FirstRunPrepareFailed", prepared.Error));
+            throw new LocalizedDetailException(
+                new LocalizedText(
+                    "FirstRunPrepareFailed",
+                    prepared.ErrorDetail ?? prepared.Error ?? ""));
 
-        _vm.StatusMessage = LocalizationService.T("FirstRunStageStarting");
+        _vm.SetLocalizedStatus("FirstRunStageStarting");
         await StartMpvAndConnectAsync();
         return true;
     }
 
     private void UpdateFirstRunPrepareStatus(string line)
     {
-        var status = FirstRunStatusFromFetcherLine(line);
-        if (string.IsNullOrWhiteSpace(status)) return;
+        var statusKey = FirstRunStatusFromFetcherLine(line);
+        if (string.IsNullOrWhiteSpace(statusKey)) return;
 
         Dispatcher.BeginInvoke(() =>
         {
             if (_closing) return;
             if (_vm.State == PlayerState.Loading && _vm.CurrentMedia is null)
-                _vm.StatusMessage = status;
+                _vm.SetLocalizedStatus(statusKey);
         });
     }
 
@@ -408,18 +450,23 @@ public partial class MainWindow : Window
     {
         var lower = line.ToLowerInvariant();
         if (lower.Contains("resolving latest"))
-            return LocalizationService.T("FirstRunStageChecking");
+            return "FirstRunStageChecking";
         if (lower.Contains("downloading"))
-            return LocalizationService.T("FirstRunStageDownloading");
+            return "FirstRunStageDownloading";
         if (lower.Contains("extracting"))
-            return LocalizationService.T("FirstRunStageInstalling");
+            return "FirstRunStageInstalling";
         if (lower.Contains("already at") || lower.Contains("done"))
-            return LocalizationService.T("FirstRunStageReady");
+            return "FirstRunStageReady";
         return null;
     }
 
     private async Task RestartMpvAsync()
     {
+        if (_closing ||
+            Interlocked.CompareExchange(ref _backendOperationInFlight, 1, 0) != 0)
+            return;
+
+        _mpvStartupOrRecovery = true;
         try
         {
             _mpvProc.Dispose();
@@ -427,32 +474,72 @@ public partial class MainWindow : Window
             if (_closing) return;
             _mpvProc.Start(_videoHost.Hwnd);
             if (!await _vm.ConnectIpcAsync())
-                throw new IOException(LocalizationService.T("MpvIpcFailed"));
+                throw new LocalizedDetailException(
+                    new LocalizedText("MpvIpcFailed"));
             ResetNativeVideoTransform();
             _vm.StatusMessage = "";
-            // 재생 중이었으면 같은 파일 다시 열기
-            if (_vm.CurrentMedia is { } cm) _vm.PlayMedia(cm);
+            // 성공한 backend recovery가 이전 Failed/Backend state를 남기지 않게
+            // 먼저 정상 state로 전환한 뒤, 최신 외부 요청 또는 이전 media를 다시 연다.
+            _vm.State = PlayerState.Loading;
+            var openedPendingPath = ConsumePendingOpenPath();
+            if (!openedPendingPath && _vm.CurrentMedia is { } cm)
+            {
+                _vm.PlayMedia(cm);
+            }
+            else if (!openedPendingPath)
+            {
+                _vm.State = PlayerState.NoFile;
+            }
         }
         catch (Exception ex)
         {
-            _vm.State = PlayerState.Failed;
-            _vm.StatusMessage = LocalizationService.F("MpvRestartFailed", ex.Message);
+            _vm.SetLocalizedFailure(
+                PlayerFailureKind.Backend,
+                "MpvRestartFailed",
+                FailureDetail(ex));
+        }
+        finally
+        {
+            _mpvStartupOrRecovery = false;
+            Volatile.Write(ref _backendOperationInFlight, 0);
         }
     }
 
-    /// <summary>App.StartupArgs / SecondInstanceArgs 첫 인자가 파일이면 열기.</summary>
-    private bool OpenInitialPathIfAny()
+    private static string? FirstValidFilePath(IEnumerable<string> args)
     {
-        if (App.StartupArgs.Length > 0)
+        foreach (var path in args)
         {
-            var first = App.StartupArgs[0];
-            if (File.Exists(first))
-            {
-                _vm.OpenPath(first);
-                return true;
-            }
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                return path;
         }
-        return false;
+
+        return null;
+    }
+
+    private static object FailureDetail(Exception exception) =>
+        exception is LocalizedDetailException localized
+            ? localized.Detail
+            : exception.Message;
+
+    private bool PreservePendingOpenPath(IEnumerable<string> args, string source)
+    {
+        var path = FirstValidFilePath(args);
+        if (path is null) return false;
+
+        _pendingOpenPath = path;
+        Services.AppLog.Info($"PendingOpen[{source}] preserved '{path}'");
+        return true;
+    }
+
+    private bool ConsumePendingOpenPath()
+    {
+        var path = _pendingOpenPath;
+        if (path is null) return false;
+
+        _pendingOpenPath = null;
+        Services.AppLog.Info($"PendingOpen consumed '{path}'");
+        _vm.OpenPath(path);
+        return true;
     }
 
     /// <summary>다른 인스턴스가 인자를 보냄 (single-instance hand-off).</summary>
@@ -474,10 +561,26 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         Topmost = true; Topmost = _vm.IsAlwaysOnTop;
-        if (args.Length == 0) return;
-        var first = args[0];
-        if (File.Exists(first)) _vm.OpenPath(first);
-        else Services.AppLog.Warn($"ApplyExternalArgs: file not found '{first}'");
+        var path = FirstValidFilePath(args);
+        if (path is null)
+        {
+            if (args.Length > 0)
+                Services.AppLog.Warn("ApplyExternalArgs: no valid file path");
+            return;
+        }
+
+        if (PlayerFailurePolicy.CanStartMediaPlayback(
+                _vm.State,
+                _vm.FailureKind,
+                _vm.IsBackendConnected) &&
+            !_mpvStartupOrRecovery &&
+            Volatile.Read(ref _backendOperationInFlight) == 0)
+        {
+            _vm.OpenPath(path);
+            return;
+        }
+
+        PreservePendingOpenPath(new[] { path }, "external");
     }
 
     // ============================================================
@@ -494,9 +597,11 @@ public partial class MainWindow : Window
         try { _playlistWin?.Close(); } catch { }
         try { _recentWin?.Close(); } catch { }
         try { _toastWin?.Close(); } catch { }
+        try { _helpWin?.Close(); } catch { }
         _playlistWin = null;
         _recentWin = null;
         _toastWin = null;
+        _helpWin = null;
         double? l;
         double? t;
         double w;
@@ -537,10 +642,10 @@ public partial class MainWindow : Window
     }
 
     // ============================================================
-    // TopBar 빈 영역 드래그 + 더블클릭 fullscreen
+    // TopBar 빈 영역 드래그 + 표준 최대화/복원
     // ============================================================
-    // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 공통 fullscreen
-    // 토글 경로로 넘긴다.
+    // 타이틀바 드래그 (단일 click + hold → drag). 더블클릭은 Windows 관례대로
+    // 일반 창과 최대화 상태를 전환한다.
     // deferred-drag 패턴: MouseDown에서 arm만, MouseMove threshold 넘으면 DragMove.
     // 빠른 더블클릭은 mouse 안 움직여서 DragMove modal loop 발생 X → 두 번째 click 정상 fire.
     private bool _topBarDragArmed;
@@ -554,7 +659,7 @@ public partial class MainWindow : Window
         if (e.ClickCount >= 2)
         {
             _topBarDragArmed = false;
-            RequestFullscreenToggle("topbar", FullscreenRequestKind.DoubleClick);
+            ToggleWindowMaximizeRestore("topbar");
             e.Handled = true;
             return;
         }
@@ -1352,6 +1457,13 @@ public partial class MainWindow : Window
             CloseInactiveHoverPanels();
             return;
         }
+        if (IsCursorOverHelpWindow(screenPoint))
+        {
+            Mouse.OverrideCursor = null;
+            EndVideoPanDrag("help");
+            ResetPanelHoverIntent();
+            return;
+        }
 
         var cursorInRoot = relX >= 0 && relX < w && relY >= 0 && relY < h;
         var cursorOverThisApp = IsCursorOverThisApp(screenPoint);
@@ -1448,6 +1560,19 @@ public partial class MainWindow : Window
         catch { /* process may exit while polling */ }
 
         return false;
+    }
+
+    private bool IsCursorOverHelpWindow(Point screenPoint)
+    {
+        if (_helpWin?.IsVisible != true) return false;
+        var hit = WindowFromPoint(new PinvokePoint
+        {
+            X = (int)Math.Round(screenPoint.X),
+            Y = (int)Math.Round(screenPoint.Y)
+        });
+        if (hit == IntPtr.Zero) return false;
+        var help = new System.Windows.Interop.WindowInteropHelper(_helpWin).Handle;
+        return IsWindowOrChild(help, hit);
     }
 
     private bool IsCursorOverNativeVideoSurface(Point screenPoint)
@@ -1557,7 +1682,7 @@ public partial class MainWindow : Window
         if (isDoubleClick)
         {
             _lastPollLeftDownUtc = DateTime.MinValue;
-            RequestFullscreenToggle("cursor-poll", FullscreenRequestKind.DoubleClick);
+            ExecutePlayerDoubleClick("cursor-poll");
             return;
         }
 
@@ -2326,8 +2451,25 @@ public partial class MainWindow : Window
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (IsInteractiveDoubleClickTarget(e.OriginalSource as DependencyObject)) return;
-        RequestFullscreenToggle("wpf", FullscreenRequestKind.DoubleClick);
+
+        ExecutePlayerDoubleClick("wpf");
         e.Handled = true;
+    }
+
+    private void ExecutePlayerDoubleClick(string source)
+    {
+        switch (PlayerInteractionPolicy.DoubleClickAction(_vm.State, _vm.HasMedia))
+        {
+            case PlayerDoubleClickAction.OpenFile:
+                if (_vm.OpenCommand.CanExecute(null))
+                    _vm.OpenCommand.Execute(null);
+                return;
+            case PlayerDoubleClickAction.ToggleFullscreen:
+                RequestFullscreenToggle(source, FullscreenRequestKind.DoubleClick);
+                return;
+            default:
+                return;
+        }
     }
 
     private void OnFullscreenButtonClick(object? sender, RoutedEventArgs e)
@@ -2358,6 +2500,13 @@ public partial class MainWindow : Window
         var noModifiers = modifiers == ModifierKeys.None;
         var altOnly = modifiers == ModifierKeys.Alt;
 
+        if (noModifiers && key == Key.F1)
+        {
+            OpenHelpWindow();
+            e.Handled = true;
+            return;
+        }
+
         if (key == Key.Escape)
         {
             if (_vm.IsTrimMode)
@@ -2369,17 +2518,16 @@ public partial class MainWindow : Window
 
             if (_vm.IsFullscreen)
             {
-                if (!_osdShown)
-                {
-                    ShowControls("keyboard-esc");
-                    e.Handled = true;
-                    return;
-                }
                 RequestFullscreenState(false, "keyboard-esc", FullscreenRequestKind.Keyboard);
                 e.Handled = true;
             }
             return;
         }
+
+        var isBareEnter =
+            noModifiers && (key == Key.Enter || key == Key.Return);
+        if (isBareEnter && IsKeyboardActionFocused())
+            return;
 
         var isFullscreenShortcut =
             (noModifiers && (key == Key.F || key == Key.F11 || key == Key.Enter || key == Key.Return)) ||
@@ -2393,31 +2541,7 @@ public partial class MainWindow : Window
 
     private bool RequestFullscreenToggle(string source, FullscreenRequestKind kind)
     {
-        if (kind == FullscreenRequestKind.DoubleClick &&
-            !_vm.IsFullscreen &&
-            WindowState == WindowState.Maximized)
-        {
-            return RequestWindowRestoreFromDoubleClick(source);
-        }
-
         return RequestFullscreenState(!_vm.IsFullscreen, source, kind);
-    }
-
-    private bool RequestWindowRestoreFromDoubleClick(string source)
-    {
-        var now = DateTime.UtcNow;
-        if ((now - _lastDoubleClickToggleUtc).TotalMilliseconds < FullscreenDoubleClickDuplicateSuppressMs)
-        {
-            Services.AppLog.Info($"FullscreenRequest[{source}] ignored duplicate kind=DoubleClick fs={_vm.IsFullscreen}");
-            return false;
-        }
-
-        _lastDoubleClickToggleUtc = now;
-        ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
-        Services.AppLog.Info($"FullscreenRequest[{source}] restore maximized window kind=DoubleClick");
-        WindowState = WindowState.Normal;
-        UpdateMaxRestoreButton();
-        return true;
     }
 
     private bool RequestFullscreenState(bool targetFullscreen, string source, FullscreenRequestKind kind)
@@ -2439,11 +2563,6 @@ public partial class MainWindow : Window
 
         if (kind == FullscreenRequestKind.DoubleClick)
             _lastDoubleClickToggleUtc = now;
-
-        if (targetFullscreen)
-            _restoreNormalOnFullscreenExit = false;
-        else if (kind == FullscreenRequestKind.DoubleClick && _vm.IsFullscreen && _savedWasMaximized)
-            _restoreNormalOnFullscreenExit = true;
 
         ResetFullscreenPointerTracking(suppressPollingUntilRelease: true);
         Services.AppLog.Info(
@@ -2542,8 +2661,8 @@ public partial class MainWindow : Window
 
 
     // ============================================================
-    // Space: 짧게 누름 = Play/Pause, 1초 이상 hold = 2x 재생 (놓으면 원래 속도)
-    // 사용자 요구: IsRepeat(OS 키 auto-repeat ~500ms 가변) 대신 정확히 1초 timer.
+    // Space: 짧게 누름 = Play/Pause, 0.5초 이상 hold = 2x 재생 (놓으면 원래 속도)
+    // IsRepeat(OS 키 auto-repeat 간격 가변) 대신 정확한 0.5초 timer를 사용한다.
     // ============================================================
     private bool _spaceHeld;
     private double _speedBeforeHold = 1.0;
@@ -2552,6 +2671,7 @@ public partial class MainWindow : Window
     private void OnSpaceDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
+        if (IsKeyboardActionFocused()) return;
         _ignoreStationaryFullscreenReveal = false;
         ShowControls("space-down");
         e.Handled = true;
@@ -2578,11 +2698,16 @@ public partial class MainWindow : Window
     private void OnSpaceUp(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Space) return;
+        if (!_spaceHeld && _spaceHoldTimer?.IsEnabled != true && IsKeyboardActionFocused())
+            return;
         e.Handled = true;
         EndSpaceHoldOrToggle();
     }
 
-    /// <summary>1초 안에 release → play/pause 단발. 1초 후 release → speed 복원.</summary>
+    private static bool IsKeyboardActionFocused() =>
+        Keyboard.FocusedElement is ButtonBase or Slider or TextBoxBase or Selector or MenuItem;
+
+    /// <summary>0.5초 안에 release → play/pause 단발. 이후 release → speed 복원.</summary>
     private void EndSpaceHoldOrToggle()
     {
         _spaceHoldTimer?.Stop();
@@ -2655,6 +2780,63 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnHelpClicked(object? sender, RoutedEventArgs e)
+    {
+        OpenHelpWindow();
+        e.Handled = true;
+    }
+
+    private void OnTroubleshootingClicked(object? sender, RoutedEventArgs e)
+    {
+        OpenHelpWindow(showTroubleshooting: true);
+        e.Handled = true;
+    }
+
+    private async void OnRetryPlaybackEngineClicked(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_closing || Volatile.Read(ref _backendOperationInFlight) != 0)
+            return;
+
+        var mediaToResume = _vm.CurrentMedia;
+        _mpvProc.Dispose();
+        _vm.State = PlayerState.Loading;
+        _vm.SetLocalizedStatus("FirstRunStageChecking");
+        await InitializePlaybackBackendAsync(mediaToResume);
+    }
+
+    private void OpenHelpWindow(bool showTroubleshooting = false)
+    {
+        ShowControls("help");
+        ResetPanelHoverIntent();
+        DismissPlaylistPanel();
+        _recentWin?.HideSlide();
+        EndVideoPanDrag("help-open");
+
+        if (_helpWin is null)
+        {
+            var help = new HelpWindow { Owner = this };
+            help.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_helpWin, help))
+                    _helpWin = null;
+            };
+            _helpWin = help;
+            help.Show();
+        }
+        else
+        {
+            if (_helpWin.WindowState == WindowState.Minimized)
+                _helpWin.WindowState = WindowState.Normal;
+            if (!_helpWin.IsVisible)
+                _helpWin.Show();
+        }
+
+        _helpWin.Activate();
+        if (showTroubleshooting)
+            _helpWin.ScrollToTroubleshooting();
+    }
+
     private void OnMinimize(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void OnMaxRestore(object? sender, RoutedEventArgs e)
     {
@@ -2666,22 +2848,31 @@ public partial class MainWindow : Window
         }
         _lastMaxRestoreClickUtc = now;
 
+        ToggleWindowMaximizeRestore("max-restore");
+        e.Handled = true;
+    }
+
+    private void ToggleWindowMaximizeRestore(string source)
+    {
         if (_vm.IsFullscreen)
         {
-            RequestFullscreenState(false, "max-restore", FullscreenRequestKind.WindowButton);
-            e.Handled = true;
+            RequestFullscreenState(false, source, FullscreenRequestKind.WindowButton);
             return;
         }
 
-        RequestFullscreenState(true, "max-restore", FullscreenRequestKind.WindowButton);
-        e.Handled = true;
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+        UpdateMaxRestoreButton();
+        Services.AppLog.Info($"WindowState[{source}] -> {WindowState}");
     }
+
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 
     private void UpdateMaxRestoreButton()
     {
         if (MaxRestoreBtn is null) return;
-        MaxRestoreBtn.Content = _vm?.IsFullscreen == true
+        MaxRestoreBtn.Content = _vm?.IsFullscreen == true || WindowState == WindowState.Maximized
             ? "\uE923"
             : "\uE922";
     }
@@ -2752,9 +2943,8 @@ public partial class MainWindow : Window
                 EnsureCustomWindowStyle();
                 UpdateMediaLayerForFullscreen(immersive: false);
                 ResizeMode = _savedResize == ResizeMode.NoResize ? ResizeMode.CanResize : _savedResize;
-                if (_savedWasMaximized && !_restoreNormalOnFullscreenExit)
+                if (_savedWasMaximized)
                     WindowState = WindowState.Maximized;
-                _restoreNormalOnFullscreenExit = false;
                 _hasFullscreenRestoreBounds = false;
                 SyncPlaylistWindowPosition();
                 SyncRecentWindowPosition();
@@ -2862,6 +3052,29 @@ public partial class MainWindow : Window
     }
 
     private bool _savedWasMaximized;
+
+    // 현재 윈도우가 있는 모니터의 작업 영역 (taskbar 제외, DIP 단위).
+    internal Rect GetCurrentMonitorWorkAreaBounds()
+    {
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (TryGetMonitorWorkArea(hwnd, out var workArea))
+            {
+                var src = System.Windows.PresentationSource.FromVisual(this);
+                var dpiX = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                var dpiY = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+                return new Rect(workArea.Left / dpiX, workArea.Top / dpiY,
+                    (workArea.Right - workArea.Left) / dpiX,
+                    (workArea.Bottom - workArea.Top) / dpiY);
+            }
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Warn($"GetCurrentMonitorWorkAreaBounds failed: {ex.Message}");
+        }
+        return SystemParameters.WorkArea;
+    }
 
     // 현재 윈도우가 있는 모니터의 전체 bounds (DPI scale 적용된 DIP 단위).
     private Rect GetCurrentMonitorBounds()

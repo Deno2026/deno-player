@@ -23,11 +23,12 @@ public sealed class ExtItem : INotifyPropertyChanged
 
 public sealed class ExtGroup : INotifyPropertyChanged
 {
-    public string Title { get; }
+    private readonly string _titleKey;
+    public string Title => LocalizationService.T(_titleKey);
     public ObservableCollection<ExtItem> Items { get; }
-    public ExtGroup(string title, IEnumerable<ExtItem> items)
+    public ExtGroup(string titleKey, IEnumerable<ExtItem> items)
     {
-        Title = title;
+        _titleKey = titleKey;
         Items = new ObservableCollection<ExtItem>(items);
         foreach (var item in Items)
         {
@@ -52,6 +53,9 @@ public sealed class ExtGroup : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void RefreshLocalizedTitle() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Title)));
 }
 
 public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
@@ -125,9 +129,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 
         Groups = new ObservableCollection<ExtGroup>
         {
-            new(LocalizationService.T("Video"), VideoExts.Select(Make)),
-            new(LocalizationService.T("Audio"), AudioExts.Select(Make)),
-            new(LocalizationService.T("Image"), ImageExts.Select(Make)),
+            new("Video", VideoExts.Select(Make)),
+            new("Audio", AudioExts.Select(Make)),
+            new("Image", ImageExts.Select(Make)),
         };
 
         _screenshotFolder = settings.ScreenshotFolder ?? "";
@@ -136,4 +140,10 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 
     public IEnumerable<string> SelectedExtensions =>
         Groups.SelectMany(g => g.SelectedExtensions);
+
+    public void RefreshLocalizedText()
+    {
+        foreach (var group in Groups)
+            group.RefreshLocalizedTitle();
+    }
 }
