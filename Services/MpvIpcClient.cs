@@ -276,6 +276,10 @@ public sealed class MpvIpcClient : IDisposable
             lockTaken = false;
             return await tcs.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
         }
+        catch (ObjectDisposedException ex) when (Volatile.Read(ref _disposed) == 0)
+        {
+            throw new IOException("mpv IPC disconnected during command write", ex);
+        }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             throw new TimeoutException($"mpv command timeout: id={id}");
