@@ -1,10 +1,12 @@
 # Deno Video Player
 
-[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | Español | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
+[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | Español | [Português (Portugal)](README.pt-PT.md) | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
 
 **Un reproductor multimedia limpio para Windows, pensado para revisar rápidamente videos, audio, imágenes y videos con subtítulos.**
 
 Sin anuncios. Sin cuenta. Sin sincronización en la nube. Sin telemetría. Abre un archivo y empieza a verlo.
+
+**Versión estable más reciente:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Publicada el 24 de julio de 2026
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -26,7 +28,7 @@ Sin anuncios. Sin cuenta. Sin sincronización en la nube. Sin telemetría. Abre 
 ## 🚀 Instalación en 3 pasos
 
 1. Descarga el instalador más reciente:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. Ejecuta el instalador.
 3. Abre **Deno Video Player** y arrastra un archivo multimedia a la ventana.
 
@@ -55,7 +57,7 @@ El reproductor vacío también incluye un enlace de primeros pasos, y los errore
 
 ## 📦 Opción portable
 
-Si prefieres no instalar, descarga el archivo más reciente llamado `DenoVideoPlayer-<version>-portable-win-x64.zip` desde [Releases](https://github.com/Deno2026/deno-video-player/releases), descomprímelo y ejecuta `DenoVideoPlayer.exe`.
+Si prefieres no instalar, descarga [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), descomprímelo y ejecuta `DenoVideoPlayer.exe`.
 
 Para la mayoría de principiantes, el instalador `Setup.exe` es la opción más sencilla.
 

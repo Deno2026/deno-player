@@ -1,10 +1,12 @@
 # Deno Video Player
 
-[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | Bahasa Indonesia
+[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [Português (Portugal)](README.pt-PT.md) | [Português (Brasil)](README.pt-BR.md) | Bahasa Indonesia
 
 **Pemutar media Windows yang bersih untuk memeriksa video, audio, gambar, dan video bersubtitle dengan cepat.**
 
 Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file dan langsung tonton.
+
+**Versi stabil terbaru:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Dirilis 24 Juli 2026
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -26,7 +28,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 ## 🚀 Instal dalam 3 Langkah
 
 1. Unduh installer terbaru:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. Jalankan installer.
 3. Buka **Deno Video Player**, lalu tarik file media ke jendela aplikasi.
 
@@ -55,7 +57,7 @@ Player yang kosong juga menyediakan link untuk mulai menggunakan aplikasi, dan k
 
 ## 📦 Opsi Portable
 
-Jika tidak ingin menginstal, unduh aset terbaru bernama `DenoVideoPlayer-<version>-portable-win-x64.zip` dari [Releases](https://github.com/Deno2026/deno-video-player/releases), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
+Jika tidak ingin menginstal, unduh [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
 
 Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 

@@ -1,10 +1,12 @@
 # Deno Video Player
 
-[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | Português (Brasil) | [Bahasa Indonesia](README.id.md)
+[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [Português (Portugal)](README.pt-PT.md) | Português (Brasil) | [Bahasa Indonesia](README.id.md)
 
 **Um player de mídia limpo para Windows, feito para revisar rapidamente vídeos, áudios, imagens e vídeos com legendas.**
 
 Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um arquivo e assista.
+
+**Versão estável mais recente:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Publicada em 24 de julho de 2026
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -26,7 +28,7 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 ## 🚀 Instale em 3 passos
 
 1. Baixe o instalador mais recente:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. Execute o instalador.
 3. Abra o **Deno Video Player** e arraste um arquivo de mídia para a janela.
 
@@ -55,7 +57,7 @@ O player vazio também inclui um link de primeiros passos, e as falhas de reprod
 
 ## 📦 Opção portátil
 
-Se você prefere não instalar, baixe o arquivo mais recente chamado `DenoVideoPlayer-<version>-portable-win-x64.zip` em [Releases](https://github.com/Deno2026/deno-video-player/releases), extraia o arquivo e execute `DenoVideoPlayer.exe`.
+Se você prefere não instalar, baixe [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), extraia o arquivo e execute `DenoVideoPlayer.exe`.
 
 Para a maioria dos iniciantes, o `Setup.exe` é a opção mais fácil.
 

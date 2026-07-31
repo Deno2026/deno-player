@@ -1,10 +1,12 @@
 # Deno Video Player
 
-[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | 简体中文 | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
+[English](../README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | 简体中文 | [Español](README.es.md) | [Português (Portugal)](README.pt-PT.md) | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
 
 **一个简洁的 Windows 本地媒体播放器，用来快速查看视频、音频、图片和字幕视频。**
 
 无广告。无需账号。无云同步。无遥测。打开文件，即可观看。
+
+**最新稳定版:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · 2026 年 7 月 24 日发布
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -26,7 +28,7 @@
 ## 🚀 3 步安装
 
 1. 下载最新安装程序：
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. 运行安装程序。
 3. 打开 **Deno Video Player**，把媒体文件拖到窗口中。
 
@@ -55,7 +57,7 @@
 
 ## 📦 便携版
 
-如果不想安装，可以在 [Releases](https://github.com/Deno2026/deno-video-player/releases) 下载名为 `DenoVideoPlayer-<version>-portable-win-x64.zip` 的最新文件，解压后运行 `DenoVideoPlayer.exe`。
+如果不想安装，可以下载 [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip)，解压后运行 `DenoVideoPlayer.exe`。
 
 对大多数新手来说，`Setup.exe` 安装版更简单。
 

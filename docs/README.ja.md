@@ -1,10 +1,12 @@
 # Deno Video Player
 
-[English](../README.md) | [한국어](README.ko.md) | 日本語 | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
+[English](../README.md) | [한국어](README.ko.md) | 日本語 | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [Português (Portugal)](README.pt-PT.md) | [Português (Brasil)](README.pt-BR.md) | [Bahasa Indonesia](README.id.md)
 
 **ローカルの動画、音声、画像、字幕付き動画をすばやく確認できる、Windows 向けの軽量メディアプレイヤーです。**
 
 広告なし。アカウント不要。クラウド同期なし。テレメトリなし。ファイルを開いて、すぐに確認できます。
+
+**最新の安定版:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · 2026 年 7 月 24 日公開
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -26,7 +28,7 @@
 ## 🚀 3 ステップでインストール
 
 1. 最新のインストーラーをダウンロード:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. インストーラーを実行します。
 3. **Deno Video Player** を開き、メディアファイルをウィンドウにドラッグ＆ドロップします。
 
@@ -55,7 +57,7 @@ Windows SmartScreen が表示された場合は、公式 GitHub Releases から�
 
 ## 📦 ポータブル版
 
-インストールせずに使いたい場合は、[Releases](https://github.com/Deno2026/deno-video-player/releases) から `DenoVideoPlayer-<version>-portable-win-x64.zip` という名前の最新ファイルをダウンロードし、解凍して `DenoVideoPlayer.exe` を実行してください。
+インストールせずに使いたい場合は、[DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip) をダウンロードし、解凍して `DenoVideoPlayer.exe` を実行してください。
 
 はじめて使う方には `Setup.exe` 版がおすすめです。
 

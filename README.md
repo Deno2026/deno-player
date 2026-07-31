@@ -1,10 +1,12 @@
 # Deno Video Player
 
-🌐 English | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [简体中文](docs/README.zh-CN.md) | [Español](docs/README.es.md) | [Português (Brasil)](docs/README.pt-BR.md) | [Bahasa Indonesia](docs/README.id.md)
+🌐 English | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [简体中文](docs/README.zh-CN.md) | [Español](docs/README.es.md) | [Português (Portugal)](docs/README.pt-PT.md) | [Português (Brasil)](docs/README.pt-BR.md) | [Bahasa Indonesia](docs/README.id.md)
 
 **A clean Windows media player for quickly checking local video, audio, images, and subtitles.**
 
 No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
+
+**Latest stable:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Published July 24, 2026
 
 ![Deno Video Player preview](docs/assets/preview.png)
 
@@ -26,7 +28,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 ## 🚀 Install in 3 Steps
 
 1. Download the latest installer:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/latest/download/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
 2. Run the installer.
 3. Open **Deno Video Player**, then drag a media file into the window.
 
@@ -55,7 +57,7 @@ The empty player also includes a **New here?** link, and playback failures link 
 
 ## 📦 Portable Option
 
-Prefer not to install? Download the latest asset named `DenoVideoPlayer-<version>-portable-win-x64.zip` from [Releases](https://github.com/Deno2026/deno-video-player/releases), unzip it, and run `DenoVideoPlayer.exe`.
+Prefer not to install? Download [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), unzip it, and run `DenoVideoPlayer.exe`.
 
 For most beginners, the `Setup.exe` installer is the easier choice.
 
