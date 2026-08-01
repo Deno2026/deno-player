@@ -6,7 +6,7 @@
 
 No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
-**Latest stable:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Published July 24, 2026
+**Latest stable:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Published August 2, 2026
 
 ![Deno Video Player preview](docs/assets/preview.png)
 
@@ -16,7 +16,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 - Fast drag-and-drop playback for local media files
 - Automatically builds a playlist from the same folder
-- Hover side panels for playlist and recent files
+- Explicit toolbar buttons for recent files and the playlist
 - Screenshots with `Ctrl + S`
 - Video zoom with `Ctrl + mouse wheel`, then pan with middle-button drag
 - Simple lossless clip trimming with `I` → `O` → `Ctrl + E`
@@ -28,7 +28,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 ## 🚀 Install in 3 Steps
 
 1. Download the latest installer:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
 2. Run the installer.
 3. Open **Deno Video Player**, then drag a media file into the window.
 
@@ -57,7 +57,7 @@ The empty player also includes a **New here?** link, and playback failures link 
 
 ## 📦 Portable Option
 
-Prefer not to install? Download [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), unzip it, and run `DenoVideoPlayer.exe`.
+Prefer not to install? Download [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip), unzip it, and run `DenoVideoPlayer.exe`.
 
 For most beginners, the `Setup.exe` installer is the easier choice.
 
@@ -73,7 +73,7 @@ Double-click the open media to enter or exit fullscreen. When the player is empt
 
 When you open one file, the app can use nearby media files in the same folder as a simple playlist. This is useful for checking renders, exports, references, and downloaded clips.
 
-Open the playlist from the right edge or with `P` / `Ctrl + L`. Sort it by natural file name, newest first, or oldest first; the selected order is remembered and also controls previous/next navigation. Move to the left edge to open Recent files.
+Open Recent files from the toolbar or with `Ctrl + H`. Open the current-folder playlist from its toolbar button or with `P` / `Ctrl + L`. Sort it by natural file name, newest first, or oldest first; the selected order is remembered and also controls previous/next navigation.
 
 The bottom controls include repeat off, repeat all, repeat one, shuffle, volume, playback speed, and fullscreen. Click the speed value for presets or use the mouse wheel over it for 0.25x changes.
 
@@ -122,6 +122,7 @@ You can change the display language in **Settings**.
 | Previous / next file | `PageUp` / `PageDown` or `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |
 | Always on top | `Ctrl + T` |
+| Recent files | `Ctrl + H` |
 | Playlist | `P` / `Ctrl + L` |
 | Subtitle track | `V` / `Shift + V` |
 | Audio track | `Ctrl + J` |

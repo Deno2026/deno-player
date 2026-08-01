@@ -51,6 +51,14 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="RecentToggleButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRecentOpen}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource BrushAccent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="HelpIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Setter Property="Focusable" Value="True"/>
             <Setter Property="IsTabStop" Value="True"/>
@@ -169,6 +177,7 @@
         <KeyBinding Key="O"        Modifiers="Control" Command="{Binding OpenCommand}"/>
         <KeyBinding Key="S"        Modifiers="Control" Command="{Binding ScreenshotCommand}"/>
         <KeyBinding Key="T"        Modifiers="Control" Command="{Binding AlwaysOnTopCommand}"/>
+        <KeyBinding Key="H"        Modifiers="Control" Command="{Binding ToggleRecentCommand}"/>
         <KeyBinding Key="P"        Command="{Binding TogglePlaylistCommand}"/>
         <KeyBinding Key="L"        Modifiers="Control" Command="{Binding TogglePlaylistCommand}"/>
         <!-- 자막/오디오 트랙 사이클 — mpv가 트랙 메타로 cycle. UI에 트랙 list까지 안 띄움(가벼움) -->
@@ -223,6 +232,10 @@
                             <ToolTip Content="{Binding UpdateTooltip}"/>
                         </Button.ToolTip>
                     </Button>
+                    <Button Style="{StaticResource RecentToggleButton}"
+                            Content="&#xE81C;"
+                            ToolTip="{DynamicResource TooltipRecent}"
+                            Command="{Binding ToggleRecentCommand}"/>
                     <Button Style="{StaticResource PlaylistToggleButton}"
                             Content="&#xE8FD;"
                             ToolTip="{DynamicResource TooltipPlaylist}"
@@ -310,42 +323,12 @@
         </Border>
 
         <!-- ============================================================
-             메인 영역: 영상이 전체를 차지. 재생목록은 별도 owned window로 hover 슬라이드.
-             좌/우 가장자리에 얇은 hint strip — 사용자가 hover 영역 인지하게.
+             메인 영역: 영상이 전체를 차지. 최근 파일과 재생목록은 상단의 명시적
+             버튼 또는 단축키로 여는 별도 owned window다.
              ============================================================ -->
         <Grid x:Name="MediaLayer" Grid.Row="1" Panel.ZIndex="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LeftEdgeHintColumn" Width="3"/>   <!-- 좌측 hint (최근 — 상반부) -->
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition x:Name="RightEdgeHintColumn" Width="3"/>   <!-- 우측 hint (재생목록 — 상반부) -->
-            </Grid.ColumnDefinitions>
-
-            <!-- 좌측 hint: 상반부만 보이는 그라디언트 (호버 가능 영역 안내) -->
-            <Border Grid.Column="0" IsHitTestVisible="False">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0"/>
-                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0.40"/>
-                        <GradientStop Color="#0057E389" Offset="0.55"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Border.Opacity>0.32</Border.Opacity>
-            </Border>
-
-            <!-- 우측 hint: 좌측과 같은 상반부 그라디언트 (재생목록 hover 영역 안내) -->
-            <Border Grid.Column="2" IsHitTestVisible="False">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0"/>
-                        <GradientStop Color="{StaticResource ColorAccent}" Offset="0.40"/>
-                        <GradientStop Color="#0057E389" Offset="0.55"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Border.Opacity>0.32</Border.Opacity>
-            </Border>
-
             <!-- 영상 호스트 + 오버레이들 -->
-            <Grid Grid.Column="1" ClipToBounds="True">
+            <Grid ClipToBounds="True">
                 <!-- 영상 — 비디오/이미지일 때만 Visible. 오디오/NoFile/Failed일 땐 Hidden -->
                 <Border x:Name="VideoHostContainer"
                         Background="#FF050705"

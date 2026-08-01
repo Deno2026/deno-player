@@ -32,6 +32,7 @@ public sealed class AppSettings
 
     // 이전 설정 파일 호환용. 현재 fullscreen 영상 전용 모드는 명시 버튼으로 전환한다.
     public int ControlAutoHideMs { get; set; } = 2500;
+    // v0.5.2 이하 설정 JSON 호환용. 패널은 이제 명시적 버튼/단축키로만 연다.
     public bool PlaylistPanelEnabled { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = false;
 

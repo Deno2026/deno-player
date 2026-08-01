@@ -109,7 +109,7 @@ internal sealed class SlidePanelMotion
 /// <summary>
 /// 메인 윈도우에 owned된 별도 child Window. WPF Popup과 달리 owner와 z-order가
 /// 묶이고 owner가 비활성/최소화/닫힘 시 같이 사라져서 다른 앱 위로 새는 문제가 없다.
-/// 우측 슬라이드 hover overlay 전용.
+/// 상단 버튼 또는 단축키로 여는 우측 재생목록 overlay다.
 /// </summary>
 public partial class PlaylistWindow : Window
 {
@@ -137,6 +137,7 @@ public partial class PlaylistWindow : Window
     private long _acceptItemClicksAfterTick;
     private MediaItem? _pressedItem;
     private readonly SlidePanelMotion _motion;
+    private int _showSerial;
 
     public PlaylistWindow()
     {
@@ -155,7 +156,9 @@ public partial class PlaylistWindow : Window
     public void ShowSlide()
     {
         if (IsShown) return;
+        var showSerial = ++_showSerial;
         _pressedItem = null;
+        var needsInitialLayout = !IsVisible;
         if (!IsVisible)
         {
             _motion.ResetHidden();
@@ -163,12 +166,30 @@ public partial class PlaylistWindow : Window
         }
         IsShown = true;
         ShownChanged?.Invoke(true);
+        _acceptItemClicksAfterTick = Environment.TickCount64 + 1000;
+
+        if (needsInitialLayout)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => RevealAfterLayout(showSerial)),
+                DispatcherPriority.Loaded);
+            return;
+        }
+
+        RevealAfterLayout(showSerial);
+    }
+
+    private void RevealAfterLayout(int showSerial)
+    {
+        if (showSerial != _showSerial || !IsShown || !IsVisible) return;
+        PlaylistListBox.InvalidateMeasure();
+        Root.UpdateLayout();
         var revealDurationMs = _motion.Reveal(() =>
         {
-            if (!IsShown || DataContext?.CurrentMedia is not { } cur) return;
+            if (showSerial != _showSerial || !IsShown || DataContext?.CurrentMedia is not { } cur) return;
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (!IsShown || !IsVisible) return;
+                if (showSerial != _showSerial || !IsShown || !IsVisible) return;
                 if (!ReferenceEquals(DataContext?.CurrentMedia, cur)) return;
                 PlaylistListBox.ScrollIntoView(cur);
             }),
@@ -182,6 +203,7 @@ public partial class PlaylistWindow : Window
         if (!IsShown) return;
         if (_ctxMenuOpenCount > 0 || PlaylistSortButton.ContextMenu?.IsOpen == true)
             return; // 메뉴 열린 동안은 닫지 않음
+        _showSerial++;
         _pressedItem = null;
         IsShown = false;
         ShownChanged?.Invoke(false);
@@ -192,10 +214,10 @@ public partial class PlaylistWindow : Window
         });
     }
 
-    // 닫힘 판정은 MainWindow의 통합 hot zone polling에서만 처리.
-    // HideSlide는 즉시 시작하되 짧은 slide-out으로 자연스럽게 숨긴다.
+    // 패널은 명시적 toggle로 유지한다. enter/leave는 ContextMenu와 기존 XAML
+    // 이벤트 호환을 위해 남기고 자동 닫기에는 사용하지 않는다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
-    private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
+    private void OnPanelLeave(object sender, MouseEventArgs e) { /* explicit toggle */ }
 
     private void OnSortButtonClicked(object sender, RoutedEventArgs e)
     {

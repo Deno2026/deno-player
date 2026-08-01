@@ -283,7 +283,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Border Style="{StaticResource HelpKey}">
-                        <TextBlock Text="P / Ctrl + L" Style="{StaticResource TextMono}"/>
+                        <TextBlock Text="Ctrl + H / P / Ctrl + L" Style="{StaticResource TextMono}"/>
                     </Border>
                     <TextBlock Grid.Column="1" Text="{DynamicResource HelpShortcutPlaylist}"
                                Style="{StaticResource HelpBody}"/>

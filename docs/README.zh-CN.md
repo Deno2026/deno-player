@@ -6,7 +6,7 @@
 
 无广告。无需账号。无云同步。无遥测。打开文件，即可观看。
 
-**最新稳定版:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · 2026 年 7 月 24 日发布
+**最新稳定版:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026 年 8 月 2 日发布
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -16,7 +16,7 @@
 
 - 拖放本地媒体文件即可快速播放
 - 自动把同一文件夹中的媒体整理成简单播放列表
-- 鼠标移动到左右边缘即可打开播放列表和最近文件
+- 通过工具栏按钮打开最近文件和播放列表
 - 使用 `Ctrl + S` 保存截图
 - 使用 `Ctrl + 鼠标滚轮` 缩放视频，并按住中键拖动
 - 使用 `I` → `O` → `Ctrl + E` 快速无损裁剪片段
@@ -28,7 +28,7 @@
 ## 🚀 3 步安装
 
 1. 下载最新安装程序：
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
 2. 运行安装程序。
 3. 打开 **Deno Video Player**，把媒体文件拖到窗口中。
 
@@ -57,7 +57,7 @@
 
 ## 📦 便携版
 
-如果不想安装，可以下载 [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip)，解压后运行 `DenoVideoPlayer.exe`。
+如果不想安装，可以下载 [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip)，解压后运行 `DenoVideoPlayer.exe`。
 
 对大多数新手来说，`Setup.exe` 安装版更简单。
 
@@ -73,7 +73,7 @@
 
 打开一个文件后，应用可以把同一文件夹中的附近媒体作为简单播放列表使用。适合检查渲染结果、导出视频、参考素材和下载片段。
 
-从右侧边缘或使用 `P` / `Ctrl + L` 打开播放列表。可按文件名自然排序、最新优先或最早优先；所选顺序会被保留，并用于上一个 / 下一个文件的导航顺序。将鼠标移到左侧边缘可打开最近文件。
+通过工具栏按钮或 `Ctrl + H` 打开最近文件。通过工具栏按钮或 `P` / `Ctrl + L` 打开当前文件夹播放列表。可按文件名自然排序、最新优先或最早优先；所选顺序会被保留，并用于上一个 / 下一个文件的导航顺序。
 
 底部控件包括关闭循环、全部循环、单项循环、随机播放、音量、播放速度和全屏。单击速度值可打开预设，也可以在速度值上滚动鼠标滚轮，以 0.25x 为单位调整。
 
@@ -120,6 +120,7 @@
 | 上一个 / 下一个文件 | `PageUp` / `PageDown` 或 `Ctrl + ←` / `Ctrl + →` |
 | 截图 | `Ctrl + S` |
 | 置顶 | `Ctrl + T` |
+| 最近文件 | `Ctrl + H` |
 | 播放列表 | `P` / `Ctrl + L` |
 | 字幕轨道 | `V` / `Shift + V` |
 | 音频轨道 | `Ctrl + J` |

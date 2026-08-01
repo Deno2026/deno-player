@@ -6,7 +6,7 @@
 
 Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file dan langsung tonton.
 
-**Versi stabil terbaru:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Dirilis 24 Juli 2026
+**Versi stabil terbaru:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Dirilis 2 Agustus 2026
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -16,7 +16,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 
 - Putar media lokal dengan drag-and-drop
 - Otomatis membuat playlist sederhana dari folder yang sama
-- Panel samping dengan hover untuk playlist dan file terbaru
+- Tombol toolbar untuk file terbaru dan playlist
 - Simpan screenshot dengan `Ctrl + S`
 - Zoom video dengan `Ctrl + roda mouse`, lalu geser dengan drag tombol tengah
 - Potong klip secara sederhana dan lossless dengan `I` → `O` → `Ctrl + E`
@@ -28,7 +28,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 ## 🚀 Instal dalam 3 Langkah
 
 1. Unduh installer terbaru:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
 2. Jalankan installer.
 3. Buka **Deno Video Player**, lalu tarik file media ke jendela aplikasi.
 
@@ -57,7 +57,7 @@ Player yang kosong juga menyediakan link untuk mulai menggunakan aplikasi, dan k
 
 ## 📦 Opsi Portable
 
-Jika tidak ingin menginstal, unduh [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
+Jika tidak ingin menginstal, unduh [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
 
 Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 
@@ -73,7 +73,7 @@ Klik dua kali media yang sedang dibuka untuk masuk atau keluar dari fullscreen. 
 
 Saat membuka satu file, aplikasi dapat memakai media lain di folder yang sama sebagai playlist sederhana. Ini berguna untuk memeriksa hasil render, export, referensi, dan klip unduhan.
 
-Buka playlist dari tepi kanan atau dengan `P` / `Ctrl + L`. Urutkan menurut urutan alami nama file, terbaru lebih dulu, atau terlama lebih dulu; urutan yang dipilih akan diingat dan juga mengatur navigasi file sebelumnya atau berikutnya. Arahkan penunjuk ke tepi kiri untuk membuka file terbaru.
+Buka file terbaru dari toolbar atau dengan `Ctrl + H`. Buka playlist folder saat ini dari tombol toolbar atau dengan `P` / `Ctrl + L`. Urutkan menurut urutan alami nama file, terbaru lebih dulu, atau terlama lebih dulu; urutan yang dipilih akan diingat dan juga mengatur navigasi file sebelumnya atau berikutnya.
 
 Kontrol bawah mencakup pengulangan nonaktif, ulangi semua, ulangi satu, shuffle, volume, kecepatan playback, dan fullscreen. Klik nilai kecepatan untuk membuka preset atau putar roda mouse di atasnya untuk perubahan 0,25x.
 
@@ -120,6 +120,7 @@ Bahasa tampilan dapat diubah di **Settings**.
 | File sebelumnya / berikutnya | `PageUp` / `PageDown` atau `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |
 | Always on top | `Ctrl + T` |
+| File terbaru | `Ctrl + H` |
 | Playlist | `P` / `Ctrl + L` |
 | Track subtitle | `V` / `Shift + V` |
 | Track audio | `Ctrl + J` |

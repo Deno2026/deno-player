@@ -2,7 +2,23 @@
 
 Dates are KST (UTC+9).
 
-## Unreleased
+## [0.5.3] - 2026-08-02
+
+### Player UX and responsiveness
+- Replaced automatic left/right edge panels with explicit toolbar buttons and
+  shortcuts. Recent files now use `Ctrl+H`; the playlist keeps `P` / `Ctrl+L`.
+- Kept recent files and the playlist mutually exclusive so they cannot overlap
+  in a narrow player window, and protected rapid close/reopen animations from
+  applying stale layout work.
+- Re-enabled recycling virtualization for recent and playlist rows so opening a
+  panel does not construct every item in a large folder at once.
+
+### Fullscreen and window behavior
+- Keeps fullscreen above the taskbar while Deno Video Player is the foreground
+  application, then releases that temporary priority when switching to another
+  app.
+- Applies the same effective always-on-top state to recent files, the playlist,
+  and owned dialogs without changing the user's saved Always on top setting.
 
 ## [0.5.2] - 2026-07-24
 
