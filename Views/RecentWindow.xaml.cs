@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using DenoVideoPlayer.Models;
 using DenoVideoPlayer.ViewModels;
 
@@ -24,6 +25,7 @@ public partial class RecentWindow : Window
     private long _acceptItemClicksAfterTick;
     private RecentItem? _pressedItem;
     private readonly SlidePanelMotion _motion;
+    private int _showSerial;
 
     public RecentWindow()
     {
@@ -41,7 +43,9 @@ public partial class RecentWindow : Window
     public void ShowSlide()
     {
         if (IsShown) return;
+        var showSerial = ++_showSerial;
         _pressedItem = null;
+        var needsInitialLayout = !IsVisible;
         if (!IsVisible)
         {
             _motion.ResetHidden();
@@ -49,6 +53,24 @@ public partial class RecentWindow : Window
         }
         IsShown = true;
         ShownChanged?.Invoke(true);
+        _acceptItemClicksAfterTick = Environment.TickCount64 + 1000;
+
+        if (needsInitialLayout)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(() => RevealAfterLayout(showSerial)),
+                DispatcherPriority.Loaded);
+            return;
+        }
+
+        RevealAfterLayout(showSerial);
+    }
+
+    private void RevealAfterLayout(int showSerial)
+    {
+        if (showSerial != _showSerial || !IsShown || !IsVisible) return;
+        RecentListBox.InvalidateMeasure();
+        Root.UpdateLayout();
         var revealDurationMs = _motion.Reveal();
         _acceptItemClicksAfterTick = Environment.TickCount64 + revealDurationMs + 40;
     }
@@ -57,6 +79,7 @@ public partial class RecentWindow : Window
     {
         if (!IsShown) return;
         if (_ctxMenuOpenCount > 0) return; // 우클릭 메뉴 열린 동안은 닫지 않음
+        _showSerial++;
         _pressedItem = null;
         IsShown = false;
         ShownChanged?.Invoke(false);
@@ -67,10 +90,9 @@ public partial class RecentWindow : Window
         });
     }
 
-    // PlaylistWindow와 동일: 닫힘 판정은 MainWindow.UpdateHotZones에서 일원화.
-    // HideSlide는 즉시 시작하되 짧은 slide-out으로 자연스럽게 숨긴다.
+    // 패널은 명시적 toggle로 유지한다. 최근 항목을 선택하면 아래 click 경로에서 닫는다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { }
-    private void OnPanelLeave(object sender, MouseEventArgs e) { /* main window가 판정 */ }
+    private void OnPanelLeave(object sender, MouseEventArgs e) { /* explicit toggle */ }
 
     private void OnItemPressed(object sender, MouseButtonEventArgs e)
     {

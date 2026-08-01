@@ -6,7 +6,7 @@
 
 광고 없음. 계정 없음. 클라우드 동기화 없음. 텔레메트리 없음. 파일을 열고 바로 확인하세요.
 
-**최신 안정 버전:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · 2026년 7월 24일 공개
+**최신 안정 버전:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026년 8월 2일 공개
 
 ![Deno Video Player preview](assets/preview.png)
 
@@ -16,7 +16,7 @@
 
 - 로컬 미디어 파일을 드래그 앤 드롭으로 빠르게 재생
 - 같은 폴더의 미디어를 자동으로 간단한 재생목록으로 구성
-- 화면 양쪽 가장자리 hover로 재생목록과 최근 파일 확인
+- 상단 버튼으로 최근 파일과 재생목록 열기
 - `Ctrl + S`로 스크린샷 저장
 - `Ctrl + 마우스 휠`로 영상을 확대하고, 가운데 버튼 드래그로 이동
 - `I` → `O` → `Ctrl + E`로 간단한 무손실 구간 추출
@@ -28,7 +28,7 @@
 ## 🚀 3단계 설치
 
 1. 최신 설치 파일을 받으세요:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
 2. 설치 파일을 실행하세요.
 3. **Deno Video Player**를 열고 미디어 파일을 창에 끌어다 놓으세요.
 
@@ -57,7 +57,7 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 ## 📦 포터블 버전
 
-설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
+설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
 
 초보자에게는 `Setup.exe` 설치 버전을 추천합니다.
 
@@ -73,7 +73,7 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 파일 하나를 열면 같은 폴더의 주변 미디어를 간단한 재생목록처럼 사용할 수 있습니다. 렌더 결과, 다운로드 클립, 레퍼런스 파일을 확인할 때 편합니다.
 
-화면 오른쪽 가장자리 또는 `P` / `Ctrl + L`로 재생목록을 열 수 있습니다. 이름순, 최신순, 오래된순 정렬을 선택하면 다음 실행에도 유지되며 이전/다음 이동 순서에도 함께 적용됩니다. 화면 왼쪽 가장자리에서는 최근 재생을 확인할 수 있습니다.
+상단 버튼 또는 `Ctrl + H`로 최근 파일을 열 수 있습니다. 현재 폴더 재생목록은 상단 버튼 또는 `P` / `Ctrl + L`로 엽니다. 이름순, 최신순, 오래된순 정렬을 선택하면 다음 실행에도 유지되며 이전/다음 이동 순서에도 함께 적용됩니다.
 
 하단 조작부에서는 반복 없음, 전체 반복, 한 항목 반복, 셔플, 음량, 배속, 전체화면을 조작합니다. 배속 값을 클릭하면 프리셋이 열리고, 그 위에서 마우스 휠을 돌리면 0.25x 단위로 바뀝니다.
 
@@ -120,6 +120,7 @@ FFmpeg stream copy 방식이라 빠르고 화질 손실이 없습니다. 다만 
 | 이전 / 다음 파일 | `PageUp` / `PageDown` 또는 `Ctrl + ←` / `Ctrl + →` |
 | 스크린샷 | `Ctrl + S` |
 | 항상 위 | `Ctrl + T` |
+| 최근 파일 | `Ctrl + H` |
 | 재생목록 | `P` / `Ctrl + L` |
 | 자막 트랙 | `V` / `Shift + V` |
 | 오디오 트랙 | `Ctrl + J` |

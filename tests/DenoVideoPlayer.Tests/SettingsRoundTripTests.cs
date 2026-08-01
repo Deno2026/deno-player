@@ -154,6 +154,8 @@ public class SettingsRoundTripTests
             LocalizationService.Apply("ko");
             Assert.Equal("빠른 사용법", LocalizationService.T("HelpHeader"));
             Assert.Contains("F1", LocalizationService.T("TooltipHelp"));
+            Assert.Contains("Ctrl+H", LocalizationService.T("TooltipRecent"));
+            Assert.Contains("Ctrl+H", LocalizationService.T("HelpQuickPanelsBody"));
             Assert.Contains("문제 해결", LocalizationService.T("HelpTroubleshootingHeader"));
             Assert.Contains("FFmpeg", LocalizationService.T("HelpTroubleshootingExport"));
             Assert.Equal("재생 엔진을 사용할 수 없습니다",
@@ -164,6 +166,8 @@ public class SettingsRoundTripTests
             LocalizationService.Apply("en");
             Assert.Equal("Quick guide", LocalizationService.T("HelpHeader"));
             Assert.Contains("F1", LocalizationService.T("TooltipHelp"));
+            Assert.Contains("Ctrl+H", LocalizationService.T("TooltipRecent"));
+            Assert.Contains("Ctrl+H", LocalizationService.T("HelpQuickPanelsBody"));
             Assert.Equal("Troubleshooting",
                 LocalizationService.T("HelpTroubleshootingHeader"));
             Assert.Contains("FFmpeg", LocalizationService.T("HelpTroubleshootingExport"));
@@ -176,6 +180,24 @@ public class SettingsRoundTripTests
         {
             LocalizationService.Apply("ko");
         }
+    }
+
+    [Fact]
+    public void RecentPanelCommandRequestsAnExplicitToggle()
+    {
+        using var viewModel = new MainViewModel(
+            new MpvProcessService(),
+            AppSettings.Defaults());
+        var requested = false;
+        viewModel.RecentToggleRequested += () => requested = true;
+
+        viewModel.ToggleRecentCommand.Execute(null);
+
+        Assert.True(requested);
+        viewModel.SetRecentOpen(true);
+        Assert.True(viewModel.IsRecentOpen);
+        viewModel.SetRecentOpen(false);
+        Assert.False(viewModel.IsRecentOpen);
     }
 
     [Fact]

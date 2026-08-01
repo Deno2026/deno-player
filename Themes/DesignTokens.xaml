@@ -96,7 +96,6 @@
     <sys:Double x:Key="SeekBarHoverHeight">6</sys:Double>
     <sys:Double x:Key="PlaylistDefaultWidth">320</sys:Double>
     <sys:Double x:Key="PlaylistMaxRatio">0.36</sys:Double>
-    <sys:Double x:Key="PlaylistHotZoneWidth">24</sys:Double>
 
     <!-- ▣ Timing (ms) -->
     <sys:Double x:Key="DurationFast">120</sys:Double>
@@ -386,9 +385,14 @@
         <Setter Property="ItemContainerStyle" Value="{StaticResource PlaylistItem}"/>
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <!-- IsVirtualizing=False — owned child window가 처음 show될 때 viewport 0인 상태로
-             items realize 안 되는 케이스 발견 (panel 떴는데 contents 빈 검은 사각형). -->
-        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="False"/>
+        <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+        <!-- 대량 폴더도 보이는 행만 만들고 재사용한다. owned child window의 첫 viewport는
+             각 panel이 Show 직후 layout을 준비해 빈 목록이 되지 않도록 보완한다. -->
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
+        <Setter Property="VirtualizingPanel.CacheLength" Value="1"/>
+        <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
         <!-- ListBox가 ↑↓ 키를 가로채면 Window의 볼륨 단축키가 안 먹음 -->
         <Setter Property="KeyboardNavigation.DirectionalNavigation" Value="None"/>
         <Setter Property="Focusable" Value="False"/>

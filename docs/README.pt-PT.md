@@ -6,7 +6,7 @@
 
 Sem anúncios. Sem conta. Sem sincronização na nuvem. Sem telemetria. Basta abrir um ficheiro e ver.
 
-**Versão estável mais recente:** [v0.5.2](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.2) · Publicada em 24 de julho de 2026
+**Versão estável mais recente:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Publicada em 2 de agosto de 2026
 
 ![Pré-visualização do Deno Video Player](assets/preview.png)
 
@@ -16,7 +16,7 @@ Sem anúncios. Sem conta. Sem sincronização na nuvem. Sem telemetria. Basta ab
 
 - Reprodução rápida de ficheiros multimédia locais por arrastar e largar
 - Cria automaticamente uma lista de reprodução simples com os ficheiros da mesma pasta
-- Painéis laterais ao passar o rato para a lista de reprodução e os ficheiros recentes
+- Botões na barra superior para os ficheiros recentes e a lista de reprodução
 - Capturas de ecrã com `Ctrl + S`
 - Zoom de vídeo com `Ctrl + roda do rato` e deslocamento com arrasto do botão do meio
 - Corte simples e sem perdas com `I` → `O` → `Ctrl + E`
@@ -28,7 +28,7 @@ Sem anúncios. Sem conta. Sem sincronização na nuvem. Sem telemetria. Basta ab
 ## 🚀 Instalar em 3 passos
 
 1. Transfira o instalador mais recente:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
 2. Execute o instalador.
 3. Abra o **Deno Video Player** e arraste um ficheiro multimédia para a janela.
 
@@ -57,7 +57,7 @@ O leitor vazio também inclui uma ligação **New here?**, e as falhas de reprod
 
 ## 📦 Opção portátil
 
-Se preferir não instalar, transfira [DenoVideoPlayer-v0.5.2-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.2/DenoVideoPlayer-v0.5.2-portable-win-x64.zip), extraia o ficheiro e execute `DenoVideoPlayer.exe`.
+Se preferir não instalar, transfira [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip), extraia o ficheiro e execute `DenoVideoPlayer.exe`.
 
 Para a maioria dos principiantes, o instalador `Setup.exe` é a opção mais simples.
 
@@ -73,7 +73,7 @@ Faça duplo clique no conteúdo aberto para entrar ou sair do ecrã inteiro. Qua
 
 Ao abrir um ficheiro, a aplicação pode usar outros ficheiros multimédia da mesma pasta como uma lista de reprodução simples. Isto é útil para verificar renderizações, exportações, referências e clips transferidos.
 
-Abra a lista de reprodução pela margem direita ou com `P` / `Ctrl + L`. Ordene por nome de ficheiro natural, mais recentes primeiro ou mais antigos primeiro; a ordem escolhida é memorizada e também controla a navegação para o ficheiro anterior ou seguinte. Mova o ponteiro até à margem esquerda para abrir os ficheiros recentes.
+Abra os ficheiros recentes pelo botão da barra superior ou com `Ctrl + H`. Abra a lista de reprodução da pasta atual pelo respetivo botão ou com `P` / `Ctrl + L`. Ordene por nome de ficheiro natural, mais recentes primeiro ou mais antigos primeiro; a ordem escolhida é memorizada e também controla a navegação para o ficheiro anterior ou seguinte.
 
 Os controlos inferiores incluem repetição desativada, repetir tudo, repetir um item, aleatório, volume, velocidade de reprodução e ecrã inteiro. Clique no valor da velocidade para abrir os valores predefinidos ou use a roda do rato sobre ele para mudar em passos de 0,25x.
 
@@ -119,6 +119,7 @@ Pode alterar o idioma de apresentação em **Settings**.
 | Ficheiro anterior / seguinte | `PageUp` / `PageDown` ou `Ctrl + ←` / `Ctrl + →` |
 | Captura de ecrã | `Ctrl + S` |
 | Sempre visível | `Ctrl + T` |
+| Ficheiros recentes | `Ctrl + H` |
 | Lista de reprodução | `P` / `Ctrl + L` |
 | Faixa de legendas | `V` / `Shift + V` |
 | Faixa de áudio | `Ctrl + J` |

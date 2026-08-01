@@ -17,9 +17,9 @@
     <Company>DENO</Company>
     <Copyright>Copyright © DENO 2026</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Version>0.5.2</Version>
-    <FileVersion>0.5.2.0</FileVersion>
-    <InformationalVersion>0.5.2</InformationalVersion>
+    <Version>0.5.3</Version>
+    <FileVersion>0.5.3.0</FileVersion>
+    <InformationalVersion>0.5.3</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <NeutralLanguage>ko-KR</NeutralLanguage>
     <Platforms>x64</Platforms>
@@ -59,13 +59,14 @@
     <Resource Include="icon.ico" />
   </ItemGroup>
 
-  <!-- tests 폴더는 별도 프로젝트(tests/DenoVideoPlayer.Tests) — 메인 csproj가 자동으로 끌어들이지 않게 -->
+  <!-- tests 폴더는 별도 프로젝트이고 out은 로컬 검증 산출물이다.
+       SDK 기본 glob이 둘을 제품 source로 다시 컴파일/패키징하지 않게 한다. -->
   <ItemGroup>
-    <Compile Remove="tests\**" />
-    <Page Remove="tests\**" />
-    <Resource Remove="tests\**" />
-    <None Remove="tests\**" />
-    <EmbeddedResource Remove="tests\**" />
+    <Compile Remove="tests\**;out\**" />
+    <Page Remove="tests\**;out\**" />
+    <Resource Remove="tests\**;out\**" />
+    <None Remove="tests\**;out\**" />
+    <EmbeddedResource Remove="tests\**;out\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Velopack" Version="1.2.0" />

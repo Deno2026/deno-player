@@ -39,6 +39,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>잠깐 띄울 OSD toast. 스크린샷 저장 같은 짧은 confirm용.</summary>
     public event Action<string>? Toast;
     public event Action<UpdatePromptRequest>? UpdatePromptRequested;
+    public event Action? RecentToggleRequested;
     public event Action? PlaylistToggleRequested;
     public event Action? PlaylistOrderChanged;
 
@@ -52,6 +53,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _muted = Settings.Muted;
         _speed = Settings.PlaybackRate;
         _playlistSort = Settings.PlaylistSort;
+        _isRecentOpen = false;
         _isPlaylistOpen = false;
         _repeat = Settings.RepeatMode is >= 0 and <= 2 ? (RepeatMode)Settings.RepeatMode : RepeatMode.None;
         _shuffle = Settings.Shuffle;
@@ -80,6 +82,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         });
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
+        ToggleRecentCommand = new RelayCommand(() => RecentToggleRequested?.Invoke());
         TogglePlaylistCommand = new RelayCommand(() => PlaylistToggleRequested?.Invoke());
         SetPlaylistSortCommand = new RelayCommand(parameter =>
         {
@@ -750,6 +753,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (Set(ref _isAlwaysOnTop, value)) Settings.AlwaysOnTop = value; }
     }
 
+    private bool _isRecentOpen;
+    public bool IsRecentOpen
+    {
+        get => _isRecentOpen;
+        private set => Set(ref _isRecentOpen, value);
+    }
+    public void SetRecentOpen(bool open) => IsRecentOpen = open;
+
     private bool _isPlaylistOpen;
     public bool IsPlaylistOpen
     {
@@ -873,6 +884,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand ExitFullscreenCommand { get; }
     public RelayCommand ScreenshotCommand { get; }
     public RelayCommand AlwaysOnTopCommand { get; }
+    public RelayCommand ToggleRecentCommand { get; }
     public RelayCommand TogglePlaylistCommand { get; }
     public RelayCommand SetPlaylistSortCommand { get; }
     public RelayCommand CycleRepeatCommand { get; }
@@ -1797,8 +1809,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 case "dheight":
                     if (TryGetDouble(value, out var dh)) SetVideoDisplayHeight(dh);
                     break;
-                // mouse-pos observe 폐기 — MainWindow의 GetCursorPos polling이 mouse 활동
-                // 감지 + hot zone trigger 둘 다 담당. mpv 좌표계 신뢰 못 함.
+                // mouse-pos observe 폐기 — MainWindow의 GetCursorPos polling이 fullscreen
+                // mouse 활동과 native video 입력을 담당. mpv 좌표계는 신뢰하지 않는다.
             }
         });
     }
