@@ -8,9 +8,9 @@ Sem anúncios. Sem conta. Sem sincronização na nuvem. Sem telemetria. Basta ab
 
 **Versão estável mais recente:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Publicada em 2 de agosto de 2026
 
-![Pré-visualização do Deno Video Player](assets/preview.png)
+![Deno Video Player a reproduzir um vídeo de exemplo com legendas](assets/playback-preview.png)
 
-*A captura de ecrã está em coreano. A interface da aplicação está disponível em inglês e coreano.*
+*Reprodução real com legendas de um vídeo de exemplo criado pela DENO. A interface da aplicação está disponível em inglês e coreano. [Ecrã do primeiro arranque](assets/preview.png).*
 
 ## ✨ Porque é útil
 

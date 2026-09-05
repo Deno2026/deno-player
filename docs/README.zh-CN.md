@@ -8,9 +8,9 @@
 
 **最新稳定版:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026 年 8 月 2 日发布
 
-![Deno Video Player preview](assets/preview.png)
+![Deno Video Player 播放示例视频和字幕的画面](assets/playback-preview.png)
 
-*截图显示的是韩语界面。应用界面支持英语和韩语。*
+*实际播放 DENO 制作的示例视频和字幕的画面。应用界面支持英语和韩语。[查看首次启动画面](assets/preview.png)。*
 
 ## ✨ 为什么好用
 

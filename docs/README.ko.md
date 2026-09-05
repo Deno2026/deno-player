@@ -8,9 +8,9 @@
 
 **최신 안정 버전:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026년 8월 2일 공개
 
-![Deno Video Player preview](assets/preview.png)
+![Deno Video Player에서 샘플 영상과 자막을 재생하는 화면](assets/playback-preview.png)
 
-*위 화면은 한국어 UI입니다. 앱 UI는 한국어와 영어를 지원합니다.*
+*DENO가 만든 샘플 영상과 자막을 실제로 재생한 화면입니다. 앱 UI는 한국어와 영어를 지원합니다. [첫 실행 화면 보기](assets/preview.png).*
 
 ## ✨ 이런 점이 좋아요
 

@@ -8,9 +8,9 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 
 **Versi stabil terbaru:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Dirilis 2 Agustus 2026
 
-![Deno Video Player preview](assets/preview.png)
+![Deno Video Player memutar video contoh dengan subtitle](assets/playback-preview.png)
 
-*Tangkapan layar ditampilkan dalam bahasa Korea. Antarmuka aplikasi tersedia dalam bahasa Inggris dan Korea.*
+*Pemutaran nyata video contoh buatan DENO dengan subtitle. Antarmuka aplikasi tersedia dalam bahasa Inggris dan Korea. [Layar saat pertama kali dijalankan](assets/preview.png).*
 
 ## ✨ Kenapa Berguna
 

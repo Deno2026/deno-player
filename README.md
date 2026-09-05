@@ -8,9 +8,9 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 **Latest stable:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Published August 2, 2026
 
-![Deno Video Player preview](docs/assets/preview.png)
+![Deno Video Player playing a sample clip with subtitles](docs/assets/playback-preview.png)
 
-*Screenshot shown in Korean. The app interface supports English and Korean.*
+*Actual playback with subtitles, using a DENO-created sample clip. The app interface supports English and Korean. [First-launch screen](docs/assets/preview.png).*
 
 ## ✨ Why It’s Useful
 

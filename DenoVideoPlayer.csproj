@@ -43,7 +43,7 @@
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
     <!-- 사용자 설치용 파일들 — dotnet publish 시 output 폴더에 함께 복사 -->
-    <None Include="START_HERE.bat;UNINSTALL.bat;README.md;CHANGELOG.md;LICENSE;NOTICE.md;docs\README.*.md;docs\assets\preview.png">
+    <None Include="START_HERE.bat;UNINSTALL.bat;README.md;CHANGELOG.md;LICENSE;NOTICE.md;docs\README.*.md;docs\assets\preview.png;docs\assets\playback-preview.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
