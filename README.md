@@ -1,6 +1,6 @@
 # Deno Video Player
 
-🌐 English | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [简体中文](docs/README.zh-CN.md) | [Español](docs/README.es.md) | [Português (Portugal)](docs/README.pt-PT.md) | [Português (Brasil)](docs/README.pt-BR.md) | [Bahasa Indonesia](docs/README.id.md)
+English | [Korean](docs/README.ko.md) | [Japanese](docs/README.ja.md) | [Simplified Chinese](docs/README.zh-CN.md) | [Spanish](docs/README.es.md) | [Portuguese (Portugal)](docs/README.pt-PT.md) | [Portuguese (Brazil)](docs/README.pt-BR.md) | [Indonesian](docs/README.id.md)
 
 **A clean Windows media player for quickly checking local video, audio, images, and subtitles.**
 
@@ -10,7 +10,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 ![Deno Video Player playing a sample clip with subtitles](docs/assets/playback-preview.png)
 
-*Actual playback with subtitles, using a DENO-created sample clip. The app interface supports English and Korean. [First-launch screen](docs/assets/preview.png).*
+*Actual playback with subtitles, using a Deno-created sample clip. The app interface supports English and Korean. [First-launch screen](docs/assets/preview.png).*
 
 ## ✨ Why It’s Useful
 
