@@ -16,7 +16,7 @@ Sem anúncios. Sem conta. Sem sincronização na nuvem. Sem telemetria. Basta ab
 
 - Reprodução rápida de ficheiros multimédia locais por arrastar e largar
 - Cria automaticamente uma lista de reprodução simples com os ficheiros da mesma pasta
-- Botões na barra superior para os ficheiros recentes e a lista de reprodução
+- Botões na barra superior e pegas finas no centro das margens para os ficheiros recentes e a lista de reprodução
 - Capturas de ecrã com `Ctrl + S`
 - Zoom de vídeo com `Ctrl + roda do rato` e deslocamento com arrasto do botão do meio
 - Corte simples e sem perdas com `I` → `O` → `Ctrl + E`
@@ -67,13 +67,15 @@ Para a maioria dos principiantes, o instalador `Setup.exe` é a opção mais sim
 
 Abra vídeos, áudio, imagens ou vídeos com legendas sem criar uma biblioteca pesada. O Deno Video Player é focado em verificar ficheiros locais com rapidez.
 
-Faça duplo clique no conteúdo aberto para entrar ou sair do ecrã inteiro. Quando o leitor está vazio, o duplo clique abre o seletor de ficheiros; enquanto a multimédia está a carregar ou após uma falha de reprodução, não faz nada.
+`F`, o duplo clique na área de visualização ou na barra de título e os botões de tamanho nos cantos superior e inferior direitos fazem o mesmo: uma janela normal passa a ecrã inteiro; uma janela em ecrã inteiro ou maximizada pelo Windows regressa ao tamanho normal anterior. Também funciona com o leitor vazio, durante o carregamento ou após uma falha de reprodução. Para abrir multimédia, utilize **Abrir ficheiro** / **Abrir pasta**, `Ctrl + O` ou arraste e largue.
 
 ### Explorar a mesma pasta
 
 Ao abrir um ficheiro, a aplicação pode usar outros ficheiros multimédia da mesma pasta como uma lista de reprodução simples. Isto é útil para verificar renderizações, exportações, referências e clips transferidos.
 
 Abra os ficheiros recentes pelo botão da barra superior ou com `Ctrl + H`. Abra a lista de reprodução da pasta atual pelo respetivo botão ou com `P` / `Ctrl + L`. Ordene por nome de ficheiro natural, mais recentes primeiro ou mais antigos primeiro; a ordem escolhida é memorizada e também controla a navegação para o ficheiro anterior ou seguinte.
+
+Para uma consulta rápida, coloque o cursor sobre a pega fina no centro da margem esquerda para ver os ficheiros recentes, ou da margem direita para a lista de reprodução. Estes painéis fecham quando o cursor sai tanto da pega como do painel. Os painéis abertos por um botão ou atalho ficam abertos até os fechar ou mudar de painel.
 
 Os controlos inferiores incluem repetição desativada, repetir tudo, repetir um item, aleatório, volume, velocidade de reprodução e ecrã inteiro. Clique no valor da velocidade para abrir os valores predefinidos ou use a roda do rato sobre ele para mudar em passos de 0,25x.
 
@@ -114,7 +116,7 @@ Pode alterar o idioma de apresentação em **Settings**.
 | Volume | `↑` / `↓` ou roda do rato |
 | Zoom / deslocamento do vídeo | `Ctrl + roda do rato` / arrastar com o botão do meio |
 | Silenciar | `M` |
-| Ecrã inteiro | `F` / `F11` / `Enter` / `Alt + Enter` / duplo clique no conteúdo aberto |
+| Ecrã inteiro / restaurar janela | `F` / `F11` / `Enter` / `Alt + Enter` / duplo clique na área de visualização ou na barra de título |
 | Sair do ecrã inteiro | `Esc` |
 | Ficheiro anterior / seguinte | `PageUp` / `PageDown` ou `Ctrl + ←` / `Ctrl + →` |
 | Captura de ecrã | `Ctrl + S` |

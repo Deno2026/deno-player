@@ -16,7 +16,7 @@ Sin anuncios. Sin cuenta. Sin sincronización en la nube. Sin telemetría. Abre 
 
 - Reproduce archivos locales con solo arrastrar y soltar
 - Crea automáticamente una lista sencilla con los medios de la misma carpeta
-- Botones en la barra superior para archivos recientes y lista de reproducción
+- Botones en la barra superior y tiradores finos en el centro de los bordes para archivos recientes y lista de reproducción
 - Capturas de pantalla con `Ctrl + S`
 - Zoom de video con `Ctrl + rueda del mouse` y desplazamiento arrastrando el botón central
 - Recorte simple y sin pérdida con `I` → `O` → `Ctrl + E`
@@ -67,13 +67,15 @@ Para la mayoría de principiantes, el instalador `Setup.exe` es la opción más 
 
 Abre videos, audio, imágenes o videos con subtítulos sin convertirlos en una biblioteca pesada. Deno Video Player está pensado para revisar archivos locales con rapidez.
 
-Haz doble clic en el contenido multimedia abierto para entrar o salir de pantalla completa. Cuando el reproductor está vacío, el doble clic abre el selector de archivos; mientras se carga el contenido o después de un fallo de reproducción, no hace nada.
+`F`, el doble clic en el área de visualización o la barra de título y los botones de tamaño de las esquinas superior e inferior derechas hacen lo mismo: una ventana normal pasa a pantalla completa; una ventana en pantalla completa o maximizada por Windows vuelve a su tamaño normal anterior. También funciona con el reproductor vacío, durante la carga o tras un fallo de reproducción. Para abrir contenido, usa **Abrir archivo** / **Abrir carpeta**, `Ctrl + O` o arrastrar y soltar.
 
 ### Explorar la misma carpeta
 
 Al abrir un archivo, la app puede usar los otros medios cercanos de la misma carpeta como una lista simple. Es útil para revisar renders, exportaciones, referencias y clips descargados.
 
 Abre los archivos recientes desde la barra superior o con `Ctrl + H`. Abre la lista de reproducción de la carpeta actual desde su botón o con `P` / `Ctrl + L`. Ordénala por nombre de archivo con orden natural, más recientes primero o más antiguos primero; el orden elegido se recuerda y también controla la navegación al archivo anterior o siguiente.
+
+Para consultar rápidamente, pasa el cursor sobre el tirador fino del centro del borde izquierdo para ver los archivos recientes, o sobre el derecho para la lista de reproducción. Estos paneles emergentes se cierran al alejar el cursor tanto del tirador como del panel. Los paneles abiertos con un botón o atajo permanecen abiertos hasta que los cierres o cambies de panel.
 
 Los controles inferiores incluyen repetición desactivada, repetir todo, repetir uno, reproducción aleatoria, volumen, velocidad de reproducción y pantalla completa. Haz clic en el valor de velocidad para ver los ajustes predefinidos o usa la rueda del mouse sobre él para cambiar en pasos de 0,25x.
 
@@ -115,7 +117,7 @@ Puedes cambiar el idioma en **Settings**.
 | Volumen | `↑` / `↓` o rueda del mouse |
 | Zoom / desplazamiento de video | `Ctrl + rueda del mouse` / arrastrar con botón central |
 | Silenciar | `M` |
-| Pantalla completa | `F` / `F11` / `Enter` / `Alt + Enter` / doble clic en el contenido multimedia abierto |
+| Pantalla completa / restaurar ventana | `F` / `F11` / `Enter` / `Alt + Enter` / doble clic en el área de visualización o la barra de título |
 | Salir de pantalla completa | `Esc` |
 | Archivo anterior / siguiente | `PageUp` / `PageDown` o `Ctrl + ←` / `Ctrl + →` |
 | Captura de pantalla | `Ctrl + S` |

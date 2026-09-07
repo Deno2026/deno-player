@@ -16,7 +16,7 @@ No ads. No account. No cloud sync. No telemetry. Just open a file and watch.
 
 - Fast drag-and-drop playback for local media files
 - Automatically builds a playlist from the same folder
-- Explicit toolbar buttons for recent files and the playlist
+- Toolbar buttons and slim center-edge handles for recent files and the playlist
 - Screenshots with `Ctrl + S`
 - Video zoom with `Ctrl + mouse wheel`, then pan with middle-button drag
 - Simple lossless clip trimming with `I` → `O` → `Ctrl + E`
@@ -67,13 +67,15 @@ For most beginners, the `Setup.exe` installer is the easier choice.
 
 Drop a video, audio file, image, or subtitle-friendly video into the player. Deno Video Player focuses on fast local review, not library management.
 
-Double-click the open media to enter or exit fullscreen. When the player is empty, double-click opens the file picker; while media is loading or after playback fails, double-click does nothing.
+`F`, a double-click in the viewing area or title bar, and the upper/lower-right size buttons all share one action: a normal window enters fullscreen; fullscreen or a Windows-maximized window returns to its previous normal size. This also works with an empty player, while loading, or after playback fails. To open media, use **Open file** / **Open folder**, `Ctrl + O`, or drag and drop.
 
 ### Browse the Same Folder
 
 When you open one file, the app can use nearby media files in the same folder as a simple playlist. This is useful for checking renders, exports, references, and downloaded clips.
 
 Open Recent files from the toolbar or with `Ctrl + H`. Open the current-folder playlist from its toolbar button or with `P` / `Ctrl + L`. Sort it by natural file name, newest first, or oldest first; the selected order is remembered and also controls previous/next navigation.
+
+For a quick look, hover the slim handle at the center of the left edge for Recent files or the right edge for the playlist. These pop-up panels close when you move away from both the handle and panel. Panels opened with a toolbar button or shortcut stay open until you close or switch them.
 
 The bottom controls include repeat off, repeat all, repeat one, shuffle, volume, playback speed, and fullscreen. Click the speed value for presets or use the mouse wheel over it for 0.25x changes.
 
@@ -117,7 +119,7 @@ You can change the display language in **Settings**.
 | Volume | `↑` / `↓` or mouse wheel |
 | Video zoom / pan | `Ctrl + mouse wheel` / middle-button drag |
 | Mute | `M` |
-| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / double-click the open media |
+| Fullscreen / restore window | `F` / `F11` / `Enter` / `Alt + Enter` / double-click the viewing area or title bar |
 | Exit fullscreen | `Esc` |
 | Previous / next file | `PageUp` / `PageDown` or `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |

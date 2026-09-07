@@ -42,6 +42,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public event Action? RecentToggleRequested;
     public event Action? PlaylistToggleRequested;
     public event Action? PlaylistOrderChanged;
+    public event Action? FullscreenToggleRequested;
+    public event Action? WindowRestoreRequested;
 
     public MainViewModel(MpvProcessService mpvProc, AppSettings? startupSettings = null)
     {
@@ -73,12 +75,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OpenCommand      = new RelayCommand(OpenDialog);
         OpenFolderCommand = new RelayCommand(OpenFolderDialog);
         MuteCommand      = new RelayCommand(() => IsMuted = !IsMuted);
-        FullscreenCommand= new RelayCommand(() => IsFullscreen = !IsFullscreen);
+        FullscreenCommand= new RelayCommand(() => FullscreenToggleRequested?.Invoke());
         ExitFullscreenCommand = new RelayCommand(() =>
         {
             // ESC 우선순위: 편집 모드 > 풀스크린. 둘 다 활성이면 편집 모드만 빠짐.
             if (IsTrimMode) { CancelTrimModeCommand?.Execute(null); return; }
-            if (IsFullscreen) IsFullscreen = false;
+            WindowRestoreRequested?.Invoke();
         });
         ScreenshotCommand= new RelayCommand(TakeScreenshot);
         AlwaysOnTopCommand=new RelayCommand(() => IsAlwaysOnTop = !IsAlwaysOnTop);
@@ -657,6 +659,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private bool _isFullscreen;
     public bool IsFullscreen { get => _isFullscreen; set => Set(ref _isFullscreen, value); }
+    private bool _isWindowExpanded;
+    public bool IsWindowExpanded { get => _isWindowExpanded; set => Set(ref _isWindowExpanded, value); }
 
     // 자동 update 후보. UpdaterService.CheckAsync가 새 버전 발견 시 채워줌.
     // UI: TopBar에 update button visible 여부 binding.

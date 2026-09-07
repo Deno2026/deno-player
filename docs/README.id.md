@@ -16,7 +16,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 
 - Putar media lokal dengan drag-and-drop
 - Otomatis membuat playlist sederhana dari folder yang sama
-- Tombol toolbar untuk file terbaru dan playlist
+- Tombol toolbar dan pegangan tipis di tengah tepi kiri/kanan untuk file terbaru dan playlist
 - Simpan screenshot dengan `Ctrl + S`
 - Zoom video dengan `Ctrl + roda mouse`, lalu geser dengan drag tombol tengah
 - Potong klip secara sederhana dan lossless dengan `I` → `O` → `Ctrl + E`
@@ -67,13 +67,15 @@ Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 
 Buka video, audio, gambar, atau video dengan subtitle tanpa manajemen library yang berat. Deno Video Player fokus pada pemeriksaan file lokal yang cepat.
 
-Klik dua kali media yang sedang dibuka untuk masuk atau keluar dari fullscreen. Saat player kosong, klik dua kali membuka pemilih file; selama media dimuat atau setelah playback gagal, tindakan ini tidak melakukan apa pun.
+`F`, klik dua kali area tampilan atau bilah judul, dan tombol ukuran di kanan atas/bawah memiliki tindakan yang sama: jendela normal masuk ke fullscreen; fullscreen atau jendela yang dimaksimalkan oleh Windows kembali ke ukuran normal sebelumnya. Ini juga berlaku saat player kosong, sedang memuat, atau setelah playback gagal. Untuk membuka media, gunakan **Buka file** / **Buka folder**, `Ctrl + O`, atau seret dan lepas.
 
 ### Menjelajah Folder yang Sama
 
 Saat membuka satu file, aplikasi dapat memakai media lain di folder yang sama sebagai playlist sederhana. Ini berguna untuk memeriksa hasil render, export, referensi, dan klip unduhan.
 
 Buka file terbaru dari toolbar atau dengan `Ctrl + H`. Buka playlist folder saat ini dari tombol toolbar atau dengan `P` / `Ctrl + L`. Urutkan menurut urutan alami nama file, terbaru lebih dulu, atau terlama lebih dulu; urutan yang dipilih akan diingat dan juga mengatur navigasi file sebelumnya atau berikutnya.
+
+Untuk melihat sekilas, arahkan kursor ke pegangan tipis di tengah tepi kiri untuk file terbaru, atau tepi kanan untuk playlist. Panel pop-up menutup saat kursor meninggalkan pegangan dan panel. Panel yang dibuka melalui tombol toolbar atau pintasan tetap terbuka sampai Anda menutup atau beralih panel.
 
 Kontrol bawah mencakup pengulangan nonaktif, ulangi semua, ulangi satu, shuffle, volume, kecepatan playback, dan fullscreen. Klik nilai kecepatan untuk membuka preset atau putar roda mouse di atasnya untuk perubahan 0,25x.
 
@@ -115,7 +117,7 @@ Bahasa tampilan dapat diubah di **Settings**.
 | Volume | `↑` / `↓` atau roda mouse |
 | Zoom / geser video | `Ctrl + roda mouse` / drag tombol tengah |
 | Mute | `M` |
-| Fullscreen | `F` / `F11` / `Enter` / `Alt + Enter` / klik dua kali pada media yang terbuka |
+| Fullscreen / pulihkan ukuran jendela | `F` / `F11` / `Enter` / `Alt + Enter` / klik dua kali area tampilan atau bilah judul |
 | Keluar fullscreen | `Esc` |
 | File sebelumnya / berikutnya | `PageUp` / `PageDown` atau `Ctrl + ←` / `Ctrl + →` |
 | Screenshot | `Ctrl + S` |

@@ -16,10 +16,29 @@
         Focusable="True"
         WindowStyle="None"
         ResizeMode="CanResize"
-        MouseDoubleClick="OnRootDoubleClick"
         FocusManager.FocusedElement="{Binding RelativeSource={RelativeSource Self}}">
 
     <Window.Resources>
+        <Style x:Key="EdgePanelHandle" TargetType="Button">
+            <Setter Property="Width" Value="{x:Static vm:EdgePanelHoverController.HandleWidth}"/>
+            <Setter Property="Height" Value="{x:Static vm:EdgePanelHoverController.HandleHeight}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource BrushFgMuted}"/>
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <Border Width="3" CornerRadius="1.5"
+                                    HorizontalAlignment="Center"
+                                    Background="{TemplateBinding Foreground}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <h:BoolToVisibilityConverter x:Key="BoolVis"/>
         <h:BoolToVisibilityConverter x:Key="BoolVisHidden" WhenFalse="Hidden"/>
         <h:BoolToVisibilityConverter x:Key="BoolVisInverse" Invert="True"/>
@@ -324,11 +343,13 @@
 
         <!-- ============================================================
              메인 영역: 영상이 전체를 차지. 최근 파일과 재생목록은 상단의 명시적
-             버튼 또는 단축키로 여는 별도 owned window다.
+             버튼·단축키 또는 중앙 손잡이로 여는 별도 owned window다.
              ============================================================ -->
-        <Grid x:Name="MediaLayer" Grid.Row="1" Panel.ZIndex="0">
+        <Grid x:Name="MediaLayer" Grid.Row="1" Panel.ZIndex="0" Background="Transparent">
             <!-- 영상 호스트 + 오버레이들 -->
-            <Grid ClipToBounds="True">
+            <!-- Fixed gutters keep native video HWND airspace away from the handles.
+                 The viewport never changes size when a side panel opens. -->
+            <Grid ClipToBounds="True" Margin="4,0">
                 <!-- 영상 — 비디오/이미지일 때만 Visible. 오디오/NoFile/Failed일 땐 Hidden -->
                 <Border x:Name="VideoHostContainer"
                         Background="#FF050705"
@@ -802,7 +823,7 @@
 
                         <Button x:Name="BottomFullscreenBtn"
                                 Style="{StaticResource IconButton}"
-                                Content="{Binding IsFullscreen, Converter={StaticResource FsIcon}}"
+                                Content="{Binding IsWindowExpanded, Converter={StaticResource FsIcon}}"
                                 Foreground="{StaticResource BrushAccent}"
                                 Margin="2,0,0,0"
                                 ToolTip="{DynamicResource TooltipFullscreen}"
@@ -854,5 +875,18 @@
                 </Border>
             </Grid>
         </Border>
+        <!-- Fixed at the window midpoint, even when fullscreen chrome is hidden. -->
+        <Button x:Name="RecentEdgeHandle" Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="30"
+                Style="{StaticResource EdgePanelHandle}" HorizontalAlignment="Left"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                ToolTip="{DynamicResource TooltipRecent}"
+                AutomationProperties.Name="{DynamicResource TooltipRecent}"
+                Click="OnRecentEdgeHandleClick"/>
+        <Button x:Name="PlaylistEdgeHandle" Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="30"
+                Style="{StaticResource EdgePanelHandle}" HorizontalAlignment="Right"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                ToolTip="{DynamicResource TooltipPlaylist}"
+                AutomationProperties.Name="{DynamicResource TooltipPlaylist}"
+                Click="OnPlaylistEdgeHandleClick"/>
     </Grid>
 </Window>

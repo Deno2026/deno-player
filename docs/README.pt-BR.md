@@ -16,7 +16,7 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 
 - Reproduz mídia local com arrastar e soltar
 - Cria automaticamente uma lista simples com arquivos da mesma pasta
-- Botões na barra superior para arquivos recentes e playlist
+- Botões na barra superior e alças finas no centro das bordas para arquivos recentes e playlist
 - Capturas de tela com `Ctrl + S`
 - Zoom do vídeo com `Ctrl + roda do mouse` e movimento arrastando o botão do meio
 - Corte simples e sem perda com `I` → `O` → `Ctrl + E`
@@ -67,13 +67,15 @@ Para a maioria dos iniciantes, o `Setup.exe` é a opção mais fácil.
 
 Abra vídeos, áudio, imagens ou vídeos com legenda sem criar uma biblioteca pesada. O Deno Video Player é focado em revisar arquivos locais com rapidez.
 
-Clique duas vezes na mídia aberta para entrar ou sair da tela cheia. Quando o player está vazio, o clique duplo abre o seletor de arquivos; enquanto a mídia está carregando ou após uma falha de reprodução, ele não faz nada.
+`F`, o clique duplo na área de exibição ou na barra de título e os botões de tamanho nos cantos superior e inferior direitos fazem a mesma coisa: uma janela normal entra em tela cheia; uma janela em tela cheia ou maximizada pelo Windows volta ao tamanho normal anterior. Isso também funciona com o player vazio, durante o carregamento ou após uma falha de reprodução. Para abrir mídia, use **Abrir arquivo** / **Abrir pasta**, `Ctrl + O` ou arraste e solte.
 
 ### Navegar pela mesma pasta
 
 Ao abrir um arquivo, o app pode usar outros arquivos de mídia da mesma pasta como uma playlist simples. Isso ajuda a revisar renders, exportações, referências e clipes baixados.
 
 Abra os arquivos recentes pela barra superior ou com `Ctrl + H`. Abra a playlist da pasta atual pelo botão correspondente ou com `P` / `Ctrl + L`. Ordene por nome de arquivo em ordem natural, mais recentes primeiro ou mais antigos primeiro; a ordem escolhida é lembrada e também controla a navegação para o arquivo anterior ou seguinte.
+
+Para uma consulta rápida, passe o cursor sobre a alça fina no centro da borda esquerda para ver arquivos recentes, ou da borda direita para a playlist. Esses painéis pop-up fecham quando o cursor sai tanto da alça quanto do painel. Painéis abertos por um botão ou atalho ficam abertos até você fechá-los ou trocar de painel.
 
 Os controles inferiores incluem repetição desativada, repetir tudo, repetir um item, ordem aleatória, volume, velocidade de reprodução e tela cheia. Clique no valor da velocidade para abrir os ajustes predefinidos ou use a roda do mouse sobre ele para mudar em passos de 0,25x.
 
@@ -115,7 +117,7 @@ Você pode mudar o idioma em **Settings**.
 | Volume | `↑` / `↓` ou roda do mouse |
 | Zoom / movimento do vídeo | `Ctrl + roda do mouse` / arrastar com botão do meio |
 | Mudo | `M` |
-| Tela cheia | `F` / `F11` / `Enter` / `Alt + Enter` / clique duplo na mídia aberta |
+| Tela cheia / restaurar janela | `F` / `F11` / `Enter` / `Alt + Enter` / clique duplo na área de exibição ou na barra de título |
 | Sair da tela cheia | `Esc` |
 | Arquivo anterior / próximo | `PageUp` / `PageDown` ou `Ctrl + ←` / `Ctrl + →` |
 | Captura de tela | `Ctrl + S` |

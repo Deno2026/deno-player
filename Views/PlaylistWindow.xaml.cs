@@ -109,7 +109,7 @@ internal sealed class SlidePanelMotion
 /// <summary>
 /// 메인 윈도우에 owned된 별도 child Window. WPF Popup과 달리 owner와 z-order가
 /// 묶이고 owner가 비활성/최소화/닫힘 시 같이 사라져서 다른 앱 위로 새는 문제가 없다.
-/// 상단 버튼 또는 단축키로 여는 우측 재생목록 overlay다.
+/// 중앙 손잡이 hover, 상단 버튼 또는 단축키로 여는 우측 재생목록 overlay다.
 /// </summary>
 public partial class PlaylistWindow : Window
 {
@@ -134,6 +134,8 @@ public partial class PlaylistWindow : Window
     // popup window라 IsMouseOver=false 됨 → 메인 polling이 닫으려고 함. 그 사이에
     // 사용자가 메뉴 항목 클릭하려는데 패널이 사라져버림.
     private int _ctxMenuOpenCount;
+    public bool IsInteractionActive => _ctxMenuOpenCount > 0 ||
+        PlaylistSortButton.ContextMenu?.IsOpen == true || IsMouseCaptureWithin;
     private long _acceptItemClicksAfterTick;
     private MediaItem? _pressedItem;
     private readonly SlidePanelMotion _motion;
@@ -214,8 +216,8 @@ public partial class PlaylistWindow : Window
         });
     }
 
-    // 패널은 명시적 toggle로 유지한다. enter/leave는 ContextMenu와 기존 XAML
-    // 이벤트 호환을 위해 남기고 자동 닫기에는 사용하지 않는다.
+    // Hover 자동 닫기는 MainWindow가 담당한다. enter/leave는 ContextMenu와
+    // 기존 XAML 이벤트 호환을 위해 남긴다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { /* keep shown */ }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* explicit toggle */ }
 
