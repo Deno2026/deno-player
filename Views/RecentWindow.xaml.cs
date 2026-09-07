@@ -22,6 +22,7 @@ public partial class RecentWindow : Window
     // ContextMenu open count — PlaylistWindow와 동일 패턴. 우클릭 메뉴 떴을 때
     // 메인 polling이 IsMouseOver=false라 닫지 않게.
     private int _ctxMenuOpenCount;
+    public bool IsInteractionActive => _ctxMenuOpenCount > 0 || IsMouseCaptureWithin;
     private long _acceptItemClicksAfterTick;
     private RecentItem? _pressedItem;
     private readonly SlidePanelMotion _motion;
@@ -90,7 +91,7 @@ public partial class RecentWindow : Window
         });
     }
 
-    // 패널은 명시적 toggle로 유지한다. 최근 항목을 선택하면 아래 click 경로에서 닫는다.
+    // Hover 자동 닫기는 MainWindow가 담당한다. 최근 항목 선택 시에도 닫는다.
     private void OnPanelEnter(object sender, MouseEventArgs e) { }
     private void OnPanelLeave(object sender, MouseEventArgs e) { /* explicit toggle */ }
 

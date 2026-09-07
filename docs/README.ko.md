@@ -6,7 +6,7 @@
 
 광고 없음. 계정 없음. 클라우드 동기화 없음. 텔레메트리 없음. 파일을 열고 바로 확인하세요.
 
-**최신 안정 버전:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026년 8월 2일 공개
+**최신 안정 버전:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · 2026년 9월 7일 공개
 
 ![Deno Video Player에서 샘플 영상과 자막을 재생하는 화면](assets/playback-preview.png)
 
@@ -16,7 +16,7 @@
 
 - 로컬 미디어 파일을 드래그 앤 드롭으로 빠르게 재생
 - 같은 폴더의 미디어를 자동으로 간단한 재생목록으로 구성
-- 상단 버튼으로 최근 파일과 재생목록 열기
+- 상단 버튼이나 좌우 중앙의 얇은 손잡이로 최근 파일과 재생목록 열기
 - `Ctrl + S`로 스크린샷 저장
 - `Ctrl + 마우스 휠`로 영상을 확대하고, 가운데 버튼 드래그로 이동
 - `I` → `O` → `Ctrl + E`로 간단한 무손실 구간 추출
@@ -28,13 +28,13 @@
 ## 🚀 3단계 설치
 
 1. 최신 설치 파일을 받으세요:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
-2. 설치 파일을 실행하세요.
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
+2. 받은 `DenoVideoPlayer-win-Setup.exe`를 더블클릭해 설치하세요.
 3. **Deno Video Player**를 열고 미디어 파일을 창에 끌어다 놓으세요.
 
-첫 실행 때 필요한 재생 엔진을 준비합니다. 보통 처음 한 번만 진행됩니다.
+압축 해제, 회원가입, 별도 코덱 설치는 필요 없습니다. 첫 실행 때 필요한 재생 도구를 자동으로 준비하므로 인터넷에 연결한 상태로 잠시 기다려 주세요.
 
-Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인지 확인한 뒤 **More info** → **Run anyway**로 진행하면 됩니다.
+아직 코드 서명되지 않은 앱이므로 Windows SmartScreen의 ‘인식할 수 없는 앱’ 경고가 나타날 수 있습니다. 공식 GitHub Releases에서 받은 파일인지 확인하고 신뢰하는 경우에만 **추가 정보 → 실행**을 선택하세요. 악성코드 탐지 등 다른 경고가 나오면 진행하지 말고 확인해 주세요. 보안 기능을 끌 필요는 없습니다.
 
 ### 시스템 요구사항
 
@@ -57,7 +57,7 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 ## 📦 포터블 버전
 
-설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
+설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
 
 초보자에게는 `Setup.exe` 설치 버전을 추천합니다.
 
@@ -67,13 +67,15 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 영상, 오디오, 이미지, 자막이 있는 영상을 빠르게 열 수 있습니다. Deno Video Player는 무거운 라이브러리 관리보다 로컬 파일 확인에 집중합니다.
 
-미디어가 열린 상태에서 더블클릭하면 전체화면을 전환합니다. 빈 화면을 더블클릭하면 파일 열기가 실행되며, 미디어 로딩 중이거나 재생 실패 상태에서는 동작하지 않습니다.
+`F`, 화면·제목줄 더블클릭, 우측 상·하단의 크기 버튼은 모두 같은 동작입니다. 일반 창에서는 전체화면으로, 전체화면이나 Windows 최대화 상태에서는 이전의 일반 창 크기로 돌아옵니다. 빈 화면·로딩 중·재생 실패 상태에서도 같습니다. 파일을 열려면 **파일 열기** / **폴더 열기** 버튼, `Ctrl + O`, 끌어다 놓기를 사용하세요.
 
 ### 같은 폴더 탐색
 
 파일 하나를 열면 같은 폴더의 주변 미디어를 간단한 재생목록처럼 사용할 수 있습니다. 렌더 결과, 다운로드 클립, 레퍼런스 파일을 확인할 때 편합니다.
 
 상단 버튼 또는 `Ctrl + H`로 최근 파일을 열 수 있습니다. 현재 폴더 재생목록은 상단 버튼 또는 `P` / `Ctrl + L`로 엽니다. 이름순, 최신순, 오래된순 정렬을 선택하면 다음 실행에도 유지되며 이전/다음 이동 순서에도 함께 적용됩니다.
+
+잠깐 확인하려면 왼쪽 가장자리 중앙의 얇은 손잡이에 마우스를 올려 최근 파일을, 오른쪽 손잡이로 재생목록을 여세요. 손잡이와 패널을 모두 벗어나면 닫힙니다. 상단 버튼이나 단축키로 연 패널은 직접 닫거나 다른 패널로 바꿀 때까지 유지됩니다.
 
 하단 조작부에서는 반복 없음, 전체 반복, 한 항목 반복, 셔플, 음량, 배속, 전체화면을 조작합니다. 배속 값을 클릭하면 프리셋이 열리고, 그 위에서 마우스 휠을 돌리면 0.25x 단위로 바뀝니다.
 
@@ -115,7 +117,7 @@ FFmpeg stream copy 방식이라 빠르고 화질 손실이 없습니다. 다만 
 | 볼륨 | `↑` / `↓` 또는 마우스 휠 |
 | 영상 확대 / 이동 | `Ctrl + 마우스 휠` / 가운데 버튼 드래그 |
 | 음소거 | `M` |
-| 전체화면 | `F` / `F11` / `Enter` / `Alt + Enter` / 열린 미디어 더블클릭 |
+| 전체화면 / 원래 창 크기 | `F` / `F11` / `Enter` / `Alt + Enter` / 화면·제목줄 더블클릭 |
 | 전체화면 해제 | `Esc` |
 | 이전 / 다음 파일 | `PageUp` / `PageDown` 또는 `Ctrl + ←` / `Ctrl + →` |
 | 스크린샷 | `Ctrl + S` |

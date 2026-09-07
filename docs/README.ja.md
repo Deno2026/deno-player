@@ -6,7 +6,7 @@
 
 広告なし。アカウント不要。クラウド同期なし。テレメトリなし。ファイルを開いて、すぐに確認できます。
 
-**最新の安定版:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026 年 8 月 2 日公開
+**最新の安定版:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · 2026 年 9 月 7 日公開
 
 ![Deno Video Playerでサンプル動画と字幕を再生している画面](assets/playback-preview.png)
 
@@ -16,7 +16,7 @@
 
 - ローカルメディアをドラッグ＆ドロップですばやく再生
 - 同じフォルダ内のメディアを自動で簡易プレイリスト化
-- ツールバーボタンで最近使ったファイルやプレイリストを表示
+- ツールバーボタンや左右の端の中央にある細いハンドルで最近使ったファイルやプレイリストを表示
 - `Ctrl + S` でスクリーンショット保存
 - `Ctrl + マウスホイール` で動画を拡大し、中ボタンドラッグで移動
 - `I` → `O` → `Ctrl + E` で簡単なロスレス切り出し
@@ -28,7 +28,7 @@
 ## 🚀 3 ステップでインストール
 
 1. 最新のインストーラーをダウンロード:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
 2. インストーラーを実行します。
 3. **Deno Video Player** を開き、メディアファイルをウィンドウにドラッグ＆ドロップします。
 
@@ -57,7 +57,7 @@ Windows SmartScreen が表示された場合は、公式 GitHub Releases から�
 
 ## 📦 ポータブル版
 
-インストールせずに使いたい場合は、[DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip) をダウンロードし、解凍して `DenoVideoPlayer.exe` を実行してください。
+インストールせずに使いたい場合は、[DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip) をダウンロードし、解凍して `DenoVideoPlayer.exe` を実行してください。
 
 はじめて使う方には `Setup.exe` 版がおすすめです。
 
@@ -67,13 +67,15 @@ Windows SmartScreen が表示された場合は、公式 GitHub Releases から�
 
 動画、音声、画像、字幕付き動画をすぐに開けます。Deno Video Player は重いライブラリ管理ではなく、ローカルファイルの確認に集中しています。
 
-開いているメディアをダブルクリックすると、フルスクリーンを切り替えられます。プレイヤーが空のときはファイル選択ダイアログが開き、メディアの読み込み中または再生失敗後は何も起こりません。
+`F`、表示領域やタイトルバーのダブルクリック、右上・右下のサイズ切り替えボタンはすべて同じ動作です。通常のウィンドウからはフルスクリーンに、フルスクリーンまたは Windows の最大化状態からは元の通常サイズに戻ります。空の画面、読み込み中、再生失敗後も同じです。ファイルを開くには、**ファイルを開く** / **フォルダーを開く**、`Ctrl + O`、またはドラッグ＆ドロップを使ってください。
 
 ### 同じフォルダをそのまま確認
 
 1 つのファイルを開くと、同じフォルダにあるメディアを簡易プレイリストとして扱えます。レンダー結果、書き出し動画、参考素材の確認に便利です。
 
 最近使ったファイルはツールバーボタンまたは `Ctrl + H` で開けます。現在のフォルダのプレイリストはツールバーボタンまたは `P` / `Ctrl + L` で開きます。ファイル名の自然順、新しい順、古い順で並べ替えでき、選んだ順序は次回も保持され、前 / 次のファイルへの移動順にも反映されます。
+
+一時的に確認するには、左端中央の細いハンドルにマウスを重ねると最近使ったファイル、右側ではプレイリストが開きます。ハンドルとパネルの両方からマウスを離すと閉じます。ツールバーボタンやショートカットで開いたパネルは、閉じるか別のパネルに切り替えるまで表示されます。
 
 下部のコントロールでは、リピートなし、全体リピート、1 項目リピート、シャッフル、音量、再生速度、フルスクリーンを操作できます。速度の値をクリックするとプリセットが開き、その上でマウスホイールを回すと 0.25x 刻みで変更できます。
 
@@ -115,7 +117,7 @@ FFmpeg の stream copy を使うため、高速で画質劣化もありません
 | 音量 | `↑` / `↓` またはマウスホイール |
 | 動画の拡大 / 移動 | `Ctrl + マウスホイール` / 中ボタンドラッグ |
 | ミュート | `M` |
-| フルスクリーン | `F` / `F11` / `Enter` / `Alt + Enter` / 開いているメディアをダブルクリック |
+| フルスクリーン / 元のウィンドウサイズ | `F` / `F11` / `Enter` / `Alt + Enter` / 表示領域やタイトルバーをダブルクリック |
 | フルスクリーン解除 | `Esc` |
 | 前 / 次のファイル | `PageUp` / `PageDown` または `Ctrl + ←` / `Ctrl + →` |
 | スクリーンショット | `Ctrl + S` |

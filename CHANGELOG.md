@@ -2,6 +2,30 @@
 
 Dates are KST (UTC+9).
 
+## [0.5.4] - 2026-09-07
+
+### Fullscreen input reliability
+- Give fullscreen shortcuts, viewing-area/title-bar double-clicks, and both
+  size buttons one action: normal window to fullscreen; fullscreen or a
+  Windows-maximized window back to its previous normal size.
+- Ignore held-key repeats for fullscreen shortcuts, and accept fresh media
+  double-clicks immediately while deduplicating the same native/WPF input.
+- Allow viewing-area double-clicks to toggle size when empty, loading, or after
+  playback failure. Opening files remains on the explicit buttons and shortcuts.
+- Restore normal window bounds synchronously so a delayed resize
+  cannot undo a later minimize or fullscreen action.
+
+### Center-edge panel handles
+- Add slim handles at the center of the left and right edges: hover to open
+  Recent files or the playlist, then move away from both the handle and panel
+  to close the pop-up. Context menus and dragging keep the panel open.
+- Keep toolbar and shortcut access for panels that stay open, and retain
+  virtualized lists for folders with many files.
+- Give the thin handles a more forgiving hover area and highlight them as soon
+  as the pointer enters that area, before the panel opens.
+- Close hover-opened panels after a short exit grace with a quick, smooth slide;
+  returning to the handle or panel during the grace period keeps it open.
+
 ## [0.5.3] - 2026-08-02
 
 ### Player UX and responsiveness

@@ -40,7 +40,6 @@ public static class PlayerFailurePolicy
 public enum PlayerDoubleClickAction
 {
     None,
-    OpenFile,
     ToggleFullscreen
 }
 
@@ -48,15 +47,11 @@ public static class PlayerInteractionPolicy
 {
     public static PlayerDoubleClickAction DoubleClickAction(
         PlayerState state,
-        bool hasMedia)
+        bool hasMedia,
+        bool isFullscreen = false)
     {
-        if (state == PlayerState.NoFile)
-            return PlayerDoubleClickAction.OpenFile;
-        if (!hasMedia)
-            return PlayerDoubleClickAction.None;
-
-        return state is PlayerState.Ready or PlayerState.Playing or PlayerState.Paused
-            ? PlayerDoubleClickAction.ToggleFullscreen
-            : PlayerDoubleClickAction.None;
+        // Screen size is independent of playback readiness. Opening a file stays
+        // on explicit Open controls/Ctrl+O, even on the empty player surface.
+        return PlayerDoubleClickAction.ToggleFullscreen;
     }
 }

@@ -72,6 +72,9 @@ public sealed class Win32VideoHost : HwndHost
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    private static extern int GetMessageTime();
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
@@ -159,7 +162,7 @@ public sealed class Win32VideoHost : HwndHost
     private int _lastTransformHeight = int.MinValue;
 
     public IntPtr Hwnd { get; private set; }
-    public event Action? DoubleClicked;
+    public event Action<uint>? DoubleClicked;
     public event Action? ActivationRequested;
     public event Action? MiddleButtonDown;
     public event Action? MiddleButtonMove;
@@ -255,7 +258,7 @@ public sealed class Win32VideoHost : HwndHost
         if (msg == WM_LBUTTONDBLCLK)
         {
             handled = true;
-            DoubleClicked?.Invoke();
+            DoubleClicked?.Invoke(unchecked((uint)GetMessageTime()));
             return IntPtr.Zero;
         }
         if (msg == WM_MBUTTONDOWN)

@@ -110,23 +110,40 @@ public sealed class UserSafetyRegressionTests : IDisposable
     }
 
     [Theory]
-    [InlineData(PlayerState.NoFile, false, PlayerDoubleClickAction.OpenFile)]
-    [InlineData(PlayerState.NoFile, true, PlayerDoubleClickAction.OpenFile)]
-    [InlineData(PlayerState.Loading, false, PlayerDoubleClickAction.None)]
-    [InlineData(PlayerState.Loading, true, PlayerDoubleClickAction.None)]
-    [InlineData(PlayerState.Dragging, true, PlayerDoubleClickAction.None)]
-    [InlineData(PlayerState.Failed, false, PlayerDoubleClickAction.None)]
-    [InlineData(PlayerState.Failed, true, PlayerDoubleClickAction.None)]
+    [InlineData(PlayerState.NoFile, false, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.NoFile, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Loading, false, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Loading, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Dragging, false, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Dragging, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Failed, false, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Failed, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Ready, false, PlayerDoubleClickAction.ToggleFullscreen)]
     [InlineData(PlayerState.Ready, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Playing, false, PlayerDoubleClickAction.ToggleFullscreen)]
     [InlineData(PlayerState.Playing, true, PlayerDoubleClickAction.ToggleFullscreen)]
+    [InlineData(PlayerState.Paused, false, PlayerDoubleClickAction.ToggleFullscreen)]
     [InlineData(PlayerState.Paused, true, PlayerDoubleClickAction.ToggleFullscreen)]
-    public void DoubleClickActionRespectsPlayerState(
+    public void ScreenDoubleClickIsIndependentOfPlayerState(
         PlayerState state,
         bool hasMedia,
         PlayerDoubleClickAction expected)
     {
         Assert.Equal(expected,
             PlayerInteractionPolicy.DoubleClickAction(state, hasMedia));
+    }
+
+    [Theory]
+    [InlineData(PlayerState.NoFile, false)]
+    [InlineData(PlayerState.Loading, true)]
+    [InlineData(PlayerState.Failed, true)]
+    [InlineData(PlayerState.Failed, false)]
+    [InlineData(PlayerState.Dragging, true)]
+    [InlineData(PlayerState.Playing, true)]
+    public void FullscreenExitDoesNotDependOnPlaybackReadiness(PlayerState state, bool hasMedia)
+    {
+        Assert.Equal(PlayerDoubleClickAction.ToggleFullscreen,
+            PlayerInteractionPolicy.DoubleClickAction(state, hasMedia, isFullscreen: true));
     }
 
     [Fact]
