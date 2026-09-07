@@ -6,7 +6,7 @@
 
 Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um arquivo e assista.
 
-**Versão estável mais recente:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Publicada em 2 de agosto de 2026
+**Versão estável mais recente:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · Publicada em 7 de setembro de 2026
 
 ![Deno Video Player reproduzindo um vídeo de exemplo com legendas](assets/playback-preview.png)
 
@@ -28,7 +28,7 @@ Sem anúncios. Sem conta. Sem sincronização em nuvem. Sem telemetria. Abra um 
 ## 🚀 Instale em 3 passos
 
 1. Baixe o instalador mais recente:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
 2. Execute o instalador.
 3. Abra o **Deno Video Player** e arraste um arquivo de mídia para a janela.
 
@@ -57,7 +57,7 @@ O player vazio também inclui um link de primeiros passos, e as falhas de reprod
 
 ## 📦 Opção portátil
 
-Se você prefere não instalar, baixe [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip), extraia o arquivo e execute `DenoVideoPlayer.exe`.
+Se você prefere não instalar, baixe [DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip), extraia o arquivo e execute `DenoVideoPlayer.exe`.
 
 Para a maioria dos iniciantes, o `Setup.exe` é a opção mais fácil.
 

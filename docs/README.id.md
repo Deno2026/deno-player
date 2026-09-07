@@ -6,7 +6,7 @@
 
 Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file dan langsung tonton.
 
-**Versi stabil terbaru:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · Dirilis 2 Agustus 2026
+**Versi stabil terbaru:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · Dirilis 7 September 2026
 
 ![Deno Video Player memutar video contoh dengan subtitle](assets/playback-preview.png)
 
@@ -28,7 +28,7 @@ Tanpa iklan. Tanpa akun. Tanpa sinkronisasi cloud. Tanpa telemetri. Buka file da
 ## 🚀 Instal dalam 3 Langkah
 
 1. Unduh installer terbaru:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
 2. Jalankan installer.
 3. Buka **Deno Video Player**, lalu tarik file media ke jendela aplikasi.
 
@@ -57,7 +57,7 @@ Player yang kosong juga menyediakan link untuk mulai menggunakan aplikasi, dan k
 
 ## 📦 Opsi Portable
 
-Jika tidak ingin menginstal, unduh [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
+Jika tidak ingin menginstal, unduh [DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip), ekstrak, lalu jalankan `DenoVideoPlayer.exe`.
 
 Untuk kebanyakan pemula, installer `Setup.exe` adalah pilihan yang lebih mudah.
 

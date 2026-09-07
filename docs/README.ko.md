@@ -6,7 +6,7 @@
 
 광고 없음. 계정 없음. 클라우드 동기화 없음. 텔레메트리 없음. 파일을 열고 바로 확인하세요.
 
-**최신 안정 버전:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026년 8월 2일 공개
+**최신 안정 버전:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · 2026년 9월 7일 공개
 
 ![Deno Video Player에서 샘플 영상과 자막을 재생하는 화면](assets/playback-preview.png)
 
@@ -28,13 +28,13 @@
 ## 🚀 3단계 설치
 
 1. 최신 설치 파일을 받으세요:
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
-2. 설치 파일을 실행하세요.
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
+2. 받은 `DenoVideoPlayer-win-Setup.exe`를 더블클릭해 설치하세요.
 3. **Deno Video Player**를 열고 미디어 파일을 창에 끌어다 놓으세요.
 
-첫 실행 때 필요한 재생 엔진을 준비합니다. 보통 처음 한 번만 진행됩니다.
+압축 해제, 회원가입, 별도 코덱 설치는 필요 없습니다. 첫 실행 때 필요한 재생 도구를 자동으로 준비하므로 인터넷에 연결한 상태로 잠시 기다려 주세요.
 
-Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인지 확인한 뒤 **More info** → **Run anyway**로 진행하면 됩니다.
+아직 코드 서명되지 않은 앱이므로 Windows SmartScreen의 ‘인식할 수 없는 앱’ 경고가 나타날 수 있습니다. 공식 GitHub Releases에서 받은 파일인지 확인하고 신뢰하는 경우에만 **추가 정보 → 실행**을 선택하세요. 악성코드 탐지 등 다른 경고가 나오면 진행하지 말고 확인해 주세요. 보안 기능을 끌 필요는 없습니다.
 
 ### 시스템 요구사항
 
@@ -57,7 +57,7 @@ Windows SmartScreen이 보이면 공식 GitHub Releases에서 받은 파일인�
 
 ## 📦 포터블 버전
 
-설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
+설치 없이 쓰고 싶다면 [DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip)을 받아 압축을 풀고 `DenoVideoPlayer.exe`를 실행하세요.
 
 초보자에게는 `Setup.exe` 설치 버전을 추천합니다.
 

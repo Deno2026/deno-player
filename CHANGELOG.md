@@ -2,7 +2,7 @@
 
 Dates are KST (UTC+9).
 
-## [Unreleased]
+## [0.5.4] - 2026-09-07
 
 ### Fullscreen input reliability
 - Give fullscreen shortcuts, viewing-area/title-bar double-clicks, and both
@@ -21,6 +21,10 @@ Dates are KST (UTC+9).
   to close the pop-up. Context menus and dragging keep the panel open.
 - Keep toolbar and shortcut access for panels that stay open, and retain
   virtualized lists for folders with many files.
+- Give the thin handles a more forgiving hover area and highlight them as soon
+  as the pointer enters that area, before the panel opens.
+- Close hover-opened panels after a short exit grace with a quick, smooth slide;
+  returning to the handle or panel during the grace period keeps it open.
 
 ## [0.5.3] - 2026-08-02
 

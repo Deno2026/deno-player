@@ -6,7 +6,7 @@
 
 无广告。无需账号。无云同步。无遥测。打开文件，即可观看。
 
-**最新稳定版:** [v0.5.3](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.3) · 2026 年 8 月 2 日发布
+**最新稳定版:** [v0.5.4](https://github.com/Deno2026/deno-video-player/releases/tag/v0.5.4) · 2026 年 9 月 7 日发布
 
 ![Deno Video Player 播放示例视频和字幕的画面](assets/playback-preview.png)
 
@@ -28,7 +28,7 @@
 ## 🚀 3 步安装
 
 1. 下载最新安装程序：
-   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-win-Setup.exe)
+   [DenoVideoPlayer-win-Setup.exe](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-win-Setup.exe)
 2. 运行安装程序。
 3. 打开 **Deno Video Player**，把媒体文件拖到窗口中。
 
@@ -57,7 +57,7 @@
 
 ## 📦 便携版
 
-如果不想安装，可以下载 [DenoVideoPlayer-v0.5.3-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.3/DenoVideoPlayer-v0.5.3-portable-win-x64.zip)，解压后运行 `DenoVideoPlayer.exe`。
+如果不想安装，可以下载 [DenoVideoPlayer-v0.5.4-portable-win-x64.zip](https://github.com/Deno2026/deno-video-player/releases/download/v0.5.4/DenoVideoPlayer-v0.5.4-portable-win-x64.zip)，解压后运行 `DenoVideoPlayer.exe`。
 
 对大多数新手来说，`Setup.exe` 安装版更简单。
 
